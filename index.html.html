@@ -3898,61 +3898,84 @@ function buscarIMEIVenta(val){
 }
 
 async function buscarIMEICredito(val){
-  if(val.length<5){$('crdIMEIInfo').style.display='none';return;}
+  if(val.length < 5){ $('crdIMEIInfo').style.display='none'; return; }
 
-  // Buscar primero en memoria local
-  let found = db.compras.find(c=>
-    (c.imei1||'').includes(val)||(c.imei2||'').includes(val)||
-    (c.serial||'').toLowerCase().includes(val.toLowerCase())
-  );
+  try {
+    // Buscar SIEMPRE en Supabase para garantizar datos frescos
+    // Intentar por imei1, imei2 y serial
+    let rows = [];
 
-  // Si no está en memoria, buscar directo en Supabase
-  if(!found) {
-    try {
-      const res = await sbFetch('productos', {
-        filter: `imei1=ilike.*${val}*&estado=eq.DISPONIBLE`,
-        select: 'id,producto,marca,modelo,imei1,imei2,serial,valor_compra,sede_id,proveedor_id'
-      });
-      if(res && res.length > 0) {
-        const p = res[0];
-        found = {
-          id: p.id,
-          producto: p.producto,
-          imei1: p.imei1||'',
-          imei2: p.imei2||'',
-          serial: p.serial||'',
-          valorCompra: parseFloat(p.valor_compra)||0,
-          sede: p.sede_id===1?'LOCAL PEREIRA':'LOCAL ARMENIA',
-          proveedorId: p.proveedor_id
-        };
-      }
-    } catch(e) { console.error('Error buscando IMEI:', e); }
-  }
+    const r1 = await sbFetch('productos', {
+      filter: `imei1=ilike.*${val}*`,
+      select: 'id,producto,imei1,imei2,serial,valor_compra,sede_id,proveedor_id'
+    }).catch(()=>[]);
+    if(r1 && r1.length) rows = r1;
 
-  if(found){
-    const prov = db.proveedores.find(p=>p.id===found.proveedorId);
-    $('crdIMEIInfo').style.display='block';
-    $('crdInfoProducto').textContent = found.producto;
-    $('crdInfoProveedor').textContent = prov?prov.nombre:'—';
-    $('crdInfoCosto').textContent = fmt(found.valorCompra);
-    $('crdInfoSede').textContent = found.sede;
-    $('crdInfoIMEI').textContent = found.imei1||found.serial||'—';
-    $('crdEquipo').value = found.producto;
-    $('crdIMEI').value = found.imei1||found.serial||'';
-    // Llenar costo automáticamente
-    const costoEl = $('crdCosto');
-    if(costoEl) {
-      costoEl.value = found.valorCompra;
+    if(!rows.length) {
+      const r2 = await sbFetch('productos', {
+        filter: `imei2=ilike.*${val}*`,
+        select: 'id,producto,imei1,imei2,serial,valor_compra,sede_id,proveedor_id'
+      }).catch(()=>[]);
+      if(r2 && r2.length) rows = r2;
+    }
+
+    if(!rows.length) {
+      const r3 = await sbFetch('productos', {
+        filter: `serial=ilike.*${val}*`,
+        select: 'id,producto,imei1,imei2,serial,valor_compra,sede_id,proveedor_id'
+      }).catch(()=>[]);
+      if(r3 && r3.length) rows = r3;
+    }
+
+    if(rows.length > 0) {
+      const p = rows[0];
+      const costo = parseFloat(p.valor_compra) || 0;
+      const sedeNombre = p.sede_id===1 ? 'LOCAL PEREIRA' : p.sede_id===2 ? 'LOCAL ARMENIA' : '—';
+      const prov = db.proveedores.find(x => x.id === p.proveedor_id);
+
+      // Mostrar info encontrada
+      $('crdIMEIInfo').style.display = 'block';
+      $('crdInfoProducto').textContent = p.producto || '—';
+      $('crdInfoProveedor').textContent = prov ? prov.nombre : '—';
+      $('crdInfoCosto').textContent = fmt(costo);
+      $('crdInfoSede').textContent = sedeNombre;
+      $('crdInfoIMEI').textContent = p.imei1 || p.serial || '—';
+
+      // Llenar campos del formulario
+      $('crdEquipo').value = p.producto || '';
+      $('crdIMEI').value = p.imei1 || p.serial || '';
+
+      // COSTO — llenar y resaltar en verde
+      const costoEl = $('crdCosto');
+      costoEl.value = costo;
       costoEl.style.background = '#f0fdf4';
       costoEl.style.borderColor = '#16a34a';
+
+      // Precio venta sugerido con 45% margen
+      $('crdVentaBase').value = Math.round(costo / 0.55);
+
+      recalcCredito();
+      toast('✅ ' + p.producto + ' — Costo: ' + fmt(costo));
+    } else {
+      $('crdIMEIInfo').style.display = 'none';
+      // Intentar en memoria local como fallback
+      const local = db.compras.find(c=>
+        (c.imei1||'').includes(val)||(c.imei2||'').includes(val)||
+        (c.serial||'').toLowerCase().includes(val.toLowerCase())
+      );
+      if(local && local.valorCompra > 0) {
+        $('crdEquipo').value = local.producto;
+        $('crdIMEI').value = local.imei1 || local.serial || '';
+        $('crdCosto').value = local.valorCompra;
+        $('crdCosto').style.background = '#f0fdf4';
+        $('crdVentaBase').value = Math.round(local.valorCompra / 0.55);
+        recalcCredito();
+        toast('✅ ' + local.producto + ' — Costo: ' + fmt(local.valorCompra));
+      }
     }
-    // Sugerir precio de venta con 45% margen
-    const precio = Math.round(found.valorCompra / 0.55);
-    if($('crdVentaBase')) $('crdVentaBase').value = precio;
-    recalcCredito();
-    toast('✅ ' + found.producto + ' — Costo: ' + fmt(found.valorCompra));
-  } else {
-    $('crdIMEIInfo').style.display='none';
+  } catch(e) {
+    console.error('Error buscando IMEI:', e);
+    toast('Error buscando el IMEI', 'error');
   }
 }
 
