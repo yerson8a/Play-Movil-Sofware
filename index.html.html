@@ -2820,7 +2820,8 @@ async function guardarVentaDB(datos) {
   try {
     const sedeId = datos.sede && datos.sede.includes('ARMENIA') ? 2 : 1;
     const row = {
-      producto: datos.equipo,
+      producto: datos.equipo || null,
+      imei: datos.imei || null,
       cliente: datos.cliente,
       cedula_cliente: datos.cedula || null,
       telefono_cliente: datos.telefono || null,
