@@ -3944,16 +3944,29 @@ async function buscarIMEICredito(val){
       $('crdInfoSede').textContent = sedeNombre;
       $('crdInfoIMEI').textContent = p.imei1 || p.serial || '—';
 
-      $('crdEquipo').value = p.producto || '';
-      $('crdIMEI').value = p.imei1 || p.serial || '';
+      // Usar getElementById directo para garantizar que encuentra los campos
+      const elEquipo   = document.getElementById('crdEquipo');
+      const elIMEI     = document.getElementById('crdIMEI');
+      const elCosto    = document.getElementById('crdCosto');
+      const elVentaBase= document.getElementById('crdVentaBase');
 
-      const costoEl = $('crdCosto');
-      costoEl.value = costo;
-      costoEl.style.background = '#f0fdf4';
-      costoEl.style.borderColor = '#16a34a';
+      if(elEquipo)    elEquipo.value    = p.producto || '';
+      if(elIMEI)      elIMEI.value      = p.imei1 || p.serial || '';
 
-      $('crdVentaBase').value = Math.round(costo / 0.55);
-      recalcCredito();
+      if(elCosto) {
+        elCosto.value            = costo;
+        elCosto.style.background = '#f0fdf4';
+        elCosto.style.borderColor= '#16a34a';
+        // Disparar evento input para que recalcCredito se entere
+        elCosto.dispatchEvent(new Event('input'));
+      }
+
+      if(elVentaBase) {
+        elVentaBase.value = Math.round(costo / 0.55);
+        elVentaBase.dispatchEvent(new Event('input'));
+      }
+
+      setTimeout(()=>recalcCredito(), 50);
       toast('✅ ' + p.producto + ' — Costo: ' + fmt(costo));
 
     } else {
