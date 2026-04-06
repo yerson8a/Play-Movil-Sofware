@@ -1595,231 +1595,381 @@
 
 <!-- Modal Nuevo Crédito / Venta -->
 <div class="modal-overlay" id="modalNuevoCredito">
-  <div class="modal" style="max-width:860px;">
+  <div class="modal" style="max-width:900px;">
     <div class="modal-header">
       <div class="modal-title">🤝 Registrar Venta a Crédito</div>
       <button class="modal-close" onclick="closeModal('modalNuevoCredito')">✕</button>
     </div>
 
     <!-- Buscar IMEI -->
-    <div class="card" style="margin-bottom:16px;border:2px solid var(--border);">
+    <div class="card" style="margin-bottom:14px;border:2px solid #ece8f5;">
       <div class="card-title" style="font-size:13px;margin-bottom:10px;">📡 Buscar Producto por IMEI / Serial</div>
       <div class="search-wrap">
         <span class="search-icon">📡</span>
-        <input type="text" class="form-control" id="crdIMEIBusca" placeholder="Escribe o escanea el IMEI / Serial para cargar datos automáticamente..." oninput="buscarIMEICredito(this.value)" style="padding-left:40px;">
+        <input type="text" class="form-control" id="crdIMEIBusca" placeholder="Escribe o escanea el IMEI para cargar datos automáticamente..." oninput="buscarIMEICredito(this.value)" style="padding-left:40px;">
       </div>
       <div id="crdIMEIInfo" style="margin-top:10px;display:none;">
-        <div style="background:rgba(0,230,118,0.08);border:1px solid rgba(0,230,118,0.2);border-radius:10px;padding:12px;display:flex;gap:20px;flex-wrap:wrap;font-size:13px;">
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px;display:flex;gap:20px;flex-wrap:wrap;font-size:13px;">
           <div>📱 <strong id="crdInfoProducto">—</strong></div>
           <div>🏭 Proveedor: <strong id="crdInfoProveedor">—</strong></div>
-          <div>💲 Costo: <strong style="color:var(--pink);" id="crdInfoCosto">—</strong></div>
+          <div>💲 Costo: <strong style="color:#6B2D8B;" id="crdInfoCosto">—</strong></div>
           <div>🏠 Sede: <strong id="crdInfoSede">—</strong></div>
-          <div>📡 IMEI: <strong style="color:var(--blue);font-family:monospace;" id="crdInfoIMEI">—</strong></div>
+          <div>📡 IMEI: <strong style="color:#0066cc;font-family:monospace;" id="crdInfoIMEI">—</strong></div>
         </div>
       </div>
     </div>
 
-    <!-- Datos del equipo -->
-    <div class="card" style="margin-bottom:16px;">
-      <div class="card-title" style="font-size:14px;margin-bottom:12px;">📱 Datos del Equipo</div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Modelo *</label>
-          <input type="text" class="form-control" id="crdEquipo" placeholder="Se llena automáticamente con el IMEI" oninput="recalcCredito()">
-        </div>
-        <div class="form-group">
-          <label class="form-label">IMEI Principal</label>
-          <input type="text" class="form-control" id="crdIMEI" placeholder="IMEI">
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Valor Costo (P.L) *</label>
-          <input type="number" class="form-control" id="crdCosto" placeholder="0" oninput="recalcCredito()">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Precio Base de Venta *</label>
-          <input type="number" class="form-control" id="crdVentaBase" placeholder="Se calcula con 45% margen" oninput="recalcCredito()">
-        </div>
-      </div>
-    </div>
+    <div class="form-row" style="gap:14px;">
 
-    <!-- Ajustes de precio -->
-    <div class="card" style="margin-bottom:16px;">
-      <div class="card-title" style="font-size:13px;margin-bottom:12px;">💰 Ajustes de Precio</div>
-      <div class="form-row-3">
-        <div class="form-group">
-          <label class="form-label">IVA (%)</label>
-          <select class="form-control" id="crdIVA" onchange="recalcCredito()">
-            <option value="0">Sin IVA (0%)</option>
-            <option value="5">IVA 5%</option>
-            <option value="19">IVA 19%</option>
-          </select>
-          <div style="font-size:11px;color:var(--text2);margin-top:4px;">Valor IVA: <span id="crdIVAval" style="color:var(--orange);">$0</span></div>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Descuento ($)</label>
-          <input type="number" class="form-control" id="crdDescuento" placeholder="0" oninput="recalcCredito()" min="0">
-          <div style="font-size:11px;color:var(--text2);margin-top:4px;">Desc %: <span id="crdDescPct" style="color:var(--yellow);">0%</span></div>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Comisión Financiera (%)</label>
-          <input type="number" class="form-control" id="crdComFinanciera" placeholder="0" oninput="recalcCredito()" min="0" max="100" step="0.5">
-          <div style="font-size:11px;color:var(--text2);margin-top:4px;">Valor com: <span id="crdComFinVal" style="color:var(--red);">$0</span></div>
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Financiera</label>
-          <select class="form-control" id="crdFinanciera" onchange="autoComisionCredito()">
-            <option value="CONTADO:0">💵 CONTADO (0%)</option>
-            <option value="EFECTIVO:0">💵 EFECTIVO (0%)</option>
-            <option value="CREDIYA:8">🤝 CREDIYA (8%)</option>
-            <option value="ADDI:10">🤝 ADDI (10%)</option>
-            <option value="BRILLA:9">🤝 BRILLA (9%)</option>
-            <option value="SISTICREDITO:7">🤝 SISTICREDITO (7%)</option>
-            <option value="PAY JOY:12">🤝 PAY JOY (12%)</option>
-            <option value="BANCO BOGOTÁ:6">🏦 BANCO BOGOTÁ (6%)</option>
-            <option value="CREDIPLAY:8">🤝 CREDIPLAY (8%)</option>
-            <option value="ICONS:10">🤝 ICONS (10%)</option>
-            <option value="WOMPI:5">💳 WOMPI (5%)</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Tipo de Cliente</label>
-          <select class="form-control" id="crdTipo" onchange="recalcCredito()">
-            <option value="normal">Cliente Normal</option>
-            <option value="reportado">Reportado (requiere inicial mayor)</option>
-          </select>
-        </div>
-      </div>
-    </div>
+      <!-- COLUMNA IZQUIERDA -->
+      <div style="flex:1;display:flex;flex-direction:column;gap:14px;">
 
-    <!-- Resumen financiero crédito -->
-    <div class="card" style="margin-bottom:16px;border:1px solid rgba(233,30,140,0.3);">
-      <div class="card-title" style="font-size:13px;margin-bottom:12px;">📊 Resumen y Selección de Inicial</div>
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;">
-        <div style="background:var(--bg3);border-radius:10px;padding:12px;text-align:center;">
-          <div style="font-size:10px;color:var(--text2);">PRECIO FINAL</div>
-          <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:17px;color:var(--pink);margin-top:5px;" id="crdPrecioFinal">$0</div>
+        <!-- Equipo -->
+        <div class="card">
+          <div class="card-title" style="font-size:13px;margin-bottom:10px;">📱 Equipo</div>
+          <div class="form-group">
+            <label class="form-label">Modelo *</label>
+            <input type="text" class="form-control" id="crdEquipo" placeholder="Se llena con el IMEI" oninput="recalcCredito()">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Costo (P.L) *</label>
+              <input type="number" class="form-control" id="crdCosto" placeholder="0" oninput="recalcCredito()">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Precio Venta *</label>
+              <input type="number" class="form-control" id="crdVentaBase" placeholder="0" oninput="recalcCredito()">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">IVA</label>
+              <select class="form-control" id="crdIVA" onchange="recalcCredito()">
+                <option value="0">Sin IVA (0%)</option>
+                <option value="5">IVA 5%</option>
+                <option value="19">IVA 19%</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Descuento ($)</label>
+              <input type="number" class="form-control" id="crdDescuento" placeholder="0" oninput="recalcCredito()" min="0">
+            </div>
+          </div>
         </div>
-        <div style="background:var(--bg3);border-radius:10px;padding:12px;text-align:center;">
-          <div style="font-size:10px;color:var(--text2);">GANANCIA NETA</div>
-          <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:17px;color:var(--green);margin-top:5px;" id="crdGananciaNet">$0</div>
-        </div>
-        <div style="background:var(--bg3);border-radius:10px;padding:12px;text-align:center;">
-          <div style="font-size:10px;color:var(--text2);">MARGEN REAL</div>
-          <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:17px;margin-top:5px;" id="crdMargenReal">0%</div>
-        </div>
-        <div style="background:var(--bg3);border-radius:10px;padding:12px;text-align:center;">
-          <div style="font-size:10px;color:var(--text2);">COM. FINANCIERA</div>
-          <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:17px;color:var(--red);margin-top:5px;" id="crdComDisplay">$0</div>
-        </div>
-      </div>
-      <!-- Iniciales -->
-      <div style="font-size:12px;color:var(--text2);margin-bottom:10px;" id="crdInicialesLabel">Selecciona el porcentaje de inicial:</div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;" id="crdInicialesGrid">
-        <div style="background:var(--bg3);border-radius:10px;padding:12px;text-align:center;color:var(--text2);">Ingresa el costo para ver opciones</div>
-      </div>
-      <div style="margin-top:14px;" id="crdInicialPersonalizada">
-        <label class="form-label">O ingresa una inicial personalizada ($)</label>
-        <input type="number" class="form-control" id="crdInicialManual" placeholder="Valor de inicial personalizado" oninput="recalcCredito()">
-      </div>
-    </div>
 
-    <!-- Cliente -->
-    <div class="card" style="margin-bottom:16px;">
-      <div class="card-title" style="font-size:14px;margin-bottom:12px;">👤 Datos del Cliente</div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Nombre Completo *</label>
-          <input type="text" class="form-control" id="crdCliente" placeholder="Nombre completo">
+        <!-- Producto adicional -->
+        <div class="card">
+          <div class="card-title" style="font-size:13px;margin-bottom:10px;">➕ Producto Adicional <span style="font-size:11px;color:#888899;font-weight:400;">(opcional)</span></div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Descripción</label>
+              <input type="text" class="form-control" id="crdProdAdicDesc" placeholder="Ej: Funda, audifonos..." oninput="recalcCredito()">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Valor ($)</label>
+              <input type="number" class="form-control" id="crdProdAdicVal" placeholder="0" oninput="recalcCredito()" min="0">
+            </div>
+          </div>
         </div>
-        <div class="form-group">
-          <label class="form-label">Cédula</label>
-          <input type="text" class="form-control" id="crdCedula" placeholder="No. de cédula">
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Teléfono</label>
-          <input type="text" class="form-control" id="crdTelefono" placeholder="300 000 0000">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Correo</label>
-          <input type="email" class="form-control" id="crdCorreo" placeholder="correo@email.com">
-        </div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Asesor Comercial</label>
-        <select class="form-control" id="crdAsesor">
-          <option>YERSON</option><option>JUAN</option><option>ANDREY</option>
-          <option>LESLY</option><option>VALENTINA</option>
-        </select>
-      </div>
-    </div>
 
-    <!-- Documentos -->
-    <div class="card" style="margin-bottom:16px;">
-      <div class="card-title" style="font-size:14px;margin-bottom:12px;">📄 Documentos Requeridos</div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
-        <div>
-          <label class="form-label">Cédula Frente</label>
-          <div class="upload-zone" onclick="triggerUpload('upCedFront')">
-            <input type="file" id="upCedFront" accept="image/*" onchange="handleUpload(this,'cедFrontPreview','')">
-            <div class="upload-icon">🪪</div><div class="upload-text" style="font-size:12px;">Cédula frente</div>
-            <div id="cедFrontPreview" style="font-size:11px;color:var(--green);margin-top:4px;"></div>
+        <!-- Cliente -->
+        <div class="card">
+          <div class="card-title" style="font-size:13px;margin-bottom:10px;">👤 Cliente</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Nombre *</label>
+              <input type="text" class="form-control" id="crdCliente" placeholder="Nombre completo">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Cédula</label>
+              <input type="text" class="form-control" id="crdCedula" placeholder="No. cédula">
+            </div>
           </div>
-        </div>
-        <div>
-          <label class="form-label">Cédula Reverso</label>
-          <div class="upload-zone" onclick="triggerUpload('upCedBack')">
-            <input type="file" id="upCedBack" accept="image/*" onchange="handleUpload(this,'cedBackPreview','')">
-            <div class="upload-icon">🪪</div><div class="upload-text" style="font-size:12px;">Cédula reverso</div>
-            <div id="cedBackPreview" style="font-size:11px;color:var(--green);margin-top:4px;"></div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Teléfono</label>
+              <input type="text" class="form-control" id="crdTelefono" placeholder="300 000 0000">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Correo</label>
+              <input type="email" class="form-control" id="crdCorreo" placeholder="correo@email.com">
+            </div>
           </div>
-        </div>
-        <div>
-          <label class="form-label">Foto Entrega con Producto</label>
-          <div class="upload-zone" onclick="triggerUpload('upFotoEntrega')">
-            <input type="file" id="upFotoEntrega" accept="image/*" onchange="handleUpload(this,'fotoEntregaPreview','')">
-            <div class="upload-icon">📸</div><div class="upload-text" style="font-size:12px;">Cliente con el equipo</div>
-            <div id="fotoEntregaPreview" style="font-size:11px;color:var(--green);margin-top:4px;"></div>
-          </div>
-        </div>
-        <div>
-          <label class="form-label">Remisión Firmada</label>
-          <div class="upload-zone" onclick="triggerUpload('upRemision')">
-            <input type="file" id="upRemision" accept="image/*,application/pdf" onchange="handleUpload(this,'remisionPreview','')">
-            <div class="upload-icon">📋</div><div class="upload-text" style="font-size:12px;">Remisión del cliente</div>
-            <div id="remisionPreview" style="font-size:11px;color:var(--green);margin-top:4px;"></div>
-          </div>
-        </div>
-        <div>
-          <label class="form-label">Contrato</label>
-          <div class="upload-zone" onclick="triggerUpload('upContrato')">
-            <input type="file" id="upContrato" accept="image/*,application/pdf" onchange="handleUpload(this,'contratoPreview','')">
-            <div class="upload-icon">📝</div><div class="upload-text" style="font-size:12px;">Contrato de crédito</div>
-            <div id="contratoPreview" style="font-size:11px;color:var(--green);margin-top:4px;"></div>
-          </div>
-        </div>
-        <div>
-          <label class="form-label">Acta de Aceptación</label>
-          <div class="upload-zone" onclick="triggerUpload('upActa')">
-            <input type="file" id="upActa" accept="image/*,application/pdf" onchange="handleUpload(this,'actaPreview','')">
-            <div class="upload-icon">✍️</div><div class="upload-text" style="font-size:12px;">Acta de aceptación</div>
-            <div id="actaPreview" style="font-size:11px;color:var(--green);margin-top:4px;"></div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Asesor</label>
+              <select class="form-control" id="crdAsesor">
+                <option>YERSON</option><option>JUAN</option><option>ANDREY</option>
+                <option>LESLY</option><option>VALENTINA</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Tipo Cliente</label>
+              <select class="form-control" id="crdTipo" onchange="recalcCredito()">
+                <option value="normal">Normal</option>
+                <option value="reportado">Reportado (inicial mayor)</option>
+              </select>
+            </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <div style="display:flex;gap:10px;justify-content:space-between;align-items:center;">
-      <div style="font-size:12px;color:var(--text2);">* Campos obligatorios</div>
+      <!-- COLUMNA DERECHA -->
+      <div style="flex:1;display:flex;flex-direction:column;gap:14px;">
+
+        <!-- Financiera y comisión -->
+        <div class="card">
+          <div class="card-title" style="font-size:13px;margin-bottom:10px;">🏦 Financiera</div>
+          <div class="form-group">
+            <label class="form-label">Financiera *</label>
+            <select class="form-control" id="crdFinanciera" onchange="autoComisionCredito()">
+              <option value="CONTADO:0">💵 CONTADO (0%)</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">% Comisión</label>
+              <input type="number" class="form-control" id="crdComFinanciera" placeholder="0" oninput="recalcCredito()" min="0" max="100" step="0.1">
+              <div style="font-size:11px;color:#888899;margin-top:3px;">Comisión: <span id="crdComFinVal" style="color:#dc2626;font-weight:600;">$0</span></div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Plazo (quincenas)</label>
+              <select class="form-control" id="crdPlazoQuincenas" onchange="recalcCredito()">
+                <option value="2">2 quincenas (1 mes)</option>
+                <option value="4">4 quincenas (2 meses)</option>
+                <option value="6">6 quincenas (3 meses)</option>
+                <option value="8">8 quincenas (4 meses)</option>
+                <option value="10">10 quincenas (5 meses)</option>
+                <option value="12" selected>12 quincenas (6 meses)</option>
+                <option value="16">16 quincenas (8 meses)</option>
+                <option value="18">18 quincenas (9 meses)</option>
+                <option value="24">24 quincenas (12 meses)</option>
+                <option value="36">36 quincenas (18 meses)</option>
+                <option value="48">48 quincenas (24 meses)</option>
+                <option value="60">60 quincenas (30 meses)</option>
+                <option value="72">72 quincenas (36 meses)</option>
+              </select>
+            </div>
+          </div>
+          <!-- Intereses -->
+          <div style="background:#f7f5fb;border-radius:10px;padding:12px;margin-top:4px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+              <label style="font-size:12px;font-weight:600;color:#111111;">Intereses sobre valor a financiar</label>
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:#555577;">
+                <input type="checkbox" id="crdAplicaIntereses" onchange="recalcCredito()" style="width:16px;height:16px;accent-color:#6B2D8B;">
+                Aplicar intereses
+              </label>
+            </div>
+            <div class="form-row" id="crdInteresesRow" style="display:none;">
+              <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label">% Interés quincenal</label>
+                <select class="form-control" id="crdTasaInteres" onchange="recalcCredito()">
+                  <option value="1.3">1.3%</option>
+                  <option value="1.8">1.8%</option>
+                  <option value="2.5" selected>2.5%</option>
+                  <option value="3.5">3.5%</option>
+                  <option value="5.0">5.0%</option>
+                  <option value="6.0">6.0%</option>
+                </select>
+              </div>
+              <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label">Total intereses</label>
+                <div style="background:#fee2e2;border-radius:8px;padding:10px;font-weight:700;font-size:14px;color:#dc2626;" id="crdValorIntereses">$0</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Resumen -->
+        <div class="card" style="border:1px solid #6B2D8B;">
+          <div class="card-title" style="font-size:13px;margin-bottom:12px;color:#6B2D8B;">📊 Resumen de la Venta</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+            <div style="background:#f7f5fb;border-radius:8px;padding:10px;text-align:center;">
+              <div style="font-size:10px;color:#888899;">PRECIO FINAL</div>
+              <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:18px;color:#6B2D8B;margin-top:4px;" id="crdPrecioFinal">$0</div>
+            </div>
+            <div style="background:#f0fdf4;border-radius:8px;padding:10px;text-align:center;">
+              <div style="font-size:10px;color:#888899;">GANANCIA NETA</div>
+              <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:18px;color:#16a34a;margin-top:4px;" id="crdGananciaNet">$0</div>
+            </div>
+            <div style="background:#f7f5fb;border-radius:8px;padding:10px;text-align:center;">
+              <div style="font-size:10px;color:#888899;">MARGEN</div>
+              <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:18px;margin-top:4px;" id="crdMargenReal">0%</div>
+            </div>
+            <div style="background:#fff7ed;border-radius:8px;padding:10px;text-align:center;">
+              <div style="font-size:10px;color:#888899;">VALOR A FINANCIAR</div>
+              <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:18px;color:#d97706;margin-top:4px;" id="crdValorFinanciar">$0</div>
+            </div>
+          </div>
+          <!-- Iniciales -->
+          <div style="font-size:12px;color:#555577;margin-bottom:8px;">Selecciona el porcentaje de inicial:</div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;" id="crdInicialesGrid">
+            <div style="background:#f7f5fb;border-radius:10px;padding:12px;text-align:center;color:#888899;font-size:12px;">Ingresa precio de venta</div>
+          </div>
+          <div style="margin-top:10px;">
+            <label class="form-label">Inicial personalizada ($)</label>
+            <input type="number" class="form-control" id="crdInicialManual" placeholder="O escribe el valor de inicial" oninput="recalcCredito()">
+          </div>
+          <!-- Cuota quincenal resultado -->
+          <div id="crdCuotaResultado" style="margin-top:10px;display:none;background:#f0ecf8;border-radius:10px;padding:12px;">
+            <div style="font-size:12px;color:#555577;margin-bottom:4px;">Cuota quincenal estimada:</div>
+            <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:22px;color:#6B2D8B;" id="crdCuotaValor">$0</div>
+            <div style="font-size:11px;color:#888899;margin-top:2px;" id="crdCuotaDetalle"></div>
+          </div>
+        </div>
+
+        <!-- Factura -->
+        <div class="card">
+          <div class="card-title" style="font-size:13px;margin-bottom:10px;">📄 Factura</div>
+          <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:#555577;">
+              <input type="checkbox" id="crdEnviarFactura" style="width:16px;height:16px;accent-color:#6B2D8B;">
+              Enviar factura al correo del cliente
+            </label>
+          </div>
+          <div style="margin-top:10px;font-size:12px;color:#888899;">La factura se generará automáticamente al guardar y podrás imprimirla.</div>
+        </div>
+
+        <!-- Documentos -->
+        <div class="card">
+          <div class="card-title" style="font-size:13px;margin-bottom:10px;">📎 Documentos</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div>
+              <label class="form-label" style="font-size:10px;">Cédula Frente</label>
+              <div class="upload-zone" onclick="triggerUpload('upCedFront')" style="padding:10px;">
+                <input type="file" id="upCedFront" accept="image/*" onchange="handleUpload(this,'cedFrontPreview','')">
+                <div style="font-size:20px;">🪪</div>
+                <div id="cedFrontPreview" style="font-size:10px;color:#16a34a;margin-top:2px;"></div>
+              </div>
+            </div>
+            <div>
+              <label class="form-label" style="font-size:10px;">Cédula Reverso</label>
+              <div class="upload-zone" onclick="triggerUpload('upCedBack')" style="padding:10px;">
+                <input type="file" id="upCedBack" accept="image/*" onchange="handleUpload(this,'cedBackPreview','')">
+                <div style="font-size:20px;">🪪</div>
+                <div id="cedBackPreview" style="font-size:10px;color:#16a34a;margin-top:2px;"></div>
+              </div>
+            </div>
+            <div>
+              <label class="form-label" style="font-size:10px;">Foto con Producto</label>
+              <div class="upload-zone" onclick="triggerUpload('upFotoEntrega')" style="padding:10px;">
+                <input type="file" id="upFotoEntrega" accept="image/*" onchange="handleUpload(this,'fotoEntregaPreview','')">
+                <div style="font-size:20px;">📸</div>
+                <div id="fotoEntregaPreview" style="font-size:10px;color:#16a34a;margin-top:2px;"></div>
+              </div>
+            </div>
+            <div>
+              <label class="form-label" style="font-size:10px;">Contrato / Acta</label>
+              <div class="upload-zone" onclick="triggerUpload('upContrato')" style="padding:10px;">
+                <input type="file" id="upContrato" accept="image/*,application/pdf" onchange="handleUpload(this,'contratoPreview','')">
+                <div style="font-size:20px;">📝</div>
+                <div id="contratoPreview" style="font-size:10px;color:#16a34a;margin-top:2px;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /form-row -->
+
+    <div style="display:flex;gap:10px;justify-content:space-between;align-items:center;margin-top:16px;">
+      <div style="font-size:12px;color:#888899;">* Campos obligatorios</div>
       <div style="display:flex;gap:10px;">
         <button class="btn btn-ghost" onclick="closeModal('modalNuevoCredito')">Cancelar</button>
         <button class="btn btn-primary" onclick="guardarCredito()">💾 Guardar Crédito</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Factura -->
+<div class="modal-overlay" id="modalFactura">
+  <div class="modal" style="max-width:700px;">
+    <div class="modal-header">
+      <div class="modal-title">📄 Factura de Venta</div>
+      <button class="modal-close" onclick="closeModal('modalFactura')">✕</button>
+    </div>
+    <div id="facturaContenido" style="background:#fff;padding:32px;border-radius:12px;border:1px solid #ece8f5;">
+      <!-- Se genera dinámicamente -->
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+      <button class="btn btn-ghost" onclick="closeModal('modalFactura')">Cerrar</button>
+      <button class="btn btn-outline" onclick="imprimirFactura()">🖨️ Imprimir</button>
+      <button class="btn btn-primary" id="btnEnviarFacturaCorreo" onclick="enviarFacturaCorreo()" style="display:none;">📧 Enviar por Correo</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Nueva Venta (alias) -->
+rgin-top:10px;font-size:12px;color:#888899;">La factura se generará automáticamente al guardar y podrás imprimirla.</div>
+        </div>
+
+        <!-- Documentos -->
+        <div class="card">
+          <div class="card-title" style="font-size:13px;margin-bottom:10px;">📎 Documentos</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div>
+              <label class="form-label" style="font-size:10px;">Cédula Frente</label>
+              <div class="upload-zone" onclick="triggerUpload('upCedFront')" style="padding:10px;">
+                <input type="file" id="upCedFront" accept="image/*" onchange="handleUpload(this,'cedFrontPreview','')">
+                <div style="font-size:20px;">🪪</div>
+                <div id="cedFrontPreview" style="font-size:10px;color:#16a34a;margin-top:2px;"></div>
+              </div>
+            </div>
+            <div>
+              <label class="form-label" style="font-size:10px;">Cédula Reverso</label>
+              <div class="upload-zone" onclick="triggerUpload('upCedBack')" style="padding:10px;">
+                <input type="file" id="upCedBack" accept="image/*" onchange="handleUpload(this,'cedBackPreview','')">
+                <div style="font-size:20px;">🪪</div>
+                <div id="cedBackPreview" style="font-size:10px;color:#16a34a;margin-top:2px;"></div>
+              </div>
+            </div>
+            <div>
+              <label class="form-label" style="font-size:10px;">Foto con Producto</label>
+              <div class="upload-zone" onclick="triggerUpload('upFotoEntrega')" style="padding:10px;">
+                <input type="file" id="upFotoEntrega" accept="image/*" onchange="handleUpload(this,'fotoEntregaPreview','')">
+                <div style="font-size:20px;">📸</div>
+                <div id="fotoEntregaPreview" style="font-size:10px;color:#16a34a;margin-top:2px;"></div>
+              </div>
+            </div>
+            <div>
+              <label class="form-label" style="font-size:10px;">Contrato / Acta</label>
+              <div class="upload-zone" onclick="triggerUpload('upContrato')" style="padding:10px;">
+                <input type="file" id="upContrato" accept="image/*,application/pdf" onchange="handleUpload(this,'contratoPreview','')">
+                <div style="font-size:20px;">📝</div>
+                <div id="contratoPreview" style="font-size:10px;color:#16a34a;margin-top:2px;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /form-row -->
+
+    <div style="display:flex;gap:10px;justify-content:space-between;align-items:center;margin-top:16px;">
+      <div style="font-size:12px;color:#888899;">* Campos obligatorios</div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-ghost" onclick="closeModal('modalNuevoCredito')">Cancelar</button>
+        <button class="btn btn-primary" onclick="guardarCredito()">💾 Guardar Crédito</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Factura -->
+<div class="modal-overlay" id="modalFactura">
+  <div class="modal" style="max-width:700px;">
+    <div class="modal-header">
+      <div class="modal-title">📄 Factura de Venta</div>
+      <button class="modal-close" onclick="closeModal('modalFactura')">✕</button>
+    </div>
+    <div id="facturaContenido" style="background:#fff;padding:32px;border-radius:12px;border:1px solid #ece8f5;">
+      <!-- Se genera dinámicamente -->
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+      <button class="btn btn-ghost" onclick="closeModal('modalFactura')">Cerrar</button>
+      <button class="btn btn-outline" onclick="imprimirFactura()">🖨️ Imprimir</button>
+      <button class="btn btn-primary" id="btnEnviarFacturaCorreo" onclick="enviarFacturaCorreo()" style="display:none;">📧 Enviar por Correo</button>
     </div>
   </div>
 </div>
@@ -3451,43 +3601,75 @@ async function guardarVentaContado(){
 }
 
 async function guardarCredito(){
-  const costo=parseFloat($('crdCosto')?.value)||0;
-  const base=parseFloat($('crdVentaBase')?.value)||0;
-  const ivaPct=parseFloat($('crdIVA')?.value)||0;
-  const desc=parseFloat($('crdDescuento')?.value)||0;
-  const comPct=parseFloat($('crdComFinanciera')?.value)||0;
-  const ivaVal=Math.round(base*ivaPct/100);
-  const precioFinal=base+ivaVal-desc;
-  const comVal=Math.round(precioFinal*comPct/100);
-  const ganancia=precioFinal-costo-comVal;
-  const finSel=($('crdFinanciera')?.value||'—').split(':')[0];
-  const ini=crdInicialSeleccionada||Math.round(precioFinal*0.20);
-  const saldo=precioFinal-ini;
-  const cuotas=parseInt($('crdCuotas')?.value)||12;
+  const costo        = parseFloat($('crdCosto')?.value)||0;
+  const base         = parseFloat($('crdVentaBase')?.value)||0;
+  const ivaPct       = parseFloat($('crdIVA')?.value)||0;
+  const desc         = parseFloat($('crdDescuento')?.value)||0;
+  const comPct       = parseFloat($('crdComFinanciera')?.value)||0;
+  const prodAdicVal  = parseFloat($('crdProdAdicVal')?.value)||0;
+  const prodAdicDesc = $('crdProdAdicDesc')?.value||'';
+  const quincenas    = parseInt($('crdPlazoQuincenas')?.value)||12;
+  const aplicaInt    = $('crdAplicaIntereses')?.checked||false;
+  const tasaInt      = parseFloat($('crdTasaInteres')?.value)||2.5;
+  const enviarFact   = $('crdEnviarFactura')?.checked||false;
+  const finSel       = ($('crdFinanciera')?.value||'CONTADO:0').split(':')[0];
 
-  const datos={
-    equipo:$('crdEquipo')?.value||'—',
-    cliente:$('crdCliente')?.value||'—',
-    cedula:$('crdCedula')?.value||'',
-    telefono:$('crdTelefono')?.value||'',
-    asesor:$('crdAsesor')?.value||'',
-    total:precioFinal,inicial:ini,saldo,cuotas,
-    valorCuota:Math.round(saldo/cuotas),
-    frecuencia:'Mensual',
-    sede:'LOCAL PEREIRA',obs:''
+  const ivaVal       = Math.round(base * ivaPct/100);
+  const precioFinal  = base + ivaVal - desc + prodAdicVal;
+  const comVal       = Math.round(precioFinal * comPct/100);
+  const ganancia     = precioFinal - costo - comVal;
+  const ini          = crdInicialSeleccionada || Math.round(precioFinal * 0.20);
+  const saldoFinanciar = precioFinal - ini;
+  const totalIntereses = aplicaInt ? Math.round(saldoFinanciar * (tasaInt/100) * quincenas) : 0;
+  const totalFinanciar = saldoFinanciar + totalIntereses;
+  const valorCuota   = quincenas > 0 ? Math.round(totalFinanciar / quincenas) : 0;
+  const sedeActual   = window.SEDE_ACTIVA || 'LOCAL PEREIRA';
+
+  if(!$('crdCliente')?.value?.trim()){ toast('El nombre del cliente es obligatorio','error'); return; }
+  if(!$('crdEquipo')?.value?.trim()){ toast('El equipo es obligatorio','error'); return; }
+
+  const datos = {
+    equipo: $('crdEquipo')?.value||'—',
+    cliente: $('crdCliente')?.value||'—',
+    cedula: $('crdCedula')?.value||'',
+    telefono: $('crdTelefono')?.value||'',
+    correo: $('crdCorreo')?.value||'',
+    asesor: $('crdAsesor')?.value||'',
+    total: precioFinal, inicial: ini,
+    saldo: totalFinanciar, cuotas: quincenas, valorCuota,
+    frecuencia: 'Quincenal', sede: sedeActual,
+    obs: prodAdicDesc ? 'Prod. adicional: '+prodAdicDesc+' ('+fmt(prodAdicVal)+')' : ''
   };
-  try{
+
+  try {
     await guardarCreditoDB(datos);
-    // También guardar venta asociada
     await guardarVentaDB({
-      equipo:datos.equipo,cliente:datos.cliente,cedula:datos.cedula,
-      asesor:datos.asesor,costo,venta:precioFinal,ganancia,
-      financiera:finSel,tipo:'credito',sede:'LOCAL PEREIRA'
+      equipo:datos.equipo, cliente:datos.cliente, cedula:datos.cedula,
+      asesor:datos.asesor, costo, venta:precioFinal, ganancia,
+      financiera:finSel, tipo:'credito', sede:sedeActual
     });
-    closeModal('modalNuevoCreditoVenta');
-    renderCreditos();renderVentas();
-    toast('Crédito registrado en Supabase ✅');
-  }catch(e){}
+
+    const datosFactura = {
+      tipo:'credito', cliente:datos.cliente, cedula:datos.cedula,
+      telefono:datos.telefono, correo:datos.correo,
+      equipo:datos.equipo, imei:$('crdIMEI')?.value||'',
+      asesor:datos.asesor, sede:sedeActual,
+      precioBase:base, iva:ivaVal, descuento:desc,
+      prodAdicDesc, prodAdicVal, comision:comVal,
+      precioFinal, ganancia, inicial:ini,
+      saldoFinanciar:totalFinanciar, cuotas:quincenas,
+      valorCuota, financiera:finSel,
+      intereses:totalIntereses, tasaInteres:aplicaInt?tasaInt:0,
+      fecha:new Date().toLocaleDateString('es-CO'),
+      numero:'PM-'+Date.now().toString().slice(-6)
+    };
+
+    closeModal('modalNuevoCredito');
+    crdInicialSeleccionada = 0;
+    renderCreditos(); renderVentas();
+    mostrarFactura(datosFactura, enviarFact);
+    toast('Credito registrado en Supabase ✅');
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
 }
 
 async function registrarPago(id){
@@ -3730,31 +3912,209 @@ function calcVContado(){
 }
 
 function recalcCredito(){
-  const costo=parseFloat($('crdCosto').value)||0;
-  const base=parseFloat($('crdVentaBase').value)||0;
-  const ivaPct=parseFloat($('crdIVA')?.value)||0;
-  const desc=parseFloat($('crdDescuento')?.value)||0;
-  const comPct=parseFloat($('crdComFinanciera')?.value)||0;
-  const tipo=$('crdTipo')?$('crdTipo').value:'normal';
-  if(!base){const g=$('crdInicialesGrid');if(g)g.innerHTML='<div style="background:var(--bg3);border-radius:10px;padding:12px;text-align:center;color:var(--text2);">Ingresa el precio de venta</div>';return;}
-  const ivaVal=Math.round(base*ivaPct/100);
-  const precioFinal=base+ivaVal-desc;
-  const comVal=Math.round(precioFinal*comPct/100);
-  const gananciaNeta=precioFinal-costo-comVal;
-  const margen=precioFinal>0?((gananciaNeta/precioFinal)*100).toFixed(1):0;
-  if($('crdIVAval'))$('crdIVAval').textContent=fmt(ivaVal);
-  if($('crdDescPct'))$('crdDescPct').textContent=((desc/base)*100).toFixed(1)+'%';
-  if($('crdComFinVal'))$('crdComFinVal').textContent=fmt(comVal);
-  if($('crdPrecioFinal'))$('crdPrecioFinal').textContent=fmt(precioFinal);
-  if($('crdGananciaNet'))$('crdGananciaNet').textContent=fmt(gananciaNeta);
-  if($('crdComDisplay'))$('crdComDisplay').textContent=fmt(comVal);
-  if($('crdMargenReal')){$('crdMargenReal').textContent=margen+'%';$('crdMargenReal').style.color=gananciaNeta>0?'var(--green)':'var(--red)';}
-  const pcts=tipo==='reportado'?[0.30,0.40,0.50]:[0.20,0.30,0.40];
-  const grid=$('crdInicialesGrid');
-  if(grid)grid.innerHTML=pcts.map(p=>{const ini=Math.round(precioFinal*p);const saldo=precioFinal-ini;const cuota6=Math.round(saldo/6);const cuota12=Math.round(saldo/12);return `<div class="inicial-card" onclick="elegirInicial(this,${ini},${saldo})"><div style="font-family:'Syne',sans-serif;font-weight:800;font-size:22px;color:var(--pink);">${(p*100).toFixed(0)}%</div><div style="font-size:11px;color:var(--text2);">INICIAL</div><div style="font-size:16px;font-weight:700;color:var(--green);margin-top:6px;">${fmt(ini)}</div><hr style="border-color:rgba(255,255,255,0.06);margin:8px 0;"><div style="font-size:11px;color:var(--text2);">Saldo: <strong>${fmt(saldo)}</strong></div><div style="font-size:11px;color:var(--text2);margin-top:3px;">Cuota 6m: <strong>${fmt(cuota6)}</strong></div><div style="font-size:11px;">Cuota 12m: <strong>${fmt(cuota12)}</strong></div></div>`;}).join('');
+  const costo    = parseFloat($('crdCosto')?.value)||0;
+  const base     = parseFloat($('crdVentaBase')?.value)||0;
+  const ivaPct   = parseFloat($('crdIVA')?.value)||0;
+  const desc     = parseFloat($('crdDescuento')?.value)||0;
+  const comPct   = parseFloat($('crdComFinanciera')?.value)||0;
+  const tipo     = $('crdTipo')?.value||'normal';
+  const quincenas = parseInt($('crdPlazoQuincenas')?.value)||12;
+  const prodAdicVal = parseFloat($('crdProdAdicVal')?.value)||0;
+  const aplicaIntereses = $('crdAplicaIntereses')?.checked||false;
+  const tasaInteres = parseFloat($('crdTasaInteres')?.value)||2.5;
+
+  // Mostrar/ocultar fila de intereses
+  const interesesRow = $('crdInteresesRow');
+  if(interesesRow) interesesRow.style.display = aplicaIntereses ? 'grid' : 'none';
+
+  if(!base){
+    const g=$('crdInicialesGrid');
+    if(g)g.innerHTML='<div style="background:#f7f5fb;border-radius:10px;padding:12px;text-align:center;color:#888899;font-size:12px;">Ingresa el precio de venta</div>';
+    return;
+  }
+
+  const ivaVal     = Math.round(base * ivaPct/100);
+  const precioFinal = base + ivaVal - desc + prodAdicVal;
+  const comVal     = Math.round(precioFinal * comPct/100);
+  const gananciaNeta = precioFinal - costo - comVal;
+  const margen     = precioFinal > 0 ? ((gananciaNeta/precioFinal)*100).toFixed(1) : 0;
+
+  const setEl = (id,v,color) => {
+    const e=$(id); if(!e)return;
+    e.textContent=v;
+    if(color) e.style.color=color;
+  };
+
+  setEl('crdComFinVal', fmt(comVal));
+  setEl('crdPrecioFinal', fmt(precioFinal));
+  setEl('crdGananciaNet', fmt(gananciaNeta), gananciaNeta>0?'#16a34a':'#dc2626');
+  setEl('crdMargenReal', margen+'%', gananciaNeta>0?'#16a34a':'#dc2626');
+
+  // Iniciales
+  const pcts = tipo==='reportado' ? [0.30,0.40,0.50] : [0.20,0.30,0.40];
+  const grid = $('crdInicialesGrid');
+  if(grid) grid.innerHTML = pcts.map(p => {
+    const ini   = Math.round(precioFinal * p);
+    const saldo = precioFinal - ini;
+    return `<div class="inicial-card" onclick="elegirInicial(this,${ini},${saldo})" style="border-radius:10px;padding:12px;text-align:center;cursor:pointer;border:2px solid #ece8f5;transition:all .2s;">
+      <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:20px;color:#6B2D8B;">${(p*100).toFixed(0)}%</div>
+      <div style="font-size:10px;color:#888899;">INICIAL</div>
+      <div style="font-size:15px;font-weight:700;color:#16a34a;margin-top:4px;">${fmt(ini)}</div>
+      <div style="font-size:11px;color:#555577;margin-top:3px;">Saldo: ${fmt(saldo)}</div>
+    </div>`;
+  }).join('');
+
+  // Calcular valor a financiar con la inicial seleccionada
+  const inicialUsada = crdInicialSeleccionada || Math.round(precioFinal * pcts[0]);
+  const saldoFinanciar = precioFinal - inicialUsada;
+
+  // Intereses sobre valor a financiar
+  let totalIntereses = 0;
+  if(aplicaIntereses && saldoFinanciar > 0) {
+    // Interes compuesto quincenal: Saldo * tasa * quincenas (simplificado)
+    totalIntereses = Math.round(saldoFinanciar * (tasaInteres/100) * quincenas);
+    setEl('crdValorIntereses', fmt(totalIntereses));
+  } else {
+    setEl('crdValorIntereses', '$0');
+  }
+
+  const totalFinanciar = saldoFinanciar + totalIntereses;
+  setEl('crdValorFinanciar', fmt(totalFinanciar));
+
+  // Cuota quincenal
+  if(quincenas > 0 && totalFinanciar > 0) {
+    const cuotaQ = Math.round(totalFinanciar / quincenas);
+    const resEl = $('crdCuotaResultado');
+    if(resEl) resEl.style.display = 'block';
+    setEl('crdCuotaValor', fmt(cuotaQ));
+    const meses = (quincenas/2).toFixed(0);
+    setEl('crdCuotaDetalle', `${quincenas} quincenas (${meses} meses) · Financiar: ${fmt(totalFinanciar)}${aplicaIntereses?' · Interés '+tasaInteres+'% qnal':''}`);
+  }
 }
 
 function seleccionarInicialCredito(ini,saldo,pct){toast(`Inicial ${(pct*100).toFixed(0)}%: ${fmt(ini)} | Saldo: ${fmt(saldo)}`,'success');}
+
+// ============================================================
+// FACTURA
+// ============================================================
+let facturaActual = null;
+
+function mostrarFactura(datos, enviarCorreo) {
+  facturaActual = datos;
+  const btnEnviar = document.getElementById('btnEnviarFacturaCorreo');
+  if(btnEnviar) btnEnviar.style.display = (enviarCorreo && datos.correo) ? 'inline-flex' : 'none';
+
+  const html = generarHTMLFactura(datos);
+  const contenido = document.getElementById('facturaContenido');
+  if(contenido) contenido.innerHTML = html;
+  openModal('modalFactura');
+}
+
+function generarHTMLFactura(d) {
+  const lineaProducto = `
+    <tr>
+      <td style="padding:10px 8px;border-bottom:1px solid #f0f0f5;">${d.equipo}${d.imei ? '<br><span style="font-size:11px;color:#888;font-family:monospace;">IMEI: '+d.imei+'</span>' : ''}</td>
+      <td style="padding:10px 8px;border-bottom:1px solid #f0f0f5;text-align:center;">1</td>
+      <td style="padding:10px 8px;border-bottom:1px solid #f0f0f5;text-align:right;">${fmt(d.precioBase)}</td>
+      <td style="padding:10px 8px;border-bottom:1px solid #f0f0f5;text-align:right;">${fmt(d.precioBase)}</td>
+    </tr>`;
+  const lineaAdic = d.prodAdicVal > 0 ? `
+    <tr>
+      <td style="padding:10px 8px;border-bottom:1px solid #f0f0f5;">${d.prodAdicDesc || 'Producto adicional'}</td>
+      <td style="padding:10px 8px;border-bottom:1px solid #f0f0f5;text-align:center;">1</td>
+      <td style="padding:10px 8px;border-bottom:1px solid #f0f0f5;text-align:right;">${fmt(d.prodAdicVal)}</td>
+      <td style="padding:10px 8px;border-bottom:1px solid #f0f0f5;text-align:right;">${fmt(d.prodAdicVal)}</td>
+    </tr>` : '';
+
+  return `
+  <div style="font-family:'DM Sans',sans-serif;color:#111;max-width:640px;margin:0 auto;">
+    <!-- Header -->
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:20px;border-bottom:2px solid #6B2D8B;">
+      <div>
+        <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:28px;color:#6B2D8B;">Play Móvil</div>
+        <div style="font-size:12px;color:#888;margin-top:2px;">${d.sede}</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:22px;font-weight:700;color:#111;">Factura de Venta</div>
+        <div style="font-size:13px;color:#6B2D8B;font-weight:600;margin-top:4px;">${d.numero}</div>
+        <div style="font-size:12px;color:#888;margin-top:2px;">Fecha: ${d.fecha}</div>
+      </div>
+    </div>
+
+    <!-- Datos -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px;">
+      <div>
+        <div style="font-size:12px;font-weight:700;color:#6B2D8B;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Datos del Cliente</div>
+        <div style="font-size:14px;font-weight:600;">${d.cliente}</div>
+        ${d.cedula ? `<div style="font-size:13px;color:#555;">CC/NIT: ${d.cedula}</div>` : ''}
+        ${d.telefono ? `<div style="font-size:13px;color:#555;">${d.telefono}</div>` : ''}
+        ${d.correo ? `<div style="font-size:13px;color:#555;">${d.correo}</div>` : ''}
+      </div>
+      <div>
+        <div style="font-size:12px;font-weight:700;color:#6B2D8B;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Asesor</div>
+        <div style="font-size:14px;font-weight:600;">${d.asesor}</div>
+        <div style="font-size:13px;color:#555;">Modalidad: ${d.tipo === 'credito' ? 'Crédito — '+d.financiera : 'Contado'}</div>
+        ${d.tipo === 'credito' ? `<div style="font-size:13px;color:#555;">${d.cuotas} quincenas · Cuota: ${fmt(d.valorCuota)}</div>` : ''}
+      </div>
+    </div>
+
+    <!-- Tabla productos -->
+    <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
+      <thead>
+        <tr style="background:#f7f5fb;">
+          <th style="padding:10px 8px;text-align:left;font-size:12px;color:#555;text-transform:uppercase;">Descripción</th>
+          <th style="padding:10px 8px;text-align:center;font-size:12px;color:#555;text-transform:uppercase;">Cant.</th>
+          <th style="padding:10px 8px;text-align:right;font-size:12px;color:#555;text-transform:uppercase;">Precio</th>
+          <th style="padding:10px 8px;text-align:right;font-size:12px;color:#555;text-transform:uppercase;">Total</th>
+        </tr>
+      </thead>
+      <tbody>${lineaProducto}${lineaAdic}</tbody>
+    </table>
+
+    <!-- Totales -->
+    <div style="display:flex;justify-content:flex-end;">
+      <div style="min-width:260px;">
+        ${d.iva > 0 ? `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;"><span style="color:#555;">IVA</span><span>${fmt(d.iva)}</span></div>` : ''}
+        ${d.descuento > 0 ? `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;"><span style="color:#555;">Descuento</span><span style="color:#dc2626;">-${fmt(d.descuento)}</span></div>` : ''}
+        ${d.comision > 0 ? `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;"><span style="color:#555;">Comisión financiera</span><span style="color:#dc2626;">-${fmt(d.comision)}</span></div>` : ''}
+        <div style="display:flex;justify-content:space-between;padding:10px 0;font-size:16px;font-weight:700;border-top:2px solid #6B2D8B;margin-top:6px;">
+          <span>TOTAL</span><span style="color:#6B2D8B;">${fmt(d.precioFinal)}</span>
+        </div>
+        ${d.tipo === 'credito' ? `
+        <div style="background:#f7f5fb;border-radius:8px;padding:12px;margin-top:8px;font-size:13px;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:#555;">Inicial:</span><span style="font-weight:600;color:#16a34a;">${fmt(d.inicial)}</span></div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:#555;">Saldo a financiar:</span><span style="font-weight:600;">${fmt(d.saldoFinanciar)}</span></div>
+          ${d.intereses > 0 ? `<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:#555;">Intereses (${d.tasaInteres}% qnal):</span><span style="color:#d97706;">${fmt(d.intereses)}</span></div>` : ''}
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:#555;">Cuota quincenal:</span><span style="font-weight:700;color:#6B2D8B;font-size:15px;">${fmt(d.valorCuota)}</span></div>
+          <div style="display:flex;justify-content:space-between;"><span style="color:#555;">Plazo:</span><span>${d.cuotas} quincenas</span></div>
+        </div>` : ''}
+      </div>
+    </div>
+
+    <!-- Nota legal -->
+    <div style="margin-top:24px;padding-top:16px;border-top:1px solid #ece8f5;font-size:11px;color:#888;line-height:1.6;">
+      Esta factura es un título valor conforme al Art. 772, modificado en la ley 1231 de 2008. 
+      La garantía no cubre teléfono apagado, humedad, rayones, golpes, flex y demás elementos de contacto permanente o mala manipulación.
+    </div>
+  </div>`;
+}
+
+function imprimirFactura() {
+  const contenido = document.getElementById('facturaContenido')?.innerHTML;
+  if(!contenido) return;
+  const win = window.open('','_blank');
+  win.document.write(`<!DOCTYPE html><html><head><title>Factura Play Móvil</title>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>body{margin:20px;font-family:'DM Sans',sans-serif;}@media print{body{margin:0;}}</style>
+    </head><body>${contenido}<script>window.onload=()=>window.print();<\/script></body></html>`);
+  win.document.close();
+}
+
+function enviarFacturaCorreo() {
+  if(!facturaActual?.correo){ toast('El cliente no tiene correo registrado','error'); return; }
+  toast('Factura preparada para envío a '+facturaActual.correo+' ✅');
+  // En producción aquí se conectaría con un servicio de email como EmailJS o Resend
+}
 
 // Close modal on overlay click
 document.querySelectorAll('.modal-overlay').forEach(o=>{
