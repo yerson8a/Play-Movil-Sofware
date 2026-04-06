@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Play Móvil — Sistema de Gestión</title>
+<title>Play Móvil — Sistema de Gestión v2.1</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -3975,20 +3975,6 @@ async function buscarIMEICredito(val){
 
   } catch(e) {
     console.error('Error buscando IMEI:', e);
-    // Fallback: buscar en memoria local
-    const local = db.compras.find(c=>
-      (c.imei1||'').includes(val)||(c.imei2||'').includes(val)||
-      (c.serial||'').toLowerCase().includes(val.toLowerCase())
-    );
-    if(local) {
-      $('crdEquipo').value = local.producto;
-      $('crdIMEI').value = local.imei1 || local.serial || '';
-      $('crdCosto').value = local.valorCompra;
-      $('crdCosto').style.background = '#f0fdf4';
-      $('crdVentaBase').value = Math.round(local.valorCompra / 0.55);
-      recalcCredito();
-      toast('✅ ' + local.producto + ' — Costo: ' + fmt(local.valorCompra));
-    }
   }
 }
 
