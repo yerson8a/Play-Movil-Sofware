@@ -3900,40 +3900,43 @@ function buscarIMEIVenta(val){
 async function buscarIMEICredito(val){
   if(val.length < 5){ $('crdIMEIInfo').style.display='none'; return; }
 
+  // Buscar directo con fetch a Supabase usando el formato correcto
   try {
-    // Buscar SIEMPRE en Supabase para garantizar datos frescos
-    // Intentar por imei1, imei2 y serial
-    let rows = [];
+    const headers = {
+      'apikey': SUPABASE_KEY,
+      'Authorization': 'Bearer ' + SUPABASE_KEY
+    };
+    const base = SUPABASE_URL + '/rest/v1/productos';
+    const sel = 'select=id,producto,imei1,imei2,serial,valor_compra,sede_id,proveedor_id';
 
-    const r1 = await sbFetch('productos', {
-      filter: `imei1=ilike.*${val}*`,
-      select: 'id,producto,imei1,imei2,serial,valor_compra,sede_id,proveedor_id'
-    }).catch(()=>[]);
-    if(r1 && r1.length) rows = r1;
+    // Buscar por imei1
+    let res = await fetch(`${base}?${sel}&imei1=eq.${val}`, {headers});
+    let rows = await res.json();
 
+    // Si no, buscar por imei2
     if(!rows.length) {
-      const r2 = await sbFetch('productos', {
-        filter: `imei2=ilike.*${val}*`,
-        select: 'id,producto,imei1,imei2,serial,valor_compra,sede_id,proveedor_id'
-      }).catch(()=>[]);
-      if(r2 && r2.length) rows = r2;
+      res = await fetch(`${base}?${sel}&imei2=eq.${val}`, {headers});
+      rows = await res.json();
     }
 
+    // Si no, buscar por serial
     if(!rows.length) {
-      const r3 = await sbFetch('productos', {
-        filter: `serial=ilike.*${val}*`,
-        select: 'id,producto,imei1,imei2,serial,valor_compra,sede_id,proveedor_id'
-      }).catch(()=>[]);
-      if(r3 && r3.length) rows = r3;
+      res = await fetch(`${base}?${sel}&serial=eq.${val}`, {headers});
+      rows = await res.json();
     }
 
-    if(rows.length > 0) {
+    // Si no, buscar conteniendo (búsqueda parcial)
+    if(!rows.length) {
+      res = await fetch(`${base}?${sel}&imei1=like.*${val}*`, {headers});
+      rows = await res.json();
+    }
+
+    if(rows && rows.length > 0) {
       const p = rows[0];
       const costo = parseFloat(p.valor_compra) || 0;
       const sedeNombre = p.sede_id===1 ? 'LOCAL PEREIRA' : p.sede_id===2 ? 'LOCAL ARMENIA' : '—';
       const prov = db.proveedores.find(x => x.id === p.proveedor_id);
 
-      // Mostrar info encontrada
       $('crdIMEIInfo').style.display = 'block';
       $('crdInfoProducto').textContent = p.producto || '—';
       $('crdInfoProveedor').textContent = prov ? prov.nombre : '—';
@@ -3941,41 +3944,38 @@ async function buscarIMEICredito(val){
       $('crdInfoSede').textContent = sedeNombre;
       $('crdInfoIMEI').textContent = p.imei1 || p.serial || '—';
 
-      // Llenar campos del formulario
       $('crdEquipo').value = p.producto || '';
       $('crdIMEI').value = p.imei1 || p.serial || '';
 
-      // COSTO — llenar y resaltar en verde
       const costoEl = $('crdCosto');
       costoEl.value = costo;
       costoEl.style.background = '#f0fdf4';
       costoEl.style.borderColor = '#16a34a';
 
-      // Precio venta sugerido con 45% margen
       $('crdVentaBase').value = Math.round(costo / 0.55);
-
       recalcCredito();
       toast('✅ ' + p.producto + ' — Costo: ' + fmt(costo));
+
     } else {
       $('crdIMEIInfo').style.display = 'none';
-      // Intentar en memoria local como fallback
-      const local = db.compras.find(c=>
-        (c.imei1||'').includes(val)||(c.imei2||'').includes(val)||
-        (c.serial||'').toLowerCase().includes(val.toLowerCase())
-      );
-      if(local && local.valorCompra > 0) {
-        $('crdEquipo').value = local.producto;
-        $('crdIMEI').value = local.imei1 || local.serial || '';
-        $('crdCosto').value = local.valorCompra;
-        $('crdCosto').style.background = '#f0fdf4';
-        $('crdVentaBase').value = Math.round(local.valorCompra / 0.55);
-        recalcCredito();
-        toast('✅ ' + local.producto + ' — Costo: ' + fmt(local.valorCompra));
-      }
     }
+
   } catch(e) {
     console.error('Error buscando IMEI:', e);
-    toast('Error buscando el IMEI', 'error');
+    // Fallback: buscar en memoria local
+    const local = db.compras.find(c=>
+      (c.imei1||'').includes(val)||(c.imei2||'').includes(val)||
+      (c.serial||'').toLowerCase().includes(val.toLowerCase())
+    );
+    if(local) {
+      $('crdEquipo').value = local.producto;
+      $('crdIMEI').value = local.imei1 || local.serial || '';
+      $('crdCosto').value = local.valorCompra;
+      $('crdCosto').style.background = '#f0fdf4';
+      $('crdVentaBase').value = Math.round(local.valorCompra / 0.55);
+      recalcCredito();
+      toast('✅ ' + local.producto + ' — Costo: ' + fmt(local.valorCompra));
+    }
   }
 }
 
