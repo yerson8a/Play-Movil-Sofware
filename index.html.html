@@ -1856,35 +1856,39 @@
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
             <div>
               <label class="form-label" style="font-size:10px;">Cédula Frente</label>
-              <div class="upload-zone" onclick="triggerUpload('upCedFront')" style="padding:10px;">
-                <input type="file" id="upCedFront" accept="image/*" onchange="handleUpload(this,'cedFrontPreview','')">
+              <label class="upload-zone" style="padding:10px;display:block;cursor:pointer;">
+                <input type="file" id="upCedFront" accept="image/*,application/pdf" onchange="handleUpload(this,'cedFrontPreview')" style="display:none;">
                 <div style="font-size:20px;">🪪</div>
-                <div id="cedFrontPreview" style="font-size:10px;color:#16a34a;margin-top:2px;"></div>
-              </div>
+                <div style="font-size:11px;color:#888899;margin-top:2px;">Toca para subir</div>
+                <div id="cedFrontPreview" style="font-size:10px;color:#16a34a;margin-top:2px;word-break:break-all;"></div>
+              </label>
             </div>
             <div>
               <label class="form-label" style="font-size:10px;">Cédula Reverso</label>
-              <div class="upload-zone" onclick="triggerUpload('upCedBack')" style="padding:10px;">
-                <input type="file" id="upCedBack" accept="image/*" onchange="handleUpload(this,'cedBackPreview','')">
+              <label class="upload-zone" style="padding:10px;display:block;cursor:pointer;">
+                <input type="file" id="upCedBack" accept="image/*,application/pdf" onchange="handleUpload(this,'cedBackPreview')" style="display:none;">
                 <div style="font-size:20px;">🪪</div>
-                <div id="cedBackPreview" style="font-size:10px;color:#16a34a;margin-top:2px;"></div>
-              </div>
+                <div style="font-size:11px;color:#888899;margin-top:2px;">Toca para subir</div>
+                <div id="cedBackPreview" style="font-size:10px;color:#16a34a;margin-top:2px;word-break:break-all;"></div>
+              </label>
             </div>
             <div>
               <label class="form-label" style="font-size:10px;">Foto con Producto</label>
-              <div class="upload-zone" onclick="triggerUpload('upFotoEntrega')" style="padding:10px;">
-                <input type="file" id="upFotoEntrega" accept="image/*" onchange="handleUpload(this,'fotoEntregaPreview','')">
+              <label class="upload-zone" style="padding:10px;display:block;cursor:pointer;">
+                <input type="file" id="upFotoEntrega" accept="image/*" onchange="handleUpload(this,'fotoEntregaPreview')" style="display:none;">
                 <div style="font-size:20px;">📸</div>
-                <div id="fotoEntregaPreview" style="font-size:10px;color:#16a34a;margin-top:2px;"></div>
-              </div>
+                <div style="font-size:11px;color:#888899;margin-top:2px;">Toca para subir</div>
+                <div id="fotoEntregaPreview" style="font-size:10px;color:#16a34a;margin-top:2px;word-break:break-all;"></div>
+              </label>
             </div>
             <div>
               <label class="form-label" style="font-size:10px;">Contrato / Acta</label>
-              <div class="upload-zone" onclick="triggerUpload('upContrato')" style="padding:10px;">
-                <input type="file" id="upContrato" accept="image/*,application/pdf" onchange="handleUpload(this,'contratoPreview','')">
+              <label class="upload-zone" style="padding:10px;display:block;cursor:pointer;">
+                <input type="file" id="upContrato" accept="image/*,application/pdf" onchange="handleUpload(this,'contratoPreview')" style="display:none;">
                 <div style="font-size:20px;">📝</div>
-                <div id="contratoPreview" style="font-size:10px;color:#16a34a;margin-top:2px;"></div>
-              </div>
+                <div style="font-size:11px;color:#888899;margin-top:2px;">Toca para subir</div>
+                <div id="contratoPreview" style="font-size:10px;color:#16a34a;margin-top:2px;word-break:break-all;"></div>
+              </label>
             </div>
           </div>
         </div>
@@ -1930,35 +1934,39 @@ rgin-top:10px;font-size:12px;color:#888899;">La factura se generará automática
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
             <div>
               <label class="form-label" style="font-size:10px;">Cédula Frente</label>
-              <div class="upload-zone" onclick="triggerUpload('upCedFront')" style="padding:10px;">
-                <input type="file" id="upCedFront" accept="image/*" onchange="handleUpload(this,'cedFrontPreview','')">
+              <label class="upload-zone" style="padding:10px;display:block;cursor:pointer;">
+                <input type="file" id="upCedFront" accept="image/*,application/pdf" onchange="handleUpload(this,'cedFrontPreview')" style="display:none;">
                 <div style="font-size:20px;">🪪</div>
-                <div id="cedFrontPreview" style="font-size:10px;color:#16a34a;margin-top:2px;"></div>
-              </div>
+                <div style="font-size:11px;color:#888899;margin-top:2px;">Toca para subir</div>
+                <div id="cedFrontPreview" style="font-size:10px;color:#16a34a;margin-top:2px;word-break:break-all;"></div>
+              </label>
             </div>
             <div>
               <label class="form-label" style="font-size:10px;">Cédula Reverso</label>
-              <div class="upload-zone" onclick="triggerUpload('upCedBack')" style="padding:10px;">
-                <input type="file" id="upCedBack" accept="image/*" onchange="handleUpload(this,'cedBackPreview','')">
+              <label class="upload-zone" style="padding:10px;display:block;cursor:pointer;">
+                <input type="file" id="upCedBack" accept="image/*,application/pdf" onchange="handleUpload(this,'cedBackPreview')" style="display:none;">
                 <div style="font-size:20px;">🪪</div>
-                <div id="cedBackPreview" style="font-size:10px;color:#16a34a;margin-top:2px;"></div>
-              </div>
+                <div style="font-size:11px;color:#888899;margin-top:2px;">Toca para subir</div>
+                <div id="cedBackPreview" style="font-size:10px;color:#16a34a;margin-top:2px;word-break:break-all;"></div>
+              </label>
             </div>
             <div>
               <label class="form-label" style="font-size:10px;">Foto con Producto</label>
-              <div class="upload-zone" onclick="triggerUpload('upFotoEntrega')" style="padding:10px;">
-                <input type="file" id="upFotoEntrega" accept="image/*" onchange="handleUpload(this,'fotoEntregaPreview','')">
+              <label class="upload-zone" style="padding:10px;display:block;cursor:pointer;">
+                <input type="file" id="upFotoEntrega" accept="image/*" onchange="handleUpload(this,'fotoEntregaPreview')" style="display:none;">
                 <div style="font-size:20px;">📸</div>
-                <div id="fotoEntregaPreview" style="font-size:10px;color:#16a34a;margin-top:2px;"></div>
-              </div>
+                <div style="font-size:11px;color:#888899;margin-top:2px;">Toca para subir</div>
+                <div id="fotoEntregaPreview" style="font-size:10px;color:#16a34a;margin-top:2px;word-break:break-all;"></div>
+              </label>
             </div>
             <div>
               <label class="form-label" style="font-size:10px;">Contrato / Acta</label>
-              <div class="upload-zone" onclick="triggerUpload('upContrato')" style="padding:10px;">
-                <input type="file" id="upContrato" accept="image/*,application/pdf" onchange="handleUpload(this,'contratoPreview','')">
+              <label class="upload-zone" style="padding:10px;display:block;cursor:pointer;">
+                <input type="file" id="upContrato" accept="image/*,application/pdf" onchange="handleUpload(this,'contratoPreview')" style="display:none;">
                 <div style="font-size:20px;">📝</div>
-                <div id="contratoPreview" style="font-size:10px;color:#16a34a;margin-top:2px;"></div>
-              </div>
+                <div style="font-size:11px;color:#888899;margin-top:2px;">Toca para subir</div>
+                <div id="contratoPreview" style="font-size:10px;color:#16a34a;margin-top:2px;word-break:break-all;"></div>
+              </label>
             </div>
           </div>
         </div>
@@ -3889,26 +3897,63 @@ function buscarIMEIVenta(val){
   } else {$('vcIMEIInfo').style.display='none';}
 }
 
-function buscarIMEICredito(val){
+async function buscarIMEICredito(val){
   if(val.length<5){$('crdIMEIInfo').style.display='none';return;}
-  const found=db.compras.find(c=>c.imei1.includes(val)||c.imei2.includes(val)||c.serial.toLowerCase().includes(val.toLowerCase()));
+
+  // Buscar primero en memoria local
+  let found = db.compras.find(c=>
+    (c.imei1||'').includes(val)||(c.imei2||'').includes(val)||
+    (c.serial||'').toLowerCase().includes(val.toLowerCase())
+  );
+
+  // Si no está en memoria, buscar directo en Supabase
+  if(!found) {
+    try {
+      const res = await sbFetch('productos', {
+        filter: `imei1=ilike.*${val}*&estado=eq.DISPONIBLE`,
+        select: 'id,producto,marca,modelo,imei1,imei2,serial,valor_compra,sede_id,proveedor_id'
+      });
+      if(res && res.length > 0) {
+        const p = res[0];
+        found = {
+          id: p.id,
+          producto: p.producto,
+          imei1: p.imei1||'',
+          imei2: p.imei2||'',
+          serial: p.serial||'',
+          valorCompra: parseFloat(p.valor_compra)||0,
+          sede: p.sede_id===1?'LOCAL PEREIRA':'LOCAL ARMENIA',
+          proveedorId: p.proveedor_id
+        };
+      }
+    } catch(e) { console.error('Error buscando IMEI:', e); }
+  }
+
   if(found){
-    const prov=db.proveedores.find(p=>p.id===found.proveedorId);
+    const prov = db.proveedores.find(p=>p.id===found.proveedorId);
     $('crdIMEIInfo').style.display='block';
-    $('crdInfoProducto').textContent=found.producto;
-    $('crdInfoProveedor').textContent=prov?prov.nombre:'—';
-    $('crdInfoCosto').textContent=fmt(found.valorCompra);
-    $('crdInfoSede').textContent=found.sede;
-    $('crdInfoIMEI').textContent=found.imei1||found.serial||'—';
-    $('crdEquipo').value=found.producto;
-    $('crdIMEI').value=found.imei1||found.serial||'';
-    $('crdCosto').value=found.valorCompra;
-    $('crdCosto').style.background='#f0fdf4';
-    const precio=Math.round(found.valorCompra/0.55);
-    $('crdVentaBase').value=precio;
+    $('crdInfoProducto').textContent = found.producto;
+    $('crdInfoProveedor').textContent = prov?prov.nombre:'—';
+    $('crdInfoCosto').textContent = fmt(found.valorCompra);
+    $('crdInfoSede').textContent = found.sede;
+    $('crdInfoIMEI').textContent = found.imei1||found.serial||'—';
+    $('crdEquipo').value = found.producto;
+    $('crdIMEI').value = found.imei1||found.serial||'';
+    // Llenar costo automáticamente
+    const costoEl = $('crdCosto');
+    if(costoEl) {
+      costoEl.value = found.valorCompra;
+      costoEl.style.background = '#f0fdf4';
+      costoEl.style.borderColor = '#16a34a';
+    }
+    // Sugerir precio de venta con 45% margen
+    const precio = Math.round(found.valorCompra / 0.55);
+    if($('crdVentaBase')) $('crdVentaBase').value = precio;
     recalcCredito();
-    toast('✅ Producto encontrado: '+found.producto);
-  }else{$('crdIMEIInfo').style.display='none';}
+    toast('✅ ' + found.producto + ' — Costo: ' + fmt(found.valorCompra));
+  } else {
+    $('crdIMEIInfo').style.display='none';
+  }
 }
 
 function autoComisionFinanciera(){const sel=$('vcFinanciera').value;const pct=parseFloat(sel.split(':')[1])||0;$('vcComFinanciera').value=pct;calcVContado();}
@@ -4034,16 +4079,18 @@ function triggerUpload(inputId) {
   if(el) el.click();
 }
 
-function handleUpload(input, previewId, label) {
+function handleUpload(input, previewId) {
   const file = input.files[0];
   if(!file) return;
   const preview = document.getElementById(previewId);
   if(preview) {
-    const size = (file.size/1024).toFixed(0);
-    preview.textContent = '✅ ' + file.name.substring(0,20) + (file.name.length>20?'...':'') + ' (' + size + 'KB)';
+    const size = file.size > 1024*1024
+      ? (file.size/1024/1024).toFixed(1)+'MB'
+      : (file.size/1024).toFixed(0)+'KB';
+    const nombre = file.name.length > 22 ? file.name.substring(0,22)+'...' : file.name;
+    preview.textContent = '✅ ' + nombre + ' · ' + size;
     preview.style.color = '#16a34a';
   }
-  // Actualizar el upload-zone padre visualmente
   const zone = input.closest('.upload-zone');
   if(zone) {
     zone.style.borderColor = '#16a34a';
