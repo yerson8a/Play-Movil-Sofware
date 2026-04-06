@@ -668,6 +668,7 @@
         </div>
         <div style="display:flex;gap:10px;">
           <button class="btn btn-outline btn-sm" onclick="exportarInventario()">↓ Exportar</button>
+          <button class="btn btn-ghost btn-sm" style="color:#dc2626;border-color:#dc2626;" onclick="openModal('modalSalidaInventario')">📤 Salida sin Venta</button>
           <button class="btn btn-primary btn-sm" onclick="openModal('modalNuevoEquipo')">+ Agregar Equipo</button>
         </div>
       </div>
@@ -2512,6 +2513,64 @@ rgin-top:10px;font-size:12px;color:#888899;">La factura se generará automática
   </div>
 </div>
 
+<!-- Modal Anular / Cambio Equipo -->
+<div class="modal-overlay" id="modalAnularVenta">
+  <div class="modal" style="max-width:500px;">
+    <div class="modal-header">
+      <div class="modal-title" id="anularTitulo">❌ Anular Venta</div>
+      <button class="modal-close" onclick="closeModal('modalAnularVenta')">✕</button>
+    </div>
+    <input type="hidden" id="anularCreditoId">
+    <input type="hidden" id="anularTipo">
+
+    <div id="anularContenido">
+      <!-- Se llena dinámicamente -->
+    </div>
+
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+      <button class="btn btn-ghost" onclick="closeModal('modalAnularVenta')">Cancelar</button>
+      <button class="btn btn-primary" id="anularConfirmarBtn" onclick="ejecutarAnulacion()">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Salida Inventario sin Venta -->
+<div class="modal-overlay" id="modalSalidaInventario">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-header">
+      <div class="modal-title">📤 Salida de Inventario</div>
+      <button class="modal-close" onclick="closeModal('modalSalidaInventario')">✕</button>
+    </div>
+    <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:12px;margin-bottom:16px;font-size:13px;color:#9a3412;">
+      ⚠️ Esta acción saca el equipo del inventario sin registrar venta. Solo usar para obsolescencia o mal funcionamiento.
+    </div>
+    <div class="form-group">
+      <label class="form-label">Producto / IMEI *</label>
+      <input type="text" class="form-control" id="salidaIMEI" placeholder="Escribe el IMEI o nombre del equipo" oninput="buscarParaSalida(this.value)">
+      <div id="salidaInfo" style="margin-top:8px;display:none;background:#f0fdf4;border-radius:8px;padding:10px;font-size:13px;"></div>
+    </div>
+    <input type="hidden" id="salidaProductoId">
+    <div class="form-group">
+      <label class="form-label">Motivo de Salida *</label>
+      <select class="form-control" id="salidaMotivo">
+        <option value="obsolescencia">Obsolescencia</option>
+        <option value="mal_funcionamiento">Mal funcionamiento</option>
+        <option value="robo">Robo / Hurto</option>
+        <option value="devolucion_proveedor">Devolución a proveedor</option>
+        <option value="otro">Otro</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Observaciones</label>
+      <textarea class="form-control" id="salidaObs" rows="2" placeholder="Describe el motivo detallado..."></textarea>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
+      <button class="btn btn-ghost" onclick="closeModal('modalSalidaInventario')">Cancelar</button>
+      <button class="btn btn-primary" style="background:#dc2626;" onclick="ejecutarSalidaInventario()">📤 Confirmar Salida</button>
+    </div>
+  </div>
+</div>
+
 <!-- TOASTS -->
 <div class="toast-container" id="toastContainer"></div>
 
@@ -3314,9 +3373,15 @@ function renderCreditos(filtro='activos'){
         </div>
         <div class="progress-bar"><div class="progress-fill green" style="width:${pct}%;"></div></div>
       </div>
-      <div class="cc-footer">
-        <div class="cc-asesor">Cédula: ${c.cedula}</div>
-        <button class="btn btn-sm btn-outline" onclick="registrarPago(${c.id})">+ Pago</button>
+      <div class="cc-footer" style="flex-direction:column;gap:8px;align-items:stretch;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div class="cc-asesor">Cédula: ${c.cedula}</div>
+          <button class="btn btn-sm btn-outline" onclick="registrarPago(${c.id})">+ Pago</button>
+        </div>
+        <div style="display:flex;gap:6px;border-top:1px solid #f0ecf8;padding-top:8px;">
+          <button class="btn btn-sm btn-ghost" style="flex:1;font-size:11px;" onclick="abrirCambioEquipo(${c.id})" title="Cambiar equipo">🔄 Cambio equipo</button>
+          <button class="btn btn-sm btn-ghost" style="flex:1;font-size:11px;color:#dc2626;" onclick="confirmarAnularCredito(${c.id})" title="Anular venta">❌ Anular</button>
+        </div>
       </div>
     </div>`;
   }).join(''):'<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-text">No hay créditos en esta categoría</div></div>';
@@ -4093,6 +4158,231 @@ function recalcCredito(){
 }
 
 function seleccionarInicialCredito(ini,saldo,pct){toast(`Inicial ${(pct*100).toFixed(0)}%: ${fmt(ini)} | Saldo: ${fmt(saldo)}`,'success');}
+
+// ============================================================
+// ANULACION DE VENTAS Y CAMBIO DE EQUIPO
+// ============================================================
+
+function confirmarAnularCredito(id) {
+  const c = db.creditos.find(x => x.id === id);
+  if(!c) return;
+  document.getElementById('anularCreditoId').value = id;
+  document.getElementById('anularTipo').value = 'anular';
+  document.getElementById('anularTitulo').textContent = '❌ Anular Venta';
+  document.getElementById('anularConfirmarBtn').style.background = '#dc2626';
+  document.getElementById('anularContenido').innerHTML = `
+    <div style="background:#fee2e2;border-radius:10px;padding:14px;margin-bottom:14px;">
+      <div style="font-weight:600;font-size:14px;margin-bottom:6px;">¿Anular esta venta?</div>
+      <div style="font-size:13px;color:#555577;">
+        <div>👤 Cliente: <strong>${c.cliente}</strong></div>
+        <div>📱 Equipo: <strong>${c.equipo || '—'}</strong></div>
+        <div>💰 Saldo pendiente: <strong style="color:#dc2626;">${fmt(c.saldo)}</strong></div>
+      </div>
+    </div>
+    <div style="font-size:13px;color:#555577;margin-bottom:12px;">
+      Al anular: el crédito se marcará como <strong>anulado</strong> y el equipo volverá al inventario como <strong>DISPONIBLE</strong>.
+    </div>
+    <div class="form-group">
+      <label class="form-label">Motivo de anulación *</label>
+      <select class="form-control" id="anularMotivo">
+        <option value="cliente_devuelve">Cliente devuelve el equipo</option>
+        <option value="error_registro">Error en el registro</option>
+        <option value="no_aprobado">No aprobado por financiera</option>
+        <option value="otro">Otro motivo</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Observaciones</label>
+      <textarea class="form-control" id="anularObs" rows="2" placeholder="Detalle el motivo..."></textarea>
+    </div>`;
+  openModal('modalAnularVenta');
+}
+
+function abrirCambioEquipo(id) {
+  const c = db.creditos.find(x => x.id === id);
+  if(!c) return;
+  document.getElementById('anularCreditoId').value = id;
+  document.getElementById('anularTipo').value = 'cambio';
+  document.getElementById('anularTitulo').textContent = '🔄 Cambio de Equipo';
+  document.getElementById('anularConfirmarBtn').style.background = '#6B2D8B';
+  document.getElementById('anularContenido').innerHTML = `
+    <div style="background:#f7f5fb;border-radius:10px;padding:14px;margin-bottom:14px;font-size:13px;">
+      <div>👤 Cliente: <strong>${c.cliente}</strong></div>
+      <div>📱 Equipo actual: <strong>${c.equipo || '—'}</strong></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">IMEI del nuevo equipo *</label>
+      <input type="text" class="form-control" id="cambioNuevoIMEI" placeholder="Busca por IMEI del equipo a entregar" oninput="buscarNuevoEquipoCambio(this.value)">
+      <div id="cambioNuevoInfo" style="margin-top:8px;display:none;background:#f0fdf4;border-radius:8px;padding:10px;font-size:13px;"></div>
+    </div>
+    <input type="hidden" id="cambioNuevoProductoId">
+    <div class="form-group">
+      <label class="form-label">Motivo del cambio</label>
+      <select class="form-control" id="cambioMotivo">
+        <option value="falla_tecnica">Falla técnica del equipo original</option>
+        <option value="cliente_prefiere">Cliente prefiere otro equipo</option>
+        <option value="garantia">Garantía</option>
+        <option value="otro">Otro</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Observaciones</label>
+      <textarea class="form-control" id="cambioObs" rows="2" placeholder="Detalle del cambio..."></textarea>
+    </div>`;
+  openModal('modalAnularVenta');
+}
+
+async function buscarNuevoEquipoCambio(val) {
+  if(val.length < 5) { document.getElementById('cambioNuevoInfo').style.display='none'; return; }
+  const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+  const base = SUPABASE_URL + '/rest/v1/productos';
+  const sel = 'select=id,producto,imei1,valor_compra&estado=eq.DISPONIBLE';
+  let res = await fetch(`${base}?${sel}&imei1=eq.${val}`, {headers});
+  let rows = await res.json();
+  if(!rows.length) {
+    res = await fetch(`${base}?select=id,producto,imei1,valor_compra&estado=eq.DISPONIBLE&imei2=eq.${val}`, {headers});
+    rows = await res.json();
+  }
+  const infoEl = document.getElementById('cambioNuevoInfo');
+  if(rows.length > 0) {
+    const p = rows[0];
+    document.getElementById('cambioNuevoProductoId').value = p.id;
+    infoEl.style.display = 'block';
+    infoEl.innerHTML = `✅ <strong>${p.producto}</strong> — Costo: ${fmt(parseFloat(p.valor_compra))}`;
+  } else {
+    infoEl.style.display = 'none';
+  }
+}
+
+async function buscarParaSalida(val) {
+  if(val.length < 5) { document.getElementById('salidaInfo').style.display='none'; return; }
+  const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+  const base = SUPABASE_URL + '/rest/v1/productos';
+  let res = await fetch(`${base}?select=id,producto,imei1,valor_compra,estado&imei1=eq.${val}`, {headers});
+  let rows = await res.json();
+  if(!rows.length) {
+    res = await fetch(`${base}?select=id,producto,imei1,valor_compra,estado&serial=eq.${val}`, {headers});
+    rows = await res.json();
+  }
+  const infoEl = document.getElementById('salidaInfo');
+  if(rows.length > 0) {
+    const p = rows[0];
+    document.getElementById('salidaProductoId').value = p.id;
+    infoEl.style.display = 'block';
+    infoEl.innerHTML = `📱 <strong>${p.producto}</strong> — IMEI: ${p.imei1||'—'} — Estado: <span class="badge ${p.estado==='DISPONIBLE'?'badge-green':'badge-orange'}">${p.estado}</span>`;
+  } else {
+    infoEl.style.display = 'none';
+    document.getElementById('salidaProductoId').value = '';
+  }
+}
+
+async function ejecutarAnulacion() {
+  const id = parseInt(document.getElementById('anularCreditoId').value);
+  const tipo = document.getElementById('anularTipo').value;
+
+  if(tipo === 'anular') {
+    const motivo = document.getElementById('anularMotivo')?.value || '';
+    const obs = document.getElementById('anularObs')?.value || '';
+    const credito = db.creditos.find(c => c.id === id);
+    if(!credito) return;
+
+    try {
+      showLoader('Anulando venta...');
+      // Marcar crédito como anulado
+      await sbFetch(`creditos?id=eq.${id}`, {
+        method: 'PATCH',
+        body: { estado: 'pagado', observaciones: 'ANULADO: ' + motivo + '. ' + obs }
+      });
+
+      // Devolver equipo al inventario si hay IMEI
+      if(credito.equipo) {
+        const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+        const base = SUPABASE_URL + '/rest/v1/productos';
+        // Buscar el producto por nombre y marcarlo disponible
+        const res = await fetch(`${base}?select=id&producto=eq.${encodeURIComponent(credito.equipo)}&estado=eq.VENDIDO&limit=1`, {headers});
+        const rows = await res.json();
+        if(rows.length > 0) {
+          await sbFetch(`productos?id=eq.${rows[0].id}`, { method: 'PATCH', body: { estado: 'DISPONIBLE' } });
+        }
+      }
+
+      credito.estado = 'pagado';
+      hideLoader();
+      closeModal('modalAnularVenta');
+      await cargarDatosPorSede(sesionActiva);
+      renderCreditos();
+      renderInventario();
+      toast('Venta anulada. Equipo devuelto al inventario ✅');
+    } catch(e) { hideLoader(); toast('Error: ' + e.message, 'error'); }
+
+  } else if(tipo === 'cambio') {
+    const nuevoId = parseInt(document.getElementById('cambioNuevoProductoId').value);
+    const obs = document.getElementById('cambioObs')?.value || '';
+    const credito = db.creditos.find(c => c.id === id);
+    if(!credito) { toast('Selecciona el nuevo equipo primero', 'error'); return; }
+    if(!nuevoId) { toast('Busca y selecciona el nuevo equipo por IMEI', 'error'); return; }
+
+    try {
+      showLoader('Procesando cambio...');
+      const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+      const base = SUPABASE_URL + '/rest/v1/productos';
+
+      // Obtener datos del nuevo equipo
+      const resNuevo = await fetch(`${base}?select=id,producto,imei1,valor_compra&id=eq.${nuevoId}`, {headers});
+      const nuevoEquipo = await resNuevo.json();
+      if(!nuevoEquipo.length) { hideLoader(); toast('Equipo no encontrado', 'error'); return; }
+      const nuevo = nuevoEquipo[0];
+
+      // Devolver equipo anterior al inventario
+      if(credito.equipo) {
+        const resAnterior = await fetch(`${base}?select=id&producto=eq.${encodeURIComponent(credito.equipo)}&estado=eq.VENDIDO&limit=1`, {headers});
+        const anterior = await resAnterior.json();
+        if(anterior.length > 0) {
+          await sbFetch(`productos?id=eq.${anterior[0].id}`, { method: 'PATCH', body: { estado: 'DISPONIBLE' } });
+        }
+      }
+
+      // Marcar nuevo equipo como vendido
+      await sbFetch(`productos?id=eq.${nuevoId}`, { method: 'PATCH', body: { estado: 'VENDIDO' } });
+
+      // Actualizar crédito con el nuevo equipo
+      await sbFetch(`creditos?id=eq.${id}`, {
+        method: 'PATCH',
+        body: { producto_desc: nuevo.producto, observaciones: 'CAMBIO EQUIPO: ' + (credito.equipo||'') + ' → ' + nuevo.producto + '. ' + obs }
+      });
+
+      hideLoader();
+      closeModal('modalAnularVenta');
+      await cargarDatosPorSede(sesionActiva);
+      renderCreditos();
+      renderInventario();
+      toast('Cambio de equipo realizado ✅ — ' + nuevo.producto);
+    } catch(e) { hideLoader(); toast('Error: ' + e.message, 'error'); }
+  }
+}
+
+async function ejecutarSalidaInventario() {
+  const productoId = document.getElementById('salidaProductoId').value;
+  const motivo = document.getElementById('salidaMotivo').value;
+  const obs = document.getElementById('salidaObs').value;
+  if(!productoId) { toast('Busca el equipo por IMEI primero', 'error'); return; }
+
+  try {
+    showLoader('Procesando salida...');
+    await sbFetch(`productos?id=eq.${productoId}`, {
+      method: 'PATCH',
+      body: { estado: 'DEVUELTO', observaciones: 'SALIDA: ' + motivo + '. ' + obs }
+    });
+    hideLoader();
+    closeModal('modalSalidaInventario');
+    await cargarDatosPorSede(sesionActiva);
+    renderInventario();
+    document.getElementById('salidaIMEI').value = '';
+    document.getElementById('salidaInfo').style.display = 'none';
+    document.getElementById('salidaObs').value = '';
+    toast('Equipo dado de baja del inventario ✅');
+  } catch(e) { hideLoader(); toast('Error: ' + e.message, 'error'); }
+}
 
 // ============================================================
 // UPLOAD DE ARCHIVOS
