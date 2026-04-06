@@ -196,11 +196,11 @@
 
   /* UPLOAD AREA */
   .upload-zone {
-    border:2px dashed var(--border); border-radius:12px; padding:24px; text-align:center;
-    cursor:pointer; transition:all .2s; background:var(--bg3);
+    border:2px dashed #e0d8f0; border-radius:12px; padding:16px; text-align:center;
+    cursor:pointer; transition:all .2s; background:#fafafa; position:relative;
   }
-  .upload-zone:hover { border-color:var(--pink); background:var(--pink-glow); }
-  .upload-zone input { display:none; }
+  .upload-zone:hover { border-color:#6B2D8B; background:#f7f5fb; }
+  .upload-zone input { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; }
   .upload-icon { font-size:32px; margin-bottom:8px; }
   .upload-text { font-size:13px; color:var(--text2); }
   .upload-text strong { color:var(--pink); }
@@ -1643,12 +1643,9 @@
           </div>
           <div class="form-row">
             <div class="form-group">
-              <label class="form-label">IVA</label>
-              <select class="form-control" id="crdIVA" onchange="recalcCredito()">
-                <option value="0">Sin IVA (0%)</option>
-                <option value="5">IVA 5%</option>
-                <option value="19">IVA 19%</option>
-              </select>
+              <label class="form-label">IVA (%)</label>
+              <input type="number" class="form-control" id="crdIVA" placeholder="0" oninput="recalcCredito()" min="0" max="100" step="0.1" value="0">
+              <div style="font-size:11px;color:#888899;margin-top:3px;">Valor IVA: <span id="crdIVAval" style="color:#d97706;font-weight:600;">$0</span></div>
             </div>
             <div class="form-group">
               <label class="form-label">Descuento ($)</label>
@@ -1741,12 +1738,35 @@
                 <option value="8">8 quincenas (4 meses)</option>
                 <option value="10">10 quincenas (5 meses)</option>
                 <option value="12" selected>12 quincenas (6 meses)</option>
+                <option value="14">14 quincenas (7 meses)</option>
                 <option value="16">16 quincenas (8 meses)</option>
                 <option value="18">18 quincenas (9 meses)</option>
+                <option value="20">20 quincenas (10 meses)</option>
+                <option value="22">22 quincenas (11 meses)</option>
                 <option value="24">24 quincenas (12 meses)</option>
+                <option value="26">26 quincenas (13 meses)</option>
+                <option value="28">28 quincenas (14 meses)</option>
+                <option value="30">30 quincenas (15 meses)</option>
+                <option value="32">32 quincenas (16 meses)</option>
+                <option value="34">34 quincenas (17 meses)</option>
                 <option value="36">36 quincenas (18 meses)</option>
+                <option value="38">38 quincenas (19 meses)</option>
+                <option value="40">40 quincenas (20 meses)</option>
+                <option value="42">42 quincenas (21 meses)</option>
+                <option value="44">44 quincenas (22 meses)</option>
+                <option value="46">46 quincenas (23 meses)</option>
                 <option value="48">48 quincenas (24 meses)</option>
+                <option value="50">50 quincenas (25 meses)</option>
+                <option value="52">52 quincenas (26 meses)</option>
+                <option value="54">54 quincenas (27 meses)</option>
+                <option value="56">56 quincenas (28 meses)</option>
+                <option value="58">58 quincenas (29 meses)</option>
                 <option value="60">60 quincenas (30 meses)</option>
+                <option value="62">62 quincenas (31 meses)</option>
+                <option value="64">64 quincenas (32 meses)</option>
+                <option value="66">66 quincenas (33 meses)</option>
+                <option value="68">68 quincenas (34 meses)</option>
+                <option value="70">70 quincenas (35 meses)</option>
                 <option value="72">72 quincenas (36 meses)</option>
               </select>
             </div>
@@ -3836,7 +3856,16 @@ function calcularSim(){
 function selectInicial(el,pct,ini,saldo){document.querySelectorAll('.inicial-card').forEach(c=>c.classList.remove('selected'));el.classList.add('selected');toast(`Inicial del ${(pct*100).toFixed(0)}%: ${fmt(ini)} — Saldo: ${fmt(saldo)}`,'success');}
 
 let crdInicialSeleccionada=0;
-function elegirInicial(el,ini,saldo){document.querySelectorAll('#crdInicialesGrid .inicial-card').forEach(c=>c.classList.remove('selected'));el.classList.add('selected');crdInicialSeleccionada=ini;if($('crdInicialManual'))$('crdInicialManual').value='';toast('Inicial: '+fmt(ini)+' — Saldo: '+fmt(saldo));}
+function elegirInicial(el,ini,saldo){
+  document.querySelectorAll('#crdInicialesGrid .inicial-card').forEach(c=>{
+    c.style.borderColor='#ece8f5'; c.style.background='';
+  });
+  el.style.borderColor='#6B2D8B';
+  el.style.background='#f3e8f9';
+  crdInicialSeleccionada=ini;
+  if($('crdInicialManual')) $('crdInicialManual').value='';
+  recalcCredito();
+}
 
 function buscarIMEIVenta(val){
   if(val.length<5){$('vcIMEIInfo').style.display='none';return;}
@@ -3874,6 +3903,7 @@ function buscarIMEICredito(val){
     $('crdEquipo').value=found.producto;
     $('crdIMEI').value=found.imei1||found.serial||'';
     $('crdCosto').value=found.valorCompra;
+    $('crdCosto').style.background='#f0fdf4';
     const precio=Math.round(found.valorCompra/0.55);
     $('crdVentaBase').value=precio;
     recalcCredito();
@@ -3950,7 +3980,7 @@ function recalcCredito(){
   setEl('crdGananciaNet', fmt(gananciaNeta), gananciaNeta>0?'#16a34a':'#dc2626');
   setEl('crdMargenReal', margen+'%', gananciaNeta>0?'#16a34a':'#dc2626');
 
-  // Iniciales
+  // Iniciales predefinidas
   const pcts = tipo==='reportado' ? [0.30,0.40,0.50] : [0.20,0.30,0.40];
   const grid = $('crdInicialesGrid');
   if(grid) grid.innerHTML = pcts.map(p => {
@@ -3964,14 +3994,14 @@ function recalcCredito(){
     </div>`;
   }).join('');
 
-  // Calcular valor a financiar con la inicial seleccionada
-  const inicialUsada = crdInicialSeleccionada || Math.round(precioFinal * pcts[0]);
-  const saldoFinanciar = precioFinal - inicialUsada;
+  // Calcular con la inicial que haya — personalizada tiene prioridad
+  const inicialManual = parseFloat($('crdInicialManual')?.value)||0;
+  const inicialUsada = inicialManual > 0 ? inicialManual : (crdInicialSeleccionada > 0 ? crdInicialSeleccionada : Math.round(precioFinal * pcts[0]));
+  const saldoFinanciar = Math.max(0, precioFinal - inicialUsada);
 
-  // Intereses sobre valor a financiar
+  // Intereses aplicados solo al valor a financiar
   let totalIntereses = 0;
   if(aplicaIntereses && saldoFinanciar > 0) {
-    // Interes compuesto quincenal: Saldo * tasa * quincenas (simplificado)
     totalIntereses = Math.round(saldoFinanciar * (tasaInteres/100) * quincenas);
     setEl('crdValorIntereses', fmt(totalIntereses));
   } else {
@@ -3982,17 +4012,44 @@ function recalcCredito(){
   setEl('crdValorFinanciar', fmt(totalFinanciar));
 
   // Cuota quincenal
+  const resEl = $('crdCuotaResultado');
   if(quincenas > 0 && totalFinanciar > 0) {
     const cuotaQ = Math.round(totalFinanciar / quincenas);
-    const resEl = $('crdCuotaResultado');
     if(resEl) resEl.style.display = 'block';
     setEl('crdCuotaValor', fmt(cuotaQ));
-    const meses = (quincenas/2).toFixed(0);
-    setEl('crdCuotaDetalle', `${quincenas} quincenas (${meses} meses) · Financiar: ${fmt(totalFinanciar)}${aplicaIntereses?' · Interés '+tasaInteres+'% qnal':''}`);
+    const meses = (quincenas/2).toFixed(1).replace('.0','');
+    setEl('crdCuotaDetalle', `Inicial: ${fmt(inicialUsada)} · ${quincenas} quincenas (${meses} meses) · Financiar: ${fmt(totalFinanciar)}${aplicaIntereses?' · Interés '+tasaInteres+'% qnal':''}`);
+  } else {
+    if(resEl) resEl.style.display = 'none';
   }
 }
 
 function seleccionarInicialCredito(ini,saldo,pct){toast(`Inicial ${(pct*100).toFixed(0)}%: ${fmt(ini)} | Saldo: ${fmt(saldo)}`,'success');}
+
+// ============================================================
+// UPLOAD DE ARCHIVOS
+// ============================================================
+function triggerUpload(inputId) {
+  const el = document.getElementById(inputId);
+  if(el) el.click();
+}
+
+function handleUpload(input, previewId, label) {
+  const file = input.files[0];
+  if(!file) return;
+  const preview = document.getElementById(previewId);
+  if(preview) {
+    const size = (file.size/1024).toFixed(0);
+    preview.textContent = '✅ ' + file.name.substring(0,20) + (file.name.length>20?'...':'') + ' (' + size + 'KB)';
+    preview.style.color = '#16a34a';
+  }
+  // Actualizar el upload-zone padre visualmente
+  const zone = input.closest('.upload-zone');
+  if(zone) {
+    zone.style.borderColor = '#16a34a';
+    zone.style.background = '#f0fdf4';
+  }
+}
 
 // ============================================================
 // FACTURA
