@@ -4138,15 +4138,31 @@ async function guardarFinanciera() {
   const nombre = document.getElementById('finNombre').value.trim();
   const comision = parseFloat(document.getElementById('finComision').value) || 0;
   if (!nombre) { toast('El nombre es obligatorio', 'error'); return; }
-  const nueva = { id: Date.now(), nombre: nombre.toUpperCase(), comision, plazo_max: parseInt(document.getElementById('finPlazo').value)||0, estado: document.getElementById('finEstado').value, observaciones: document.getElementById('finObs').value || '' };
-  dbAdmin.financieras.push(nueva);
-  closeModal('modalNuevaFinanciera');
-  renderFinancieras();
-  poblarSelectFinancieras();
-  toast('Financiera registrada ✅');
+  const row = {
+    nombre: nombre.toUpperCase(),
+    comision,
+    plazo_max: parseInt(document.getElementById('finPlazo').value)||0,
+    estado: document.getElementById('finEstado').value,
+    observaciones: document.getElementById('finObs').value || ''
+  };
+  try {
+    showLoader('Guardando financiera...');
+    const res = await sbFetch('financieras', { method: 'POST', body: row });
+    dbAdmin.financieras.push(res[0]);
+    closeModal('modalNuevaFinanciera');
+    ['finNombre','finComision','finPlazo','finObs'].forEach(id => { const e = document.getElementById(id); if(e) e.value=''; });
+    hideLoader();
+    renderFinancieras();
+    poblarSelectFinancieras();
+    toast('Financiera registrada ✅');
+  } catch(e) {
+    hideLoader();
+    toast('Error: ' + e.message, 'error');
+  }
 }
 
 function abrirEditarFinanciera(id) {
+  id = parseInt(id);
   const f = dbAdmin.financieras.find(x => x.id === id);
   if (!f) return;
   document.getElementById('editFinId').value = id;
@@ -4158,34 +4174,52 @@ function abrirEditarFinanciera(id) {
   openModal('modalEditarFinanciera');
 }
 
-function actualizarFinanciera() {
+async function actualizarFinanciera() {
   const id = parseInt(document.getElementById('editFinId').value);
-  const idx = dbAdmin.financieras.findIndex(x => x.id === id);
-  if (idx === -1) return;
-  dbAdmin.financieras[idx] = { ...dbAdmin.financieras[idx],
+  const row = {
     nombre: document.getElementById('editFinNombre').value.toUpperCase(),
     comision: parseFloat(document.getElementById('editFinComision').value)||0,
     plazo_max: parseInt(document.getElementById('editFinPlazo').value)||0,
     estado: document.getElementById('editFinEstado').value,
     observaciones: document.getElementById('editFinObs').value||''
   };
-  closeModal('modalEditarFinanciera');
-  renderFinancieras();
-  poblarSelectFinancieras();
-  toast('Financiera actualizada ✅');
+  try {
+    showLoader('Actualizando...');
+    await sbFetch(`financieras?id=eq.${id}`, { method: 'PATCH', body: row });
+    const idx = dbAdmin.financieras.findIndex(x => x.id === id);
+    if (idx !== -1) dbAdmin.financieras[idx] = { ...dbAdmin.financieras[idx], ...row };
+    closeModal('modalEditarFinanciera');
+    hideLoader();
+    renderFinancieras();
+    poblarSelectFinancieras();
+    toast('Financiera actualizada ✅');
+  } catch(e) { hideLoader(); toast('Error: ' + e.message, 'error'); }
 }
 
-function toggleEstadoFinanciera(id) {
+async function toggleEstadoFinanciera(id) {
+  id = parseInt(id);
   const f = dbAdmin.financieras.find(x => x.id === id);
-  if (f) { f.estado = f.estado === 'activa' ? 'inactiva' : 'activa'; renderFinancieras(); poblarSelectFinancieras(); toast('Estado actualizado'); }
+  if (!f) return;
+  const nuevoEstado = f.estado === 'activa' ? 'inactiva' : 'activa';
+  try {
+    await sbFetch(`financieras?id=eq.${id}`, { method: 'PATCH', body: { estado: nuevoEstado } });
+    f.estado = nuevoEstado;
+    renderFinancieras();
+    poblarSelectFinancieras();
+    toast('Estado actualizado');
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
 }
 
-function eliminarFinanciera(id) {
+async function eliminarFinanciera(id) {
+  id = parseInt(id);
   if (!confirm('¿Eliminar esta financiera?')) return;
-  dbAdmin.financieras = dbAdmin.financieras.filter(x => x.id !== id);
-  renderFinancieras();
-  poblarSelectFinancieras();
-  toast('Financiera eliminada');
+  try {
+    await sbFetch(`financieras?id=eq.${id}`, { method: 'DELETE' });
+    dbAdmin.financieras = dbAdmin.financieras.filter(x => x.id !== id);
+    renderFinancieras();
+    poblarSelectFinancieras();
+    toast('Financiera eliminada');
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
 }
 
 function poblarSelectFinancieras() {
