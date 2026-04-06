@@ -2350,9 +2350,15 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 // ── Función base para llamadas a Supabase REST API ──────────
 async function sbFetch(tabla, options = {}) {
   const { method='GET', filter='', body=null, select='*', order='' } = options;
-  let url = `${SUPABASE_URL}/rest/v1/${tabla}?select=${select}`;
-  if (filter) url += `&${filter}`;
-  if (order) url += `&order=${order}`;
+  // Si tabla ya contiene ?, es un filtro directo (ej: "sedes?id=eq.3")
+  let url;
+  if (tabla.includes('?')) {
+    url = `${SUPABASE_URL}/rest/v1/${tabla}`;
+  } else {
+    url = `${SUPABASE_URL}/rest/v1/${tabla}?select=${select}`;
+    if (filter) url += `&${filter}`;
+    if (order) url += `&order=${order}`;
+  }
 
   const headers = {
     'apikey': SUPABASE_KEY,
