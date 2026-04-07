@@ -3686,12 +3686,18 @@ async function guardarVentaContado(){
     obs:$('vcObservaciones')?.value||'',
     productoId:comp?comp.id:null
   };
+  // Validar que el equipo esté disponible antes de guardar
+  const imeiVC = $('vcIMEI')?.value||'';
+  const equipoVC = $('vcEquipo')?.value||'';
+  const disponibleVC = await validarDisponibilidadProducto(imeiVC, equipoVC);
+  if(!disponibleVC) return;
+
   try{
     await guardarVentaDB(datos);
     closeModal('modalVentaContado');
     renderVentas();renderInventario();
     toast('Venta registrada en Supabase ✅');
-  }catch(e){}
+  }catch(e){ toast('Error: '+e.message,'error'); }
 }
 
 async function guardarCredito(){
@@ -3721,6 +3727,12 @@ async function guardarCredito(){
 
   if(!$('crdCliente')?.value?.trim()){ toast('El nombre del cliente es obligatorio','error'); return; }
   if(!$('crdEquipo')?.value?.trim()){ toast('El equipo es obligatorio','error'); return; }
+
+  // Validar que el equipo esté disponible (no vendido ni duplicado)
+  const imeiCrd = document.getElementById('crdIMEI')?.value||'';
+  const equipoCrd = document.getElementById('crdEquipo')?.value||'';
+  const disponibleCrd = await validarDisponibilidadProducto(imeiCrd, equipoCrd);
+  if(!disponibleCrd) return;
 
   const datos = {
     equipo: $('crdEquipo')?.value||'—',
@@ -4382,6 +4394,82 @@ async function ejecutarSalidaInventario() {
     document.getElementById('salidaObs').value = '';
     toast('Equipo dado de baja del inventario ✅');
   } catch(e) { hideLoader(); toast('Error: ' + e.message, 'error'); }
+}
+
+// ============================================================
+// VALIDACION IMEI / EQUIPO DUPLICADO
+// ============================================================
+async function validarDisponibilidadProducto(imei, nombreEquipo) {
+  // Si hay IMEI buscar en Supabase si ya está vendido
+  if(imei && imei.length > 5) {
+    const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+    const base = SUPABASE_URL + '/rest/v1/productos';
+
+    // Buscar por imei1
+    let res = await fetch(`${base}?select=id,producto,estado,imei1&imei1=eq.${imei}`, {headers});
+    let rows = await res.json();
+
+    if(!rows.length) {
+      res = await fetch(`${base}?select=id,producto,estado,imei2&imei2=eq.${imei}`, {headers});
+      rows = await res.json();
+    }
+
+    if(rows.length > 0) {
+      const p = rows[0];
+      if(p.estado === 'VENDIDO') {
+        mostrarErrorVenta(
+          '⚠️ Equipo ya vendido',
+          `El equipo <strong>${p.producto}</strong> con IMEI <strong>${imei}</strong> ya fue vendido anteriormente y no está disponible en inventario.`
+        );
+        return false;
+      }
+      if(p.estado === 'GARANTIA') {
+        mostrarErrorVenta(
+          '⚠️ Equipo en garantía',
+          `El equipo <strong>${p.producto}</strong> con IMEI <strong>${imei}</strong> está actualmente en proceso de garantía.`
+        );
+        return false;
+      }
+      if(p.estado === 'DEVUELTO') {
+        mostrarErrorVenta(
+          '⚠️ Equipo dado de baja',
+          `El equipo <strong>${p.producto}</strong> con IMEI <strong>${imei}</strong> fue dado de baja del inventario.`
+        );
+        return false;
+      }
+    }
+  }
+
+  // Verificar también si ya hay una venta activa con ese mismo equipo/nombre
+  if(nombreEquipo && nombreEquipo.length > 3) {
+    const creditoActivo = db.creditos.find(c =>
+      (c.equipo||'').toLowerCase() === nombreEquipo.toLowerCase() &&
+      (c.estado === 'al_dia' || c.estado === 'mora')
+    );
+    if(creditoActivo) {
+      mostrarErrorVenta(
+        '⚠️ Venta duplicada',
+        `Ya existe un crédito activo para el equipo <strong>${nombreEquipo}</strong> a nombre de <strong>${creditoActivo.cliente}</strong>. No se puede vender el mismo equipo dos veces.`
+      );
+      return false;
+    }
+  }
+
+  return true; // Todo OK
+}
+
+function mostrarErrorVenta(titulo, mensaje) {
+  // Crear modal de error visual
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(26,10,46,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:20px;padding:32px;max-width:440px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.3);text-align:center;">
+      <div style="font-size:48px;margin-bottom:12px;">🚫</div>
+      <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:20px;color:#dc2626;margin-bottom:12px;">${titulo}</div>
+      <div style="font-size:14px;color:#555577;line-height:1.6;margin-bottom:24px;">${mensaje}</div>
+      <button onclick="this.closest('div[style*=fixed]').remove()" style="background:#6B2D8B;color:#fff;border:none;border-radius:10px;padding:12px 32px;font-size:14px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;">Entendido</button>
+    </div>`;
+  document.body.appendChild(overlay);
 }
 
 // ============================================================
