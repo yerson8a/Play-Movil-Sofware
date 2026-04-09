@@ -2681,6 +2681,7 @@ function mapProductoAInventario(p) {
 }
 
 function mapVenta(v) {
+  const anulada = (v.observaciones || '').startsWith('ANULADA');
   return {
     id: v.id,
     fecha: v.fecha_venta,
@@ -2688,10 +2689,12 @@ function mapVenta(v) {
     cliente: v.cliente,
     asesor: v.asesor || '',
     costo: parseFloat(v.valor_compra) || 0,
-    venta: parseFloat(v.valor_venta) || 0,
-    ganancia: parseFloat(v.ganancia) || 0,
+    venta: anulada ? 0 : (parseFloat(v.valor_venta) || 0),
+    ganancia: anulada ? 0 : (parseFloat(v.ganancia) || 0),
     financiera: v.financiera || 'CONTADO',
-    tipo: v.forma_pago === 'Contado' ? 'contado' : 'credito'
+    tipo: v.forma_pago === 'Contado' ? 'contado' : 'credito',
+    anulada: anulada,
+    observaciones: v.observaciones || ''
   };
 }
 
@@ -3070,7 +3073,8 @@ function renderDashboard() {
   const mesNombre = ahora.toLocaleDateString('es-CO',{month:'long',year:'numeric'});
 
   // Ventas del mes actual
-  const ventasMes = db.ventas.filter(v => v.fecha && v.fecha.startsWith(mesActual));
+  // Excluir ventas anuladas del dashboard
+  const ventasMes = db.ventas.filter(v => v.fecha && v.fecha.startsWith(mesActual) && !v.anulada);
   const totalVentasMes = ventasMes.reduce((a,v)=>a+v.venta,0);
   const totalGananciaMes = ventasMes.reduce((a,v)=>a+v.ganancia,0);
 
@@ -3254,21 +3258,22 @@ function renderVentas(filtro){
   else if(filtro==='marzo')data=data.filter(v=>v.fecha&&v.fecha.startsWith('2026-03'));
   else if(filtro==='febrero')data=data.filter(v=>v.fecha&&v.fecha.startsWith('2026-02'));
   $('tbodyVentas').innerHTML=data.length?data.map(v=>`
-    <tr>
-      <td>${v.fecha}</td><td style="font-weight:500;">${(v.equipo||'').substring(0,22)}...</td>
+    <tr style="${v.anulada?'opacity:0.55;background:#fff5f5;':''}">
+      <td style="font-size:12px;">${v.fecha}</td>
+      <td style="font-weight:500;">${(v.equipo||'').substring(0,22)}...</td>
       <td>${v.cliente}</td><td>${v.asesor}</td>
       <td style="color:var(--text2);">${fmt(v.costo)}</td>
-      <td style="font-weight:600;">${fmt(v.venta)}</td>
-      <td style="color:var(--green);font-weight:600;">${fmt(v.ganancia)}</td>
+      <td style="font-weight:600;color:${v.anulada?'#dc2626':'inherit'};">${v.anulada?'ANULADA':fmt(v.venta)}</td>
+      <td style="color:${v.anulada?'#dc2626':'var(--green)'};font-weight:600;">${v.anulada?'$0':fmt(v.ganancia)}</td>
       <td><span class="badge badge-blue">${v.financiera}</span></td>
-      <td><span class="badge ${v.tipo==='contado'?'badge-green':'badge-pink'}">${v.tipo}</span></td>
+      <td><span class="badge ${v.anulada?'badge-red':v.tipo==='contado'?'badge-green':'badge-pink'}">${v.anulada?'❌ ANULADA':v.tipo}</span></td>
     </tr>`).join(''):'<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text2);">Sin ventas registradas</td></tr>';
 }
 
 function switchVentasTab(tab,el){document.querySelectorAll('#mod-ventas .tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');renderVentas(tab);}
 function filtrarVentas(q){q=q.toLowerCase();const f=db.ventas.filter(v=>(v.equipo||'').toLowerCase().includes(q)||(v.cliente||'').toLowerCase().includes(q)||(v.asesor||'').toLowerCase().includes(q));renderVentas_data(f);}
 function filtrarVentasPorAsesor(a){renderVentas_data(a?db.ventas.filter(v=>v.asesor===a):db.ventas);}
-function renderVentas_data(data){$('tbodyVentas').innerHTML=data.map(v=>`<tr><td>${v.fecha}</td><td>${(v.equipo||'').substring(0,20)}</td><td>${v.cliente}</td><td>${v.asesor}</td><td>${fmt(v.costo)}</td><td>${fmt(v.venta)}</td><td style="color:var(--green);">${fmt(v.ganancia)}</td><td>${v.financiera}</td><td><span class="badge ${v.tipo==='contado'?'badge-green':'badge-pink'}">${v.tipo}</span></td></tr>`).join('');}
+function renderVentas_data(data){$('tbodyVentas').innerHTML=data.map(v=>`<tr style="${v.anulada?'opacity:0.5;background:#fff5f5;':''}"><td>${v.fecha}</td><td>${(v.equipo||'').substring(0,20)}</td><td>${v.cliente}</td><td>${v.asesor}</td><td>${fmt(v.costo)}</td><td>${v.anulada?'<span style="color:#dc2626;font-size:11px;">ANULADA</span>':fmt(v.venta)}</td><td style="color:${v.anulada?'#dc2626':'var(--green)'};">${v.anulada?'$0':fmt(v.ganancia)}</td><td>${v.financiera}</td><td><span class="badge ${v.anulada?'badge-red':v.tipo==='contado'?'badge-green':'badge-pink'}">${v.anulada?'ANULADA':v.tipo}</span></td></tr>`).join('');}
 
 function renderCreditos(filtro='activos'){
   // Actualizar badge del menu con creditos en mora
@@ -3335,7 +3340,8 @@ function renderContabilidad(){
   // Calcular datos reales del mes
   const ahora = new Date();
   const mesActual = ahora.getFullYear()+'-'+String(ahora.getMonth()+1).padStart(2,'0');
-  const ventasMes = db.ventas.filter(v=>v.fecha&&v.fecha.startsWith(mesActual));
+  // Excluir ventas anuladas del cálculo
+  const ventasMes = db.ventas.filter(v=>v.fecha&&v.fecha.startsWith(mesActual)&&!v.anulada);
   const ingresosMes = ventasMes.reduce((a,v)=>a+v.venta,0);
   const gastosMes = db.gastos.filter(g=>g.fecha&&g.fecha.startsWith(mesActual)).reduce((a,g)=>a+g.pago,0);
   const utilidad = ingresosMes - gastosMes;
@@ -4262,33 +4268,35 @@ async function ejecutarAnulacion() {
         body: { estado: 'anulado', observaciones: nota }
       });
 
-      // 2. Anular la venta asociada en tabla ventas (buscar por cliente + equipo)
-      if(credito.equipo && credito.cliente) {
+      // 2. Anular la venta asociada — buscar por producto + asesor + estado no anulado
+      if(credito.equipo) {
+        // Buscar venta por nombre del equipo y asesor
         const resVenta = await fetch(
-          `${baseUrl}/ventas?select=id&cliente=eq.${encodeURIComponent(credito.cliente)}&observaciones=like.*${encodeURIComponent(credito.equipo.substring(0,15))}*&limit=5`,
+          `${baseUrl}/ventas?select=id,valor_venta,ganancia&producto=eq.${encodeURIComponent(credito.equipo)}&asesor=eq.${encodeURIComponent(credito.asesor)}&limit=3`,
           {headers}
         );
         const ventas = await resVenta.json();
         for(const v of ventas) {
+          // Solo anular si la observación no dice ya ANULADA
           await fetch(`${baseUrl}/ventas?id=eq.${v.id}`, {
             method: 'PATCH',
             headers: {...headers, 'Content-Type':'application/json'},
-            body: JSON.stringify({ observaciones: 'ANULADA: ' + nota })
+            body: JSON.stringify({
+              observaciones: 'ANULADA: ' + nota,
+              valor_venta: 0,
+              ganancia: 0
+            })
           });
         }
-        // También anular por nombre del equipo directamente
-        const resVenta2 = await fetch(
-          `${baseUrl}/ventas?select=id&producto=eq.${encodeURIComponent(credito.equipo)}&asesor=eq.${encodeURIComponent(credito.asesor)}&limit=3`,
-          {headers}
-        );
-        const ventas2 = await resVenta2.json();
-        for(const v of ventas2) {
-          await fetch(`${baseUrl}/ventas?id=eq.${v.id}`, {
-            method: 'PATCH',
-            headers: {...headers, 'Content-Type':'application/json'},
-            body: JSON.stringify({ observaciones: 'ANULADA: ' + nota })
-          });
-        }
+        // Actualizar memoria local de ventas
+        db.ventas.forEach(v => {
+          if((v.equipo||'') === credito.equipo && (v.asesor||'') === credito.asesor && !v.anulada) {
+            v.anulada = true;
+            v.venta = 0;
+            v.ganancia = 0;
+            v.observaciones = 'ANULADA: ' + nota;
+          }
+        });
       }
 
       // 3. Devolver equipo al inventario (estado DISPONIBLE)
