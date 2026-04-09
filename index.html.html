@@ -464,6 +464,12 @@
     <div class="nav-item" onclick="showModule('garantias')">
       <span class="icon">🛡️</span> Garantías
     </div>
+    <div class="nav-item" onclick="showModule('servicio')">
+      <span class="icon">🔧</span> Servicio Técnico
+    </div>
+    <div class="nav-item" onclick="showModule('comisiones')">
+      <span class="icon">💎</span> Comisiones
+    </div>
     <div class="nav-section">Configuración</div>
     <div class="nav-item" onclick="showModule('sedes')">
       <span class="icon">🏪</span> Sedes
@@ -834,11 +840,21 @@
           <div class="form-group">
             <label class="form-label">Margen de Ganancia</label>
             <select class="form-control" id="simMargen" onchange="calcularSim()">
+              <option value="0.2">20%</option>
+              <option value="0.25">25%</option>
+              <option value="0.3">30%</option>
+              <option value="0.35">35%</option>
+              <option value="0.4">40%</option>
               <option value="0.45" selected>45% — Estándar Play Móvil</option>
-              <option value="0.30">30%</option>
-              <option value="0.40">40%</option>
-              <option value="0.50">50%</option>
-              <option value="0.60">60%</option>
+              <option value="0.5">50%</option>
+              <option value="0.55">55%</option>
+              <option value="0.6">60%</option>
+              <option value="0.65">65%</option>
+              <option value="0.7">70%</option>
+              <option value="0.75">75%</option>
+              <option value="0.8">80%</option>
+              <option value="0.85">85%</option>
+              <option value="0.9">90%</option>
             </select>
           </div>
           <div class="form-group">
@@ -971,20 +987,112 @@
       <div class="section-header">
         <div>
           <div class="section-title">🛡️ Garantías</div>
-          <div class="section-sub">Seguimiento de equipos en servicio técnico</div>
+          <div class="section-sub">Equipos devueltos por clientes para revisión o reparación</div>
         </div>
         <button class="btn btn-primary btn-sm" onclick="openModal('modalNuevaGarantia')">+ Nueva Garantía</button>
       </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px;">
+        <div class="stat-card blue"><div class="stat-label">Total</div><div class="stat-value blue" id="garTotal">0</div></div>
+        <div class="stat-card orange"><div class="stat-label">En Proceso</div><div class="stat-value orange" id="garEnProceso">0</div></div>
+        <div class="stat-card green"><div class="stat-label">Listas</div><div class="stat-value green" id="garListas">0</div></div>
+        <div class="stat-card pink"><div class="stat-label">Entregadas</div><div class="stat-value" style="color:#6B2D8B;" id="garEntregadas">0</div></div>
+      </div>
+      <div class="tabs">
+        <button class="tab active" onclick="switchGarantiasTab('todas',this)">Todas</button>
+        <button class="tab" onclick="switchGarantiasTab('recibido',this)">Recibidas</button>
+        <button class="tab" onclick="switchGarantiasTab('en_revision',this)">En Revisión</button>
+        <button class="tab" onclick="switchGarantiasTab('listo',this)">Listas</button>
+        <button class="tab" onclick="switchGarantiasTab('entregado',this)">Entregadas</button>
+      </div>
       <div class="card">
+        <div class="flex items-center gap-12 mb-16" style="flex-wrap:wrap;">
+          <div class="search-wrap" style="flex:1;min-width:200px;">
+            <span class="search-icon">🔍</span>
+            <input type="text" class="form-control" placeholder="Buscar por cliente, equipo, IMEI..." oninput="filtrarGarantias(this.value)">
+          </div>
+        </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Fecha</th><th>Referencia</th><th>IMEI</th><th>Detalle</th><th>Técnico</th><th>Proveedor</th><th>Estado</th></tr></thead>
+            <thead><tr>
+              <th>Fecha</th><th>Equipo / Ref.</th><th>IMEI</th><th>Cliente</th><th>Teléfono</th>
+              <th>Falla</th><th>Técnico</th><th>Estado</th><th>Documento</th><th>Acciones</th>
+            </tr></thead>
             <tbody id="tbodyGarantias"></tbody>
           </table>
         </div>
       </div>
     </div>
 
+
+    <!-- ==================== SERVICIO TÉCNICO ==================== -->
+    <div id="mod-servicio" class="module">
+      <div class="section-header">
+        <div>
+          <div class="section-title">🔧 Servicio Técnico</div>
+          <div class="section-sub">Reparaciones y diagnósticos de equipos</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="openModal('modalNuevoServicio')">+ Nueva Orden</button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px;">
+        <div class="stat-card blue"><div class="stat-label">Total Órdenes</div><div class="stat-value blue" id="stTotal">0</div></div>
+        <div class="stat-card orange"><div class="stat-label">En Proceso</div><div class="stat-value orange" id="stEnProceso">0</div></div>
+        <div class="stat-card green"><div class="stat-label">Listas</div><div class="stat-value green" id="stListas">0</div></div>
+        <div class="stat-card pink"><div class="stat-label">$ Cobrado</div><div class="stat-value" style="color:#6B2D8B;" id="stCobrado">$0</div></div>
+      </div>
+      <div class="tabs">
+        <button class="tab active" onclick="switchServicioTab('todas',this)">Todas</button>
+        <button class="tab" onclick="switchServicioTab('recibido',this)">Recibidas</button>
+        <button class="tab" onclick="switchServicioTab('diagnostico',this)">Diagnóstico</button>
+        <button class="tab" onclick="switchServicioTab('reparacion',this)">En Reparación</button>
+        <button class="tab" onclick="switchServicioTab('listo',this)">Listas</button>
+        <button class="tab" onclick="switchServicioTab('entregado',this)">Entregadas</button>
+      </div>
+      <div class="card">
+        <div class="search-wrap" style="margin-bottom:16px;">
+          <span class="search-icon">🔍</span>
+          <input type="text" class="form-control" placeholder="Buscar por cliente, equipo, IMEI..." oninput="filtrarServicio(this.value)">
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Fecha</th><th>Equipo</th><th>IMEI</th><th>Cliente</th><th>Teléfono</th>
+              <th>Daño</th><th>Costo Arreglo</th><th>Cobro Cliente</th><th>Estado</th><th>Acciones</th>
+            </tr></thead>
+            <tbody id="tbodyServicio"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== COMISIONES ==================== -->
+    <div id="mod-comisiones" class="module">
+      <div class="section-header">
+        <div>
+          <div class="section-title">💎 Comisiones y Bonos</div>
+          <div class="section-sub">Liquidación mensual por asesor</div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;">
+          <select class="form-control" style="width:160px;" id="comisionesMes" onchange="renderComisiones()">
+          </select>
+          <button class="btn btn-primary btn-sm" onclick="openModal('modalNuevoBonoComision')">+ Bono / Descuento</button>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px;">
+        <div class="stat-card green"><div class="stat-label">Total Comisiones</div><div class="stat-value green" id="comTotalComisiones">$0</div></div>
+        <div class="stat-card blue"><div class="stat-label">Total Bonos</div><div class="stat-value blue" id="comTotalBonos">$0</div></div>
+        <div class="stat-card pink"><div class="stat-label">Total a Pagar</div><div class="stat-value" style="color:#6B2D8B;" id="comTotalPagar">$0</div></div>
+      </div>
+      <div id="comisionesGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;"></div>
+      <div class="card" style="margin-top:16px;">
+        <div class="card-title">📋 Detalle de Ventas por Asesor</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Asesor</th><th>Ventas</th><th>Valor Total</th><th>Ganancia Generada</th><th>% Comisión</th><th>Comisión</th><th>Bonos</th><th>Total a Pagar</th><th>Descontar de Gastos</th></tr></thead>
+            <tbody id="tbodyComisiones"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
 
     <!-- ==================== SEDES ==================== -->
     <div id="mod-sedes" class="module">
@@ -2512,6 +2620,178 @@
   </div>
 </div>
 
+<!-- Modal Nueva Garantía MEJORADO -->
+<div class="modal-overlay" id="modalNuevaGarantia">
+  <div class="modal" style="max-width:660px;">
+    <div class="modal-header">
+      <div class="modal-title">🛡️ Registrar Garantía</div>
+      <button class="modal-close" onclick="closeModal('modalNuevaGarantia')">✕</button>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Equipo / Referencia *</label>
+        <input type="text" class="form-control" id="garRef" placeholder="Modelo del equipo">
+      </div>
+      <div class="form-group">
+        <label class="form-label">IMEI / Serial</label>
+        <input type="text" class="form-control" id="garIMEI" placeholder="IMEI o serial">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Nombre del Cliente *</label>
+        <input type="text" class="form-control" id="garCliente" placeholder="Nombre completo">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Teléfono</label>
+        <input type="text" class="form-control" id="garTelCliente" placeholder="300 000 0000">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Falla Reportada *</label>
+      <textarea class="form-control" id="garDetalle" rows="2" placeholder="Describe el problema reportado por el cliente..."></textarea>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Técnico Responsable</label>
+        <input type="text" class="form-control" id="garTecnico" placeholder="Nombre del técnico">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Fecha Promesa de Entrega</label>
+        <input type="date" class="form-control" id="garFechaPromesa">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Observaciones adicionales</label>
+      <textarea class="form-control" id="garObservaciones" rows="2" placeholder="Notas internas, accesorios recibidos, etc..."></textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Documento / Evidencia</label>
+      <label class="upload-zone" style="padding:12px;display:block;cursor:pointer;">
+        <input type="file" id="upGarantia" accept="image/*,application/pdf" onchange="handleUpload(this,'garDocPreview')" style="display:none;">
+        <div style="font-size:24px;">📎</div>
+        <div style="font-size:12px;color:#888899;margin-top:4px;">Foto del equipo, acta de recepción, etc.</div>
+        <div id="garDocPreview" style="font-size:11px;color:#16a34a;margin-top:4px;"></div>
+      </label>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
+      <button class="btn btn-ghost" onclick="closeModal('modalNuevaGarantia')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarGarantia()">Registrar Garantía</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Nueva Orden Servicio Técnico -->
+<div class="modal-overlay" id="modalNuevoServicio">
+  <div class="modal" style="max-width:680px;">
+    <div class="modal-header">
+      <div class="modal-title">🔧 Nueva Orden de Servicio</div>
+      <button class="modal-close" onclick="closeModal('modalNuevoServicio')">✕</button>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Equipo *</label>
+        <input type="text" class="form-control" id="stEquipo" placeholder="Modelo del equipo">
+      </div>
+      <div class="form-group">
+        <label class="form-label">IMEI / Serial</label>
+        <input type="text" class="form-control" id="stIMEI" placeholder="IMEI o serial">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Nombre del Cliente *</label>
+        <input type="text" class="form-control" id="stCliente" placeholder="Nombre completo">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Teléfono *</label>
+        <input type="text" class="form-control" id="stTelefono" placeholder="300 000 0000">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Descripción del Daño *</label>
+      <textarea class="form-control" id="stDanio" rows="2" placeholder="Describe detalladamente el daño o falla..."></textarea>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Técnico Responsable</label>
+        <input type="text" class="form-control" id="stTecnico" placeholder="Nombre del técnico">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Fecha Promesa</label>
+        <input type="date" class="form-control" id="stFechaPromesa">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Costo del Arreglo ($)</label>
+        <input type="number" class="form-control" id="stCostoArreglo" placeholder="0" min="0">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Cobro al Cliente ($)</label>
+        <input type="number" class="form-control" id="stCobroCliente" placeholder="0" min="0">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Observaciones</label>
+      <textarea class="form-control" id="stObservaciones" rows="2" placeholder="Accesorios recibidos, notas adicionales..."></textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Documento / Evidencia</label>
+      <label class="upload-zone" style="padding:12px;display:block;cursor:pointer;">
+        <input type="file" id="upServicio" accept="image/*,application/pdf" onchange="handleUpload(this,'stDocPreview')" style="display:none;">
+        <div style="font-size:24px;">📎</div>
+        <div style="font-size:12px;color:#888899;margin-top:4px;">Foto del equipo dañado, diagnóstico, etc.</div>
+        <div id="stDocPreview" style="font-size:11px;color:#16a34a;margin-top:4px;"></div>
+      </label>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
+      <button class="btn btn-ghost" onclick="closeModal('modalNuevoServicio')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarServicio()">Registrar Orden</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Bono / Descuento Comisión -->
+<div class="modal-overlay" id="modalNuevoBonoComision">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-header">
+      <div class="modal-title">💎 Agregar Bono o Descuento</div>
+      <button class="modal-close" onclick="closeModal('modalNuevoBonoComision')">✕</button>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Asesor *</label>
+        <select class="form-control" id="bonoAsesor">
+          <option>YERSON</option><option>JUAN</option><option>ANDREY</option>
+          <option>LESLY</option><option>VALENTINA</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Tipo</label>
+        <select class="form-control" id="bonoTipo">
+          <option value="bono">➕ Bono</option>
+          <option value="descuento">➖ Descuento</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Valor ($) *</label>
+        <input type="number" class="form-control" id="bonoValor" placeholder="0" min="0">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Concepto *</label>
+        <input type="text" class="form-control" id="bonoConcepto" placeholder="Ej: Bono por meta, descuento anticipo...">
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
+      <button class="btn btn-ghost" onclick="closeModal('modalNuevoBonoComision')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarBonoComision()">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <!-- TOASTS -->
 <div class="toast-container" id="toastContainer"></div>
 
@@ -3056,7 +3336,9 @@ function showModule(name) {
   else if(name==='contabilidad') renderContabilidad();
   else if(name==='compras') { renderCompras(); renderTablaProveedores(db.proveedores); poblarSelectProveedores(); }
   else if(name==='asesores') renderAsesores();
-  else if(name==='garantias') renderGarantias();
+  else if(name==='garantias') { cargarGarantias(); }
+  else if(name==='servicio')  { cargarServicio(); }
+  else if(name==='comisiones'){ renderComisiones(); }
   else if(name==='sedes') cargarSedes();
   else if(name==='usuarios') { cargarUsuarios(); poblarSelectSedes(); }
   else if(name==='financieras') cargarFinancieras();
@@ -5282,8 +5564,379 @@ async function eliminarCaja(id) {
 }
 
 // ============================================================
-// SISTEMA DE LOGIN
+// ENTREGA 3 — GARANTÍAS, SERVICIO TÉCNICO, COMISIONES
 // ============================================================
+
+// ── DATOS EN MEMORIA ──────────────────────────────────────────
+const dbE3 = {
+  garantias: [],
+  servicio: [],
+  bonos: []     // bonos y descuentos de comisiones
+};
+
+let filtroGarantias = 'todas';
+let filtroServicio  = 'todas';
+
+// ══════════════════════════════════════════════════════════════
+// GARANTÍAS
+// ══════════════════════════════════════════════════════════════
+async function cargarGarantias() {
+  try {
+    const res = await sbFetch('garantias', { order: 'created_at.desc' });
+    dbE3.garantias = res;
+    renderGarantias();
+  } catch(e) { console.error('Error garantías:', e); }
+}
+
+function renderGarantias(filtro) {
+  if(filtro) filtroGarantias = filtro;
+  const data = filtroGarantias === 'todas'
+    ? dbE3.garantias
+    : dbE3.garantias.filter(g => g.estado === filtroGarantias);
+
+  // Stats
+  const setEl = (id,v) => { const e=document.getElementById(id); if(e) e.textContent=v; };
+  setEl('garTotal',      dbE3.garantias.length);
+  setEl('garEnProceso',  dbE3.garantias.filter(g=>['recibido','en_revision','en_reparacion'].includes(g.estado)).length);
+  setEl('garListas',     dbE3.garantias.filter(g=>g.estado==='listo').length);
+  setEl('garEntregadas', dbE3.garantias.filter(g=>g.estado==='entregado').length);
+
+  const estadoColor = { recibido:'badge-blue', en_revision:'badge-orange', en_reparacion:'badge-yellow', listo:'badge-green', entregado:'badge-pink', sin_solucion:'badge-red' };
+  const estadoLabel = { recibido:'Recibido', en_revision:'En Revisión', en_reparacion:'En Reparación', listo:'✅ Listo', entregado:'Entregado', sin_solucion:'Sin Solución' };
+
+  const tbody = document.getElementById('tbodyGarantias');
+  if(!tbody) return;
+  tbody.innerHTML = data.length ? data.map(g => `
+    <tr>
+      <td style="font-size:11px;">${g.fecha_ingreso||'—'}</td>
+      <td style="font-weight:600;">${g.detalle||'—'}</td>
+      <td style="font-family:monospace;font-size:11px;color:#0066cc;">—</td>
+      <td>${g.cliente||'—'}</td>
+      <td style="font-size:12px;">${g.telefono_cliente||'—'}</td>
+      <td style="font-size:12px;">${g.falla_reportada||g.detalle||'—'}</td>
+      <td>${g.tecnico||'—'}</td>
+      <td><span class="badge ${estadoColor[g.estado]||'badge-blue'}">${estadoLabel[g.estado]||g.estado}</span></td>
+      <td style="font-size:11px;color:#888899;">${g.observaciones?'📎 Sí':'—'}</td>
+      <td>
+        <select class="form-control" style="width:130px;font-size:11px;padding:4px 8px;" onchange="cambiarEstadoGarantia(${g.id},this.value)">
+          <option value="recibido" ${g.estado==='recibido'?'selected':''}>Recibido</option>
+          <option value="en_revision" ${g.estado==='en_revision'?'selected':''}>En Revisión</option>
+          <option value="en_reparacion" ${g.estado==='en_reparacion'?'selected':''}>En Reparación</option>
+          <option value="listo" ${g.estado==='listo'?'selected':''}>Listo</option>
+          <option value="entregado" ${g.estado==='entregado'?'selected':''}>Entregado</option>
+          <option value="sin_solucion" ${g.estado==='sin_solucion'?'selected':''}>Sin Solución</option>
+        </select>
+      </td>
+    </tr>`) .join('') : '<tr><td colspan="10" style="text-align:center;padding:40px;color:#888899;">Sin garantías registradas</td></tr>';
+}
+
+function switchGarantiasTab(f, el) {
+  document.querySelectorAll('#mod-garantias .tab').forEach(t=>t.classList.remove('active'));
+  if(el) el.classList.add('active');
+  renderGarantias(f);
+}
+function filtrarGarantias(q) {
+  q = q.toLowerCase();
+  const data = dbE3.garantias.filter(g =>
+    (g.detalle||'').toLowerCase().includes(q) ||
+    (g.cliente||'').toLowerCase().includes(q) ||
+    (g.falla_reportada||'').toLowerCase().includes(q)
+  );
+  const tbody = document.getElementById('tbodyGarantias');
+  if(tbody) { const orig = dbE3.garantias; dbE3.garantias = data; renderGarantias(); dbE3.garantias = orig; }
+}
+
+async function guardarGarantia() {
+  const ref    = document.getElementById('garRef')?.value?.trim();
+  const cliente= document.getElementById('garCliente')?.value?.trim();
+  if(!ref || !cliente) { toast('Equipo y cliente son obligatorios','error'); return; }
+  const row = {
+    detalle:         ref,
+    falla_reportada: document.getElementById('garDetalle')?.value||'',
+    cliente:         cliente,
+    telefono_cliente:document.getElementById('garTelCliente')?.value||null,
+    tecnico:         document.getElementById('garTecnico')?.value||null,
+    fecha_promesa:   document.getElementById('garFechaPromesa')?.value||null,
+    observaciones:   document.getElementById('garObservaciones')?.value||null,
+    estado:          'recibido',
+    fecha_ingreso:   new Date().toISOString().split('T')[0],
+    sede_id:         window.SEDE_ID_ACTIVA || 1
+  };
+  try {
+    showLoader('Registrando garantía...');
+    const res = await sbFetch('garantias', { method:'POST', body:row });
+    dbE3.garantias.unshift(res[0]);
+    closeModal('modalNuevaGarantia');
+    hideLoader();
+    renderGarantias();
+    toast('Garantía registrada ✅');
+  } catch(e) { hideLoader(); toast('Error: '+e.message,'error'); }
+}
+
+async function cambiarEstadoGarantia(id, nuevoEstado) {
+  try {
+    await sbFetch(`garantias?id=eq.${id}`, { method:'PATCH', body:{ estado: nuevoEstado } });
+    const g = dbE3.garantias.find(x=>x.id===id);
+    if(g) g.estado = nuevoEstado;
+    renderGarantias();
+    toast('Estado actualizado ✅');
+  } catch(e) { toast('Error: '+e.message,'error'); }
+}
+
+// ══════════════════════════════════════════════════════════════
+// SERVICIO TÉCNICO
+// ══════════════════════════════════════════════════════════════
+async function cargarServicio() {
+  try {
+    // Usar tabla garantias con tipo_garantia = 'servicio'
+    const res = await sbFetch('garantias', {
+      filter: 'tipo_garantia=eq.servicio',
+      order: 'created_at.desc'
+    });
+    dbE3.servicio = res;
+    renderServicio();
+  } catch(e) {
+    dbE3.servicio = [];
+    renderServicio();
+  }
+}
+
+function renderServicio(filtro) {
+  if(filtro) filtroServicio = filtro;
+  const data = filtroServicio === 'todas'
+    ? dbE3.servicio
+    : dbE3.servicio.filter(s => s.estado === filtroServicio);
+
+  const setEl = (id,v) => { const e=document.getElementById(id); if(e) e.textContent=v; };
+  setEl('stTotal',      dbE3.servicio.length);
+  setEl('stEnProceso',  dbE3.servicio.filter(s=>['recibido','diagnostico','reparacion'].includes(s.estado)).length);
+  setEl('stListas',     dbE3.servicio.filter(s=>s.estado==='listo').length);
+  setEl('stCobrado',    fmt(dbE3.servicio.filter(s=>s.estado==='entregado').reduce((a,s)=>a+(parseFloat(s.costo_reparacion)||0),0)));
+
+  const estadoColor = { recibido:'badge-blue', diagnostico:'badge-orange', reparacion:'badge-yellow', listo:'badge-green', entregado:'badge-pink' };
+  const estadoLabel = { recibido:'Recibido', diagnostico:'Diagnóstico', reparacion:'En Reparación', listo:'✅ Listo', entregado:'Entregado' };
+
+  const tbody = document.getElementById('tbodyServicio');
+  if(!tbody) return;
+  tbody.innerHTML = data.length ? data.map(s => `
+    <tr>
+      <td style="font-size:11px;">${s.fecha_ingreso||'—'}</td>
+      <td style="font-weight:600;">${s.detalle||'—'}</td>
+      <td style="font-family:monospace;font-size:11px;color:#0066cc;">—</td>
+      <td>${s.cliente||'—'}</td>
+      <td style="font-size:12px;">${s.telefono_cliente||'—'}</td>
+      <td style="font-size:12px;">${s.falla_reportada||'—'}</td>
+      <td style="color:#6B2D8B;font-weight:600;">${fmt(parseFloat(s.observaciones?.split('costo:')[1])||0)}</td>
+      <td style="color:#16a34a;font-weight:600;">${fmt(parseFloat(s.costo_reparacion)||0)}</td>
+      <td><span class="badge ${estadoColor[s.estado]||'badge-blue'}">${estadoLabel[s.estado]||s.estado}</span></td>
+      <td>
+        <select class="form-control" style="width:130px;font-size:11px;padding:4px 8px;" onchange="cambiarEstadoServicio(${s.id},this.value)">
+          <option value="recibido" ${s.estado==='recibido'?'selected':''}>Recibido</option>
+          <option value="diagnostico" ${s.estado==='diagnostico'?'selected':''}>Diagnóstico</option>
+          <option value="reparacion" ${s.estado==='reparacion'?'selected':''}>En Reparación</option>
+          <option value="listo" ${s.estado==='listo'?'selected':''}>Listo</option>
+          <option value="entregado" ${s.estado==='entregado'?'selected':''}>Entregado</option>
+        </select>
+      </td>
+    </tr>`).join('') : '<tr><td colspan="10" style="text-align:center;padding:40px;color:#888899;">Sin órdenes de servicio</td></tr>';
+}
+
+function switchServicioTab(f, el) {
+  document.querySelectorAll('#mod-servicio .tab').forEach(t=>t.classList.remove('active'));
+  if(el) el.classList.add('active');
+  renderServicio(f);
+}
+function filtrarServicio(q) {
+  q = q.toLowerCase();
+  const data = dbE3.servicio.filter(s =>
+    (s.detalle||'').toLowerCase().includes(q) ||
+    (s.cliente||'').toLowerCase().includes(q)
+  );
+  const orig = dbE3.servicio;
+  dbE3.servicio = data; renderServicio(); dbE3.servicio = orig;
+}
+
+async function guardarServicio() {
+  const equipo   = document.getElementById('stEquipo')?.value?.trim();
+  const cliente  = document.getElementById('stCliente')?.value?.trim();
+  const telefono = document.getElementById('stTelefono')?.value?.trim();
+  const danio    = document.getElementById('stDanio')?.value?.trim();
+  if(!equipo||!cliente||!danio) { toast('Equipo, cliente y daño son obligatorios','error'); return; }
+
+  const costoArreglo  = parseFloat(document.getElementById('stCostoArreglo')?.value)||0;
+  const cobroCliente  = parseFloat(document.getElementById('stCobroCliente')?.value)||0;
+  const row = {
+    tipo_garantia:   'servicio',
+    detalle:         equipo,
+    falla_reportada: danio,
+    cliente:         cliente,
+    telefono_cliente: telefono||null,
+    tecnico:         document.getElementById('stTecnico')?.value||null,
+    fecha_promesa:   document.getElementById('stFechaPromesa')?.value||null,
+    costo_reparacion: cobroCliente,
+    observaciones:   `costo:${costoArreglo} | ${document.getElementById('stObservaciones')?.value||''}`,
+    estado:          'recibido',
+    fecha_ingreso:   new Date().toISOString().split('T')[0],
+    sede_id:         window.SEDE_ID_ACTIVA || 1
+  };
+  try {
+    showLoader('Registrando orden...');
+    const res = await sbFetch('garantias', { method:'POST', body:row });
+    dbE3.servicio.unshift(res[0]);
+    closeModal('modalNuevoServicio');
+    hideLoader();
+    renderServicio();
+    toast('Orden de servicio registrada ✅');
+  } catch(e) { hideLoader(); toast('Error: '+e.message,'error'); }
+}
+
+async function cambiarEstadoServicio(id, nuevoEstado) {
+  try {
+    await sbFetch(`garantias?id=eq.${id}`, { method:'PATCH', body:{ estado: nuevoEstado } });
+    const s = dbE3.servicio.find(x=>x.id===id);
+    if(s) s.estado = nuevoEstado;
+    renderServicio();
+    toast('Estado actualizado ✅');
+  } catch(e) { toast('Error: '+e.message,'error'); }
+}
+
+// ══════════════════════════════════════════════════════════════
+// COMISIONES
+// ══════════════════════════════════════════════════════════════
+const PCT_COMISION_ASESOR = 3; // % de comisión por defecto sobre ganancia
+
+function renderComisiones() {
+  const mesSelect = document.getElementById('comisionesMes');
+  // Poblar selector de meses con últimos 6 meses
+  if(mesSelect && mesSelect.options.length === 0) {
+    const ahora = new Date();
+    for(let i=0; i<6; i++) {
+      const d = new Date(ahora.getFullYear(), ahora.getMonth()-i, 1);
+      const val = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+      const label = d.toLocaleDateString('es-CO',{month:'long',year:'numeric'});
+      const opt = document.createElement('option');
+      opt.value = val; opt.textContent = label;
+      mesSelect.appendChild(opt);
+    }
+  }
+
+  const mesActual = mesSelect?.value || new Date().toISOString().slice(0,7);
+  const ventasMes = db.ventas.filter(v => v.fecha && v.fecha.startsWith(mesActual) && !v.anulada);
+  const asesores  = ['YERSON','JUAN','ANDREY','LESLY','VALENTINA'];
+
+  let totalComisiones = 0;
+  let totalBonos = 0;
+
+  const filas = asesores.map(asesor => {
+    const ventasAsesor = ventasMes.filter(v => v.asesor === asesor);
+    const totalVentas  = ventasAsesor.length;
+    const valorTotal   = ventasAsesor.reduce((a,v)=>a+v.venta,0);
+    const ganancia     = ventasAsesor.reduce((a,v)=>a+v.ganancia,0);
+    const comision     = Math.round(ganancia * PCT_COMISION_ASESOR / 100);
+    const bonosAsesor  = dbE3.bonos.filter(b => b.asesor===asesor && b.mes===mesActual);
+    const totalBonosAsesor = bonosAsesor.reduce((a,b)=>a+(b.tipo==='bono'?b.valor:-b.valor),0);
+    const totalPagar   = comision + totalBonosAsesor;
+
+    totalComisiones += comision;
+    totalBonos += totalBonosAsesor;
+
+    return { asesor, totalVentas, valorTotal, ganancia, comision, totalBonosAsesor, totalPagar };
+  });
+
+  const setEl = (id,v) => { const e=document.getElementById(id); if(e) e.textContent=v; };
+  setEl('comTotalComisiones', fmt(totalComisiones));
+  setEl('comTotalBonos', fmt(totalBonos));
+  setEl('comTotalPagar', fmt(totalComisiones+totalBonos));
+
+  // Cards de asesores
+  const grid = document.getElementById('comisionesGrid');
+  if(grid) grid.innerHTML = filas.map(f => `
+    <div class="card">
+      <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:16px;margin-bottom:10px;">${f.asesor}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;">
+        <div style="background:#f7f5fb;border-radius:8px;padding:10px;text-align:center;">
+          <div style="font-size:10px;color:#888899;">VENTAS</div>
+          <div style="font-weight:700;font-size:20px;color:#6B2D8B;">${f.totalVentas}</div>
+        </div>
+        <div style="background:#f0fdf4;border-radius:8px;padding:10px;text-align:center;">
+          <div style="font-size:10px;color:#888899;">GANANCIA</div>
+          <div style="font-weight:700;font-size:14px;color:#16a34a;">${fmt(f.ganancia)}</div>
+        </div>
+        <div style="background:#f7f5fb;border-radius:8px;padding:10px;text-align:center;">
+          <div style="font-size:10px;color:#888899;">COMISIÓN (${PCT_COMISION_ASESOR}%)</div>
+          <div style="font-weight:700;font-size:14px;color:#6B2D8B;">${fmt(f.comision)}</div>
+        </div>
+        <div style="background:${f.totalBonosAsesor>=0?'#f0fdf4':'#fff5f5'};border-radius:8px;padding:10px;text-align:center;">
+          <div style="font-size:10px;color:#888899;">BONOS/DESC</div>
+          <div style="font-weight:700;font-size:14px;color:${f.totalBonosAsesor>=0?'#16a34a':'#dc2626'};">${fmt(f.totalBonosAsesor)}</div>
+        </div>
+      </div>
+      <div style="margin-top:10px;background:#6B2D8B;border-radius:10px;padding:12px;text-align:center;">
+        <div style="font-size:11px;color:rgba(255,255,255,0.7);">TOTAL A PAGAR</div>
+        <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:22px;color:#fff;">${fmt(f.totalPagar)}</div>
+      </div>
+    </div>`).join('');
+
+  // Tabla detalle
+  const tbody = document.getElementById('tbodyComisiones');
+  if(tbody) tbody.innerHTML = filas.map(f => `
+    <tr>
+      <td style="font-weight:700;">${f.asesor}</td>
+      <td style="text-align:center;">${f.totalVentas}</td>
+      <td>${fmt(f.valorTotal)}</td>
+      <td style="color:#16a34a;">${fmt(f.ganancia)}</td>
+      <td style="text-align:center;">${PCT_COMISION_ASESOR}%</td>
+      <td style="color:#6B2D8B;font-weight:600;">${fmt(f.comision)}</td>
+      <td style="color:${f.totalBonosAsesor>=0?'#16a34a':'#dc2626'};">${fmt(f.totalBonosAsesor)}</td>
+      <td style="font-weight:700;color:#6B2D8B;">${fmt(f.totalPagar)}</td>
+      <td>
+        <button class="btn btn-sm btn-ghost" onclick="descontarDeGastos('${f.asesor}',${f.totalPagar},'${mesActual}')">
+          ➡️ Descontar
+        </button>
+      </td>
+    </tr>`).join('');
+}
+
+function guardarBonoComision() {
+  const asesor   = document.getElementById('bonoAsesor')?.value;
+  const tipo     = document.getElementById('bonoTipo')?.value;
+  const valor    = parseFloat(document.getElementById('bonoValor')?.value)||0;
+  const concepto = document.getElementById('bonoConcepto')?.value?.trim();
+  if(!valor||!concepto) { toast('Completa valor y concepto','error'); return; }
+  const mesSelect = document.getElementById('comisionesMes');
+  const mes = mesSelect?.value || new Date().toISOString().slice(0,7);
+  dbE3.bonos.push({ asesor, tipo, valor, concepto, mes });
+  closeModal('modalNuevoBonoComision');
+  renderComisiones();
+  toast(`${tipo==='bono'?'Bono':'Descuento'} registrado para ${asesor} ✅`);
+}
+
+async function descontarDeGastos(asesor, monto, mes) {
+  if(!confirm(`¿Registrar ${fmt(monto)} como gasto de comisión para ${asesor} en ${mes}?`)) return;
+  try {
+    await guardarGastoDB({
+      tipo: 'gasto',
+      detalle: `Comisión ${asesor} — ${mes}`,
+      valor: monto
+    });
+    toast(`Comisión de ${asesor} registrada en gastos ✅`);
+  } catch(e) { toast('Error: '+e.message,'error'); }
+}
+
+// ── Gastos fijos EDITABLES ────────────────────────────────────
+function editarGastoFijo(idx) {
+  const g = gastosFijosData[idx];
+  const nuevoValor = prompt(`Nuevo valor para "${g.label}":`, g.valor);
+  if(nuevoValor !== null && !isNaN(parseFloat(nuevoValor))) {
+    gastosFijosData[idx].valor = parseFloat(nuevoValor);
+    renderContabilidad();
+    toast('Gasto fijo actualizado ✅');
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// SISTEMA DE LOGIN
+// ══════════════════════════════════════════════════════════════
 
 // Usuario activo en sesion
 let sesionActiva = null;
@@ -5382,7 +6035,7 @@ async function activarSesion(user) {
   renderDashboard();
   renderVentas();
 
-  // Cargar financieras en segundo plano
+  // Cargar datos en segundo plano
   cargarFinancieras().then(() => poblarSelectFinancieras());
   cargarSedes().then(() => poblarSelectSedes());
 
