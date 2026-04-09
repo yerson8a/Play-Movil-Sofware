@@ -756,10 +756,8 @@
             <span class="search-icon">🔍</span>
             <input type="text" class="form-control" placeholder="Buscar cliente, equipo, asesor..." oninput="filtrarVentas(this.value)" id="searchVentas">
           </div>
-          <select class="form-control" style="width:160px;" onchange="filtrarVentasPorAsesor(this.value)">
+          <select class="form-control" style="width:160px;" onchange="filtrarVentasPorAsesor(this.value)" id="filtroAsesorVentas">
             <option value="">Todos los asesores</option>
-            <option>YERSON</option><option>JUAN</option><option>ANDREY</option>
-            <option>LESLY</option><option>VALENTINA</option>
           </select>
         </div>
         <div class="table-wrap">
@@ -860,8 +858,7 @@
           <div class="form-group">
             <label class="form-label">Asesor Comercial</label>
             <select class="form-control" id="simAsesor" onchange="calcularSim()">
-              <option>YERSON</option><option>JUAN</option><option>ANDREY</option>
-              <option>LESLY</option><option>VALENTINA</option>
+              <option value="">Cargando asesores...</option>
             </select>
           </div>
           <div class="form-group">
@@ -976,8 +973,9 @@
       <div class="section-header">
         <div>
           <div class="section-title">👥 Asesores Comerciales</div>
-          <div class="section-sub">Gestión del equipo de ventas</div>
+          <div class="section-sub">Gestión del equipo de ventas — tomados de Configuración → Usuarios</div>
         </div>
+        <button class="btn btn-primary btn-sm" onclick="abrirModalAsignarAsesor()">+ Asignar Asesor</button>
       </div>
       <div class="grid-3" id="asesoresGrid"></div>
     </div>
@@ -1806,8 +1804,7 @@
             <div class="form-group">
               <label class="form-label">Asesor</label>
               <select class="form-control" id="crdAsesor">
-                <option>YERSON</option><option>JUAN</option><option>ANDREY</option>
-                <option>LESLY</option><option>VALENTINA</option>
+                <option value="">Cargando asesores...</option>
               </select>
             </div>
             <div class="form-group">
@@ -2230,8 +2227,7 @@
         <div class="form-group">
           <label class="form-label">Asesor Comercial</label>
           <select class="form-control" id="vcAsesor">
-            <option>YERSON</option><option>JUAN</option><option>ANDREY</option>
-            <option>LESLY</option><option>VALENTINA</option>
+            <option value="">Cargando asesores...</option>
           </select>
         </div>
       </div>
@@ -2865,6 +2861,31 @@
   </div>
 </div>
 
+<!-- Modal Asignar Asesor -->
+<div class="modal-overlay" id="modalAsignarAsesor">
+  <div class="modal" style="max-width:440px;">
+    <div class="modal-header">
+      <div class="modal-title">👥 Asignar Asesor</div>
+      <button class="modal-close" onclick="closeModal('modalAsignarAsesor')">✕</button>
+    </div>
+    <p style="font-size:13px;color:#555577;margin-bottom:16px;">
+      Selecciona un usuario existente para asignarlo como asesor. Si el usuario no existe, créalo primero en <strong>Configuración → Usuarios</strong> con rol <strong>asesor</strong>.
+    </p>
+    <div class="form-group">
+      <label class="form-label">Usuario disponible *</label>
+      <select class="form-control" id="asignarAsesorSelect">
+        <option value="">Selecciona un usuario...</option>
+      </select>
+      <div style="font-size:11px;color:#888899;margin-top:4px;">Solo se muestran usuarios activos que no son asesores aún</div>
+    </div>
+    <div id="asignarAsesorPreview" style="display:none;background:#f7f5fb;border-radius:10px;padding:12px;margin-top:12px;font-size:13px;"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+      <button class="btn btn-ghost" onclick="closeModal('modalAsignarAsesor')">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmarAsignarAsesor()">✅ Asignar como Asesor</button>
+    </div>
+  </div>
+</div>
+
 <!-- TOASTS -->
 <div class="toast-container" id="toastContainer"></div>
 
@@ -3372,7 +3393,39 @@ const GASTOS_FIJOS_LABELS = [
   'Internet / Teléfono',
   'Otros gastos fijos'
 ];
-const NOMINA_ASESORES = ['YERSON','JUAN','ANDREY','LESLY','VALENTINA'];
+// Asesores dinámicos — se cargan desde sistema_usuarios
+let ASESORES_ACTIVOS = []; // {nombre, rol, id, activo}
+
+function getAsesoresNombres() {
+  // Retorna nombres en MAYÚSCULA de asesores activos
+  return ASESORES_ACTIVOS.filter(a => a.activo).map(a => a.nombre.toUpperCase());
+}
+
+function poblarSelectsAsesores() {
+  const nombres = getAsesoresNombres();
+  // Selectores de asesor en modales
+  ['crdAsesor','vcAsesor','simAsesor','bonoAsesor'].forEach(id => {
+    const sel = document.getElementById(id);
+    if(!sel) return;
+    const valActual = sel.value;
+    sel.innerHTML = nombres.map(n => `<option value="${n}">${n}</option>`).join('');
+    if(nombres.includes(valActual)) sel.value = valActual;
+    else if(nombres.length) sel.value = nombres[0];
+  });
+  // Filtro en historial de ventas
+  const filtroV = document.getElementById('filtroAsesorVentas');
+  if(filtroV) {
+    const valActual = filtroV.value;
+    filtroV.innerHTML = '<option value="">Todos los asesores</option>' +
+      nombres.map(n => `<option value="${n}">${n}</option>`).join('');
+    if(valActual) filtroV.value = valActual;
+  }
+  // Nóminas: actualizar lista dinámica
+  NOMINA_ASESORES.length = 0;
+  ASESORES_ACTIVOS.filter(a=>a.activo).forEach(a => NOMINA_ASESORES.push(a.nombre.toUpperCase()));
+}
+
+const NOMINA_ASESORES = []; // Se llena dinámicamente
 
 function getGastosFijosMes(mes) {
   const key = 'gastosFijos_' + mes;
@@ -3430,7 +3483,7 @@ function showModule(name) {
   else if(name==='creditos') renderCreditos();
   else if(name==='contabilidad') renderContabilidad();
   else if(name==='compras') { renderCompras(); renderTablaProveedores(db.proveedores); poblarSelectProveedores(); }
-  else if(name==='asesores') renderAsesores();
+  else if(name==='asesores') { cargarAsesoresActivos().then(()=>renderAsesores()); }
   else if(name==='garantias') { cargarGarantias(); }
   else if(name==='servicio')  { cargarServicio(); }
   else if(name==='comisiones'){ renderComisiones(); }
@@ -3918,58 +3971,166 @@ function switchContabTab(tab,el){
 }
 
 function renderAsesores(){
-  const asesores=[
-    {nombre:'YERSON',  rol:'Asesor Senior',    emoji:'🧑‍💼'},
-    {nombre:'JUAN',    rol:'Asesor Senior',    emoji:'👨‍💼'},
-    {nombre:'ANDREY',  rol:'Asesor Comercial', emoji:'🧑‍💼'},
-    {nombre:'LESLY',   rol:'Asesora Comercial',emoji:'👩‍💼'},
-    {nombre:'VALENTINA',rol:'Asesora Comercial',emoji:'👩‍💼'},
-  ];
   const mesActual = new Date().toISOString().slice(0,7);
-  // Excluir ventas anuladas
   const ventasValidas = db.ventas.filter(v => !v.anulada);
   const ventasMes     = ventasValidas.filter(v => v.fecha && v.fecha.startsWith(mesActual));
+  const emojis = ['🧑‍💼','👨‍💼','👩‍💼','🧑‍💼','👨‍💼','👩‍💼','🧑‍💼','👨‍💼'];
 
-  $('asesoresGrid').innerHTML = asesores.map(a => {
-    const vTotales  = ventasValidas.filter(v => v.asesor === a.nombre);
-    const vMes      = ventasMes.filter(v => v.asesor === a.nombre);
-    const ganMes    = vMes.reduce((s,v)=>s+v.ganancia,0);
-    const ventaMes  = vMes.reduce((s,v)=>s+v.venta,0);
-    const comision  = Math.round(ganMes * PCT_COMISION_ASESOR / 100);
-    const credAct   = db.creditos.filter(c => (c.asesor||'').toUpperCase()===a.nombre && (c.estado==='al_dia'||c.estado==='mora')).length;
+  // Mostrar todos los asesores (activos e inactivos)
+  const asesores = ASESORES_ACTIVOS;
+
+  if(!asesores.length) {
+    $('asesoresGrid').innerHTML = `<div class="card" style="grid-column:1/-1;text-align:center;padding:40px;color:#888899;">
+      <div style="font-size:40px;margin-bottom:12px;">👥</div>
+      <div>No hay asesores registrados. Asigna usuarios con rol "asesor" desde Configuración → Usuarios.</div>
+    </div>`;
+    return;
+  }
+
+  $('asesoresGrid').innerHTML = asesores.map((a,idx) => {
+    const nombre   = a.nombre.toUpperCase();
+    const vTotales = ventasValidas.filter(v => v.asesor === nombre);
+    const vMes     = ventasMes.filter(v => v.asesor === nombre);
+    const ganMes   = vMes.reduce((s,v)=>s+v.ganancia,0);
+    const ventaMes = vMes.reduce((s,v)=>s+v.venta,0);
+    const comision = Math.round(ganMes * PCT_COMISION_ASESOR / 100);
+    const credAct  = db.creditos.filter(c => (c.asesor||'').toUpperCase()===nombre && (c.estado==='al_dia'||c.estado==='mora')).length;
+    const activo   = a.activo !== false;
     return `
-    <div class="card">
-      <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;">
-        <div style="font-size:40px;">${a.emoji}</div>
-        <div>
-          <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:17px;">${a.nombre}</div>
-          <div style="font-size:12px;color:#888899;">${a.rol}</div>
+    <div class="card" style="${!activo?'opacity:0.55;':''}">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="font-size:36px;">${emojis[idx%emojis.length]}</div>
+          <div>
+            <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:16px;">${nombre}</div>
+            <div style="font-size:11px;color:#888899;">${a.rol?.toUpperCase()||'ASESOR'}</div>
+          </div>
         </div>
+        <span class="badge ${activo?'badge-green':'badge-red'}">${activo?'Activo':'Inactivo'}</span>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      ${activo ? `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
         <div style="background:#f7f5fb;border-radius:8px;padding:10px;text-align:center;">
           <div style="font-size:10px;color:#888899;">VENTAS MES</div>
           <div style="font-weight:700;font-size:22px;color:#6B2D8B;">${vMes.length}</div>
         </div>
         <div style="background:#f0fdf4;border-radius:8px;padding:10px;text-align:center;">
           <div style="font-size:10px;color:#888899;">INGRESO MES</div>
-          <div style="font-weight:700;font-size:14px;color:#16a34a;">${fmt(ventaMes)}</div>
+          <div style="font-weight:700;font-size:13px;color:#16a34a;">${fmt(ventaMes)}</div>
         </div>
         <div style="background:#fff7ed;border-radius:8px;padding:10px;text-align:center;">
           <div style="font-size:10px;color:#888899;">GANANCIA MES</div>
-          <div style="font-weight:700;font-size:14px;color:#d97706;">${fmt(ganMes)}</div>
+          <div style="font-weight:700;font-size:13px;color:#d97706;">${fmt(ganMes)}</div>
         </div>
         <div style="background:#f7f5fb;border-radius:8px;padding:10px;text-align:center;">
-          <div style="font-size:10px;color:#888899;">COMISIÓN (${PCT_COMISION_ASESOR}%)</div>
-          <div style="font-weight:700;font-size:14px;color:#6B2D8B;">${fmt(comision)}</div>
+          <div style="font-size:10px;color:#888899;">COMISIÓN ${PCT_COMISION_ASESOR}%</div>
+          <div style="font-weight:700;font-size:13px;color:#6B2D8B;">${fmt(comision)}</div>
         </div>
       </div>
-      <div style="margin-top:10px;display:flex;justify-content:space-between;font-size:12px;color:#888899;padding:6px 0;border-top:1px solid #f0ecf8;">
+      <div style="font-size:12px;color:#888899;display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid #f0ecf8;margin-bottom:10px;">
         <span>Créditos activos: <strong style="color:#6B2D8B;">${credAct}</strong></span>
         <span>Total ventas: <strong>${vTotales.length}</strong></span>
-      </div>
+      </div>` : `<div style="font-size:13px;color:#888899;padding:12px 0;text-align:center;">Asesor inactivo</div>`}
+      <button class="btn btn-sm ${activo?'btn-ghost':'btn-outline'}" style="width:100%;font-size:12px;${!activo?'color:#6B2D8B;':''}" onclick="toggleAsesorActivo(${a.id}, ${activo})">
+        ${activo?'⏸️ Inactivar':'▶️ Activar'}
+      </button>
     </div>`;
   }).join('');
+}
+
+async function cargarAsesoresActivos() {
+  try {
+    const todos = await sbFetch('sistema_usuarios', { filter: 'activo=eq.true', order: 'nombre.asc' });
+    // Incluir usuarios con rol asesor activos
+    ASESORES_ACTIVOS = todos.filter(u => u.rol === 'asesor' || u.rol === 'admin')
+      .map(u => ({ id: u.id, nombre: u.nombre.toUpperCase(), rol: u.rol, activo: u.activo !== false }));
+    poblarSelectsAsesores();
+  } catch(e) {
+    // Fallback a lista base si falla
+    ASESORES_ACTIVOS = ['YERSON','JUAN','ANDREY','LESLY','VALENTINA'].map((n,i) => ({
+      id: i+1, nombre: n, rol: 'asesor', activo: true
+    }));
+    poblarSelectsAsesores();
+  }
+}
+
+function abrirModalAsignarAsesor() {
+  // Poblar select con usuarios que NO son asesores aún o que están inactivos en asesores
+  const asesoresIds = ASESORES_ACTIVOS.map(a => a.id);
+  const disponibles = dbAdmin.usuarios.filter(u =>
+    u.activo &&
+    (u.rol === 'asesor' || u.rol === 'bodega' || u.rol === 'consulta') &&
+    !asesoresIds.includes(u.id)
+  );
+  const sel = document.getElementById('asignarAsesorSelect');
+  if(!sel) return;
+  if(!disponibles.length) {
+    sel.innerHTML = '<option value="">— No hay usuarios disponibles —</option>';
+  } else {
+    sel.innerHTML = '<option value="">Selecciona un usuario...</option>' +
+      disponibles.map(u => `<option value="${u.id}">${u.nombre} (${u.rol} · ${u.usuario})</option>`).join('');
+  }
+  document.getElementById('asignarAsesorPreview').style.display = 'none';
+  openModal('modalAsignarAsesor');
+  sel.onchange = function() {
+    const u = dbAdmin.usuarios.find(x => x.id === parseInt(this.value));
+    const prev = document.getElementById('asignarAsesorPreview');
+    if(u && prev) {
+      prev.style.display = 'block';
+      prev.innerHTML = `
+        <div style="font-weight:600;font-size:14px;">${u.nombre}</div>
+        <div style="font-size:12px;color:#888899;">Usuario: ${u.usuario} · Rol actual: ${u.rol}</div>
+        <div style="font-size:12px;color:#16a34a;margin-top:4px;">✅ Se asignará como asesor y aparecerá en todos los módulos</div>`;
+    } else if(prev) {
+      prev.style.display = 'none';
+    }
+  };
+}
+
+async function confirmarAsignarAsesor() {
+  const sel = document.getElementById('asignarAsesorSelect');
+  const userId = parseInt(sel?.value);
+  if(!userId) { toast('Selecciona un usuario','error'); return; }
+  const u = dbAdmin.usuarios.find(x => x.id === userId);
+  if(!u) return;
+  try {
+    // Cambiar rol a asesor si no lo era
+    if(u.rol !== 'asesor') {
+      await sbFetch(`sistema_usuarios?id=eq.${userId}`, {
+        method: 'PATCH',
+        body: { rol: 'asesor' }
+      });
+      u.rol = 'asesor';
+    }
+    // Agregar a ASESORES_ACTIVOS
+    if(!ASESORES_ACTIVOS.find(a => a.id === userId)) {
+      ASESORES_ACTIVOS.push({ id: userId, nombre: u.nombre.toUpperCase(), rol: 'asesor', activo: true });
+    }
+    poblarSelectsAsesores();
+    closeModal('modalAsignarAsesor');
+    renderAsesores();
+    toast(`${u.nombre} asignado como asesor ✅`);
+  } catch(e) { toast('Error: '+e.message,'error'); }
+}
+
+async function toggleAsesorActivo(userId, activo) {
+  const accion = activo ? 'inactivar' : 'activar';
+  if(!confirm(`¿Deseas ${accion} este asesor?`)) return;
+  try {
+    await sbFetch(`sistema_usuarios?id=eq.${userId}`, {
+      method: 'PATCH',
+      body: { activo: !activo }
+    });
+    // Actualizar en memoria
+    const u = ASESORES_ACTIVOS.find(a => a.id === userId);
+    if(u) u.activo = !activo;
+    // También actualizar dbAdmin.usuarios
+    const u2 = dbAdmin.usuarios.find(a => a.id === userId);
+    if(u2) u2.activo = !activo;
+    renderAsesores();
+    poblarSelectsAsesores();
+    toast(`Asesor ${!activo?'activado':'inactivado'} ✅`);
+  } catch(e) { toast('Error: '+e.message,'error'); }
 }
 
 function renderGarantias(){
@@ -6194,7 +6355,7 @@ function renderComisiones() {
 
   const mesActual = mesSelect?.value || new Date().toISOString().slice(0,7);
   const ventasMes = db.ventas.filter(v => v.fecha && v.fecha.startsWith(mesActual) && !v.anulada);
-  const asesores  = ['YERSON','JUAN','ANDREY','LESLY','VALENTINA'];
+  const asesores  = ASESORES_ACTIVOS.filter(a=>a.activo).map(a=>a.nombre.toUpperCase());
 
   let totalComisiones = 0;
   let totalBonos = 0;
@@ -6410,6 +6571,7 @@ async function activarSesion(user) {
   // Cargar datos en segundo plano
   cargarFinancieras().then(() => poblarSelectFinancieras());
   cargarSedes().then(() => poblarSelectSedes());
+  cargarAsesoresActivos();
 
   toast(`Bienvenido, ${user.nombre} 👋`);
 }
