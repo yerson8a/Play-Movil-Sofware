@@ -3291,12 +3291,34 @@ const ventasMensuales = [
   {mes:'Ene',val:0},{mes:'Feb',val:0},{mes:'Mar',val:0}
 ];
 
-const gastosFijosData = [
-  {label:'Arriendo Local Pereira',valor:0},
-  {label:'Arriendo Local Armenia',valor:0},
-  {label:'Servicios públicos',valor:0},
-  {label:'Internet/Teléfono',valor:0},
+// Gastos fijos y nóminas por mes (persisten en sessionStorage)
+const GASTOS_FIJOS_LABELS = [
+  'Arriendo Local Pereira',
+  'Arriendo Local Armenia',
+  'Servicios públicos',
+  'Internet / Teléfono',
+  'Otros gastos fijos'
 ];
+const NOMINA_ASESORES = ['YERSON','JUAN','ANDREY','LESLY','VALENTINA'];
+
+function getGastosFijosMes(mes) {
+  const key = 'gastosFijos_' + mes;
+  try { const v = sessionStorage.getItem(key); if(v) return JSON.parse(v); } catch(e){}
+  return GASTOS_FIJOS_LABELS.map(label => ({ label, valor: 0 }));
+}
+function setGastosFijosMes(mes, data) {
+  try { sessionStorage.setItem('gastosFijos_' + mes, JSON.stringify(data)); } catch(e){}
+}
+function getNominasMes(mes) {
+  const key = 'nominas_' + mes;
+  try { const v = sessionStorage.getItem(key); if(v) return JSON.parse(v); } catch(e){}
+  return NOMINA_ASESORES.map(nombre => ({ nombre, salario: 0 }));
+}
+function setNominasMes(mes, data) {
+  try { sessionStorage.setItem('nominas_' + mes, JSON.stringify(data)); } catch(e){}
+}
+// Compatibilidad hacia atrás
+const gastosFijosData = getGastosFijosMes(new Date().toISOString().slice(0,7));
 
 // ============================================================
 // UTILIDADES
@@ -3619,10 +3641,8 @@ function renderCreditos(filtro='activos'){
 function switchCreditosTab(tab,el){document.querySelectorAll('#mod-creditos .tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');renderCreditos(tab);}
 
 function renderContabilidad(){
-  // Calcular datos reales del mes
   const ahora = new Date();
   const mesActual = ahora.getFullYear()+'-'+String(ahora.getMonth()+1).padStart(2,'0');
-  // Excluir ventas anuladas del cálculo
   const ventasMes = db.ventas.filter(v=>v.fecha&&v.fecha.startsWith(mesActual)&&!v.anulada);
   const ingresosMes = ventasMes.reduce((a,v)=>a+v.venta,0);
   const gastosMes = db.gastos.filter(g=>g.fecha&&g.fecha.startsWith(mesActual)).reduce((a,g)=>a+g.pago,0);
@@ -3633,36 +3653,171 @@ function renderContabilidad(){
   setEl('contGastos',   fmt(gastosMes));
   setEl('contUtilidad', fmt(utilidad));
   setEl('contMargen',   margen+'% margen');
-  const totalFijos=gastosFijosData.reduce((a,g)=>a+g.valor,0);
-  $('gastosFijos').innerHTML=gastosFijosData.map(g=>`
-    <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04);">
+
+  // ── Gastos fijos editables por mes ──
+  const gastosMesData = getGastosFijosMes(mesActual);
+  const totalFijos = gastosMesData.reduce((a,g)=>a+g.valor,0);
+  const gfEl = $('gastosFijos');
+  if(gfEl) gfEl.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <span style="font-size:11px;color:#888899;">MES: ${mesActual}</span>
+      <button class="btn btn-sm btn-ghost" style="font-size:11px;" onclick="editarTodosGastosFijos('${mesActual}')">✏️ Editar todos</button>
+    </div>` +
+    gastosMesData.map((g,i)=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f0ecf8;">
       <span style="font-size:13px;">${g.label}</span>
-      <span style="font-size:13px;font-weight:600;color:var(--pink);">${fmt(g.valor)}</span>
-    </div>`).join('')+`<div style="display:flex;justify-content:space-between;padding:12px 0;font-weight:700;"><span>TOTAL FIJOS</span><span style="color:var(--pink);">${fmt(totalFijos)}</span></div>`;
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:13px;font-weight:600;color:#6B2D8B;">${fmt(g.valor)}</span>
+        <button class="btn btn-sm btn-ghost" style="padding:2px 7px;font-size:11px;" onclick="editarUnGastoFijo('${mesActual}',${i})">✏️</button>
+      </div>
+    </div>`).join('') +
+    `<div style="display:flex;justify-content:space-between;padding:12px 0;font-weight:700;border-top:2px solid #6B2D8B;margin-top:4px;">
+      <span>TOTAL FIJOS</span><span style="color:#6B2D8B;">${fmt(totalFijos)}</span>
+    </div>`;
 
+  // ── Cartera por financiera ──
   const carteras={};
-  db.creditos.forEach(c=>{carteras[c.financiera]=(carteras[c.financiera]||0)+c.saldo;});
-  $('carteraFinanciera').innerHTML=Object.entries(carteras).sort((a,b)=>b[1]-a[1]).map(([f,v])=>`
-    <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04);">
+  db.creditos.filter(c=>c.estado==='al_dia'||c.estado==='mora').forEach(c=>{
+    carteras[c.financiera]=(carteras[c.financiera]||0)+c.saldo;
+  });
+  const cfEl = $('carteraFinanciera');
+  if(cfEl) cfEl.innerHTML=Object.entries(carteras).sort((a,b)=>b[1]-a[1]).map(([f,v])=>`
+    <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0ecf8;">
       <span style="font-size:13px;">${f}</span>
-      <span style="font-size:13px;font-weight:600;color:var(--blue);">${fmt(v)}</span>
-    </div>`).join('');
+      <span style="font-size:13px;font-weight:600;color:#0066cc;">${fmt(v)}</span>
+    </div>`).join('') || '<div style="padding:16px;color:#888899;font-size:13px;">Sin cartera activa</div>';
 
-  $('tbodyGastos').innerHTML=db.gastos.map(g=>`
+  // ── Movimientos caja ──
+  const tg = $('tbodyGastos');
+  if(tg) tg.innerHTML=db.gastos.map(g=>`
     <tr>
       <td>${g.fecha}</td><td>${g.detalle}</td>
-      <td style="color:var(--green);">${g.entrada>0?fmt(g.entrada):'—'}</td>
-      <td style="color:var(--pink);">${g.pago>0?fmt(g.pago):'—'}</td>
+      <td style="color:#16a34a;">${g.entrada>0?fmt(g.entrada):'—'}</td>
+      <td style="color:#dc2626;">${g.pago>0?fmt(g.pago):'—'}</td>
       <td style="font-weight:600;">${fmt(g.saldo)}</td>
     </tr>`).join('');
 
-  const asesoresList=['YERSON','JUAN','ANDREY','LESLY','VALENTINA'];
-  const comisiones={};
-  db.ventas.forEach(v=>{comisiones[v.asesor]=(comisiones[v.asesor]||0)+50000;});
-  $('nominaContent').innerHTML=`<div class="table-wrap"><table>
-    <thead><tr><th>Asesor</th><th>Salario Base</th><th>Comisiones</th><th>Total</th></tr></thead>
-    <tbody>${asesoresList.map(a=>{const com=comisiones[a]||0;const base=3350000;return `<tr><td style="font-weight:600;">${a}</td><td>${fmt(base)}</td><td style="color:var(--green);">${fmt(com)}</td><td style="font-weight:700;color:var(--pink);">${fmt(base+com)}</td></tr>`;}).join('')}</tbody>
-  </table></div>`;
+  // ── Nómina editable por mes ──
+  const nominasMes = getNominasMes(mesActual);
+  const comisionesMes = {};
+  ventasMes.forEach(v=>{ comisionesMes[v.asesor]=(comisionesMes[v.asesor]||0)+Math.round(v.ganancia*PCT_COMISION_ASESOR/100); });
+  const nc = $('nominaContent');
+  if(nc) nc.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <span style="font-size:12px;color:#888899;">Salarios del mes: <strong>${mesActual}</strong></span>
+      <button class="btn btn-sm btn-ghost" style="font-size:11px;" onclick="editarTodasNominas('${mesActual}')">✏️ Editar salarios</button>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Asesor</th><th>Salario Base</th><th>Comisión (${PCT_COMISION_ASESOR}%)</th><th>Total a Pagar</th><th></th></tr></thead>
+      <tbody>${nominasMes.map((n,i)=>{
+        const com = comisionesMes[n.nombre]||0;
+        const total = n.salario + com;
+        return `<tr>
+          <td style="font-weight:600;">${n.nombre}</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px;">
+              ${fmt(n.salario)}
+              <button class="btn btn-sm btn-ghost" style="padding:2px 7px;font-size:11px;" onclick="editarUnaSalario('${mesActual}',${i})">✏️</button>
+            </div>
+          </td>
+          <td style="color:#16a34a;">${fmt(com)}</td>
+          <td style="font-weight:700;color:#6B2D8B;">${fmt(total)}</td>
+          <td>
+            <button class="btn btn-sm btn-ghost" style="font-size:11px;" onclick="descontarNominaDeGastos('${n.nombre}',${total},'${mesActual}')">➡️ Registrar en gastos</button>
+          </td>
+        </tr>`;
+      }).join('')}
+      </tbody>
+    </table></div>`;
+}
+
+// ── Editar gasto fijo / nómina con modal visual ───────────────
+function mostrarModalEdicion(titulo, campos, onGuardar) {
+  const overlay = document.createElement('div');
+  overlay.id = 'modalEdicionDinamico';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(26,10,46,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:20px;padding:28px;max-width:500px;width:92%;box-shadow:0 20px 60px rgba(0,0,0,0.2);">
+      <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:18px;color:#1a0a2e;margin-bottom:18px;">${titulo}</div>
+      ${campos.map((c,i)=>`
+        <div style="margin-bottom:12px;">
+          <label style="font-size:12px;font-weight:600;color:#555577;display:block;margin-bottom:4px;">${c.label}</label>
+          <input id="dynField_${i}" type="number" value="${c.valor}" min="0" step="1000"
+            style="width:100%;padding:10px 14px;border:1px solid #e0d8f0;border-radius:10px;font-size:14px;font-family:'DM Sans',sans-serif;box-sizing:border-box;">
+        </div>`).join('')}
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+        <button onclick="document.getElementById('modalEdicionDinamico').remove()"
+          style="background:transparent;border:1px solid #e0d8f0;border-radius:10px;padding:10px 20px;cursor:pointer;font-size:13px;">Cancelar</button>
+        <button id="dynGuardarBtn"
+          style="background:#6B2D8B;color:#fff;border:none;border-radius:10px;padding:10px 24px;cursor:pointer;font-size:13px;font-weight:600;">Guardar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  document.getElementById('dynGuardarBtn').onclick = () => {
+    const valores = campos.map((c,i) => parseFloat(document.getElementById('dynField_'+i).value)||0);
+    overlay.remove();
+    onGuardar(valores);
+  };
+}
+
+function editarUnGastoFijo(mes, idx) {
+  const data = getGastosFijosMes(mes);
+  const g = data[idx];
+  mostrarModalEdicion(`✏️ Editar: ${g.label}`, [{label: g.label + ' ($)', valor: g.valor}], (vals) => {
+    data[idx].valor = vals[0];
+    setGastosFijosMes(mes, data);
+    renderContabilidad();
+    toast(`"${g.label}" actualizado ✅`);
+  });
+}
+
+function editarTodosGastosFijos(mes) {
+  const data = getGastosFijosMes(mes);
+  mostrarModalEdicion(`✏️ Gastos Fijos — ${mes}`,
+    data.map(g => ({label: g.label+' ($)', valor: g.valor})),
+    (vals) => {
+      vals.forEach((v,i) => { data[i].valor = v; });
+      setGastosFijosMes(mes, data);
+      renderContabilidad();
+      toast('Gastos fijos actualizados ✅');
+    }
+  );
+}
+
+// ── Editar salario individual ─────────────────────────────────
+function editarUnaSalario(mes, idx) {
+  const data = getNominasMes(mes);
+  const n = data[idx];
+  mostrarModalEdicion(`✏️ Salario de ${n.nombre} — ${mes}`,
+    [{label: 'Salario base ($)', valor: n.salario}],
+    (vals) => {
+      data[idx].salario = vals[0];
+      setNominasMes(mes, data);
+      renderContabilidad();
+      toast(`Salario de ${n.nombre} actualizado ✅`);
+    }
+  );
+}
+
+function editarTodasNominas(mes) {
+  const data = getNominasMes(mes);
+  mostrarModalEdicion(`✏️ Nóminas — ${mes}`,
+    data.map(n => ({label: 'Salario '+n.nombre+' ($)', valor: n.salario})),
+    (vals) => {
+      vals.forEach((v,i) => { data[i].salario = v; });
+      setNominasMes(mes, data);
+      renderContabilidad();
+      toast('Nóminas actualizadas ✅');
+    }
+  );
+}
+
+async function descontarNominaDeGastos(nombre, monto, mes) {
+  if(!confirm(`¿Registrar nómina de ${nombre} (${fmt(monto)}) como gasto en ${mes}?`)) return;
+  try {
+    await guardarGastoDB({ tipo:'gasto', detalle:`Nómina ${nombre} — ${mes}`, valor:monto });
+    toast(`Nómina de ${nombre} registrada en gastos ✅`);
+  } catch(e) { toast('Error: '+e.message,'error'); }
 }
 
 function switchContabTab(tab,el){
@@ -4604,11 +4759,14 @@ async function ejecutarAnulacion() {
       credito.estado = 'anulado';
       hideLoader();
       closeModal('modalAnularVenta');
-      // Recargar datos frescos
+      // Recargar datos frescos — esto actualiza db.ventas con anulada:true
       await cargarDatosPorSede(sesionActiva);
       renderCreditos();
       renderVentas();
       renderInventario();
+      // Si contabilidad/comisiones están abiertos también se actualizan
+      renderContabilidad();
+      renderComisiones();
 
     } catch(e) { hideLoader(); toast('Error: ' + e.message, 'error'); }
 
@@ -5688,11 +5846,7 @@ async function cambiarEstadoGarantia(id, nuevoEstado) {
 // ══════════════════════════════════════════════════════════════
 async function cargarServicio() {
   try {
-    // Usar tabla garantias con tipo_garantia = 'servicio'
-    const res = await sbFetch('garantias', {
-      filter: 'tipo_garantia=eq.servicio',
-      order: 'created_at.desc'
-    });
+    const res = await sbFetch('servicio_tecnico', { order: 'created_at.desc' });
     dbE3.servicio = res;
     renderServicio();
   } catch(e) {
@@ -5721,13 +5875,13 @@ function renderServicio(filtro) {
   tbody.innerHTML = data.length ? data.map(s => `
     <tr>
       <td style="font-size:11px;">${s.fecha_ingreso||'—'}</td>
-      <td style="font-weight:600;">${s.detalle||'—'}</td>
-      <td style="font-family:monospace;font-size:11px;color:#0066cc;">—</td>
+      <td style="font-weight:600;">${s.equipo||'—'}</td>
+      <td style="font-family:monospace;font-size:11px;color:#0066cc;">${s.imei||'—'}</td>
       <td>${s.cliente||'—'}</td>
-      <td style="font-size:12px;">${s.telefono_cliente||'—'}</td>
-      <td style="font-size:12px;">${s.falla_reportada||'—'}</td>
-      <td style="color:#6B2D8B;font-weight:600;">${fmt(parseFloat(s.observaciones?.split('costo:')[1])||0)}</td>
-      <td style="color:#16a34a;font-weight:600;">${fmt(parseFloat(s.costo_reparacion)||0)}</td>
+      <td style="font-size:12px;">${s.telefono||'—'}</td>
+      <td style="font-size:12px;">${s.danio_reportado||'—'}</td>
+      <td style="color:#6B2D8B;font-weight:600;">${fmt(parseFloat(s.costo_arreglo)||0)}</td>
+      <td style="color:#16a34a;font-weight:600;">${fmt(parseFloat(s.cobro_cliente)||0)}</td>
       <td><span class="badge ${estadoColor[s.estado]||'badge-blue'}">${estadoLabel[s.estado]||s.estado}</span></td>
       <td>
         <select class="form-control" style="width:130px;font-size:11px;padding:4px 8px;" onchange="cambiarEstadoServicio(${s.id},this.value)">
@@ -5762,26 +5916,23 @@ async function guardarServicio() {
   const telefono = document.getElementById('stTelefono')?.value?.trim();
   const danio    = document.getElementById('stDanio')?.value?.trim();
   if(!equipo||!cliente||!danio) { toast('Equipo, cliente y daño son obligatorios','error'); return; }
-
-  const costoArreglo  = parseFloat(document.getElementById('stCostoArreglo')?.value)||0;
-  const cobroCliente  = parseFloat(document.getElementById('stCobroCliente')?.value)||0;
   const row = {
-    tipo_garantia:   'servicio',
-    detalle:         equipo,
-    falla_reportada: danio,
-    cliente:         cliente,
-    telefono_cliente: telefono||null,
+    equipo,
+    cliente,
+    telefono:        telefono||null,
+    danio_reportado: danio,
     tecnico:         document.getElementById('stTecnico')?.value||null,
     fecha_promesa:   document.getElementById('stFechaPromesa')?.value||null,
-    costo_reparacion: cobroCliente,
-    observaciones:   `costo:${costoArreglo} | ${document.getElementById('stObservaciones')?.value||''}`,
+    costo_arreglo:   parseFloat(document.getElementById('stCostoArreglo')?.value)||0,
+    cobro_cliente:   parseFloat(document.getElementById('stCobroCliente')?.value)||0,
+    observaciones:   document.getElementById('stObservaciones')?.value||null,
     estado:          'recibido',
     fecha_ingreso:   new Date().toISOString().split('T')[0],
     sede_id:         window.SEDE_ID_ACTIVA || 1
   };
   try {
     showLoader('Registrando orden...');
-    const res = await sbFetch('garantias', { method:'POST', body:row });
+    const res = await sbFetch('servicio_tecnico', { method:'POST', body:row });
     dbE3.servicio.unshift(res[0]);
     closeModal('modalNuevoServicio');
     hideLoader();
@@ -5792,7 +5943,7 @@ async function guardarServicio() {
 
 async function cambiarEstadoServicio(id, nuevoEstado) {
   try {
-    await sbFetch(`garantias?id=eq.${id}`, { method:'PATCH', body:{ estado: nuevoEstado } });
+    await sbFetch(`servicio_tecnico?id=eq.${id}`, { method:'PATCH', body:{ estado: nuevoEstado } });
     const s = dbE3.servicio.find(x=>x.id===id);
     if(s) s.estado = nuevoEstado;
     renderServicio();
