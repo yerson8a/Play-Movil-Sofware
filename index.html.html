@@ -2792,6 +2792,79 @@
   </div>
 </div>
 
+<!-- Modal Registrar Abono -->
+<div class="modal-overlay" id="modalRegistrarAbono">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-header">
+      <div class="modal-title">💳 Registrar Abono</div>
+      <button class="modal-close" onclick="closeModal('modalRegistrarAbono')">✕</button>
+    </div>
+    <input type="hidden" id="abonoCredId">
+    <div style="background:#f7f5fb;border-radius:10px;padding:12px;margin-bottom:16px;font-size:13px;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+        <span style="color:#888899;">Cliente:</span>
+        <strong id="abonoClienteInfo">—</strong>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+        <span style="color:#888899;">Equipo:</span>
+        <strong id="abonoEquipoInfo">—</strong>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+        <span style="color:#888899;">Saldo pendiente:</span>
+        <strong style="color:#dc2626;" id="abonoSaldoInfo">$0</strong>
+      </div>
+      <div style="display:flex;justify-content:space-between;">
+        <span style="color:#888899;">Cuota a pagar:</span>
+        <strong style="color:#6B2D8B;">Cuota # <span id="abonoNroCuota">1</span> — <span id="abonoCuotaInfo">$0</span></strong>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Valor del Abono ($) *</label>
+      <input type="number" class="form-control" id="abonoValor" placeholder="0" min="0" style="font-size:18px;font-weight:700;color:#6B2D8B;">
+      <div style="font-size:11px;color:#888899;margin-top:4px;">Puede abonar más del valor de la cuota</div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Forma de Pago *</label>
+        <select class="form-control" id="abonoMetodo" onchange="toggleTransfAbono(this.value)">
+          <option value="Efectivo">💵 Efectivo</option>
+          <option value="Transferencia">🏦 Transferencia</option>
+          <option value="Nequi">📱 Nequi</option>
+          <option value="Daviplata">📱 Daviplata</option>
+          <option value="Tarjeta">💳 Tarjeta</option>
+        </select>
+      </div>
+      <div class="form-group" id="abonoNroTransfRow" style="display:none;">
+        <label class="form-label">N° Referencia / Transf.</label>
+        <input type="text" class="form-control" id="abonoNroTransf" placeholder="Número de referencia">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Observaciones</label>
+      <input type="text" class="form-control" id="abonoObs" placeholder="Notas adicionales...">
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
+      <button class="btn btn-ghost" onclick="closeModal('modalRegistrarAbono')">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmarAbono()">💳 Registrar Abono</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Recibo de Abono -->
+<div class="modal-overlay" id="modalReciboAbono">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal-header">
+      <div class="modal-title">🧾 Recibo de Abono</div>
+      <button class="modal-close" onclick="closeModal('modalReciboAbono')">✕</button>
+    </div>
+    <div id="reciboAbonoContenido" style="background:#fff;padding:24px;border-radius:12px;border:1px solid #ece8f5;"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+      <button class="btn btn-ghost" onclick="closeModal('modalReciboAbono')">Cerrar</button>
+      <button class="btn btn-outline" onclick="imprimirReciboAbono()">🖨️ Imprimir</button>
+    </div>
+  </div>
+</div>
+
 <!-- TOASTS -->
 <div class="toast-container" id="toastContainer"></div>
 
@@ -3661,7 +3734,10 @@ function renderContabilidad(){
   if(gfEl) gfEl.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
       <span style="font-size:11px;color:#888899;">MES: ${mesActual}</span>
-      <button class="btn btn-sm btn-ghost" style="font-size:11px;" onclick="editarTodosGastosFijos('${mesActual}')">✏️ Editar todos</button>
+      <div style="display:flex;gap:6px;">
+        <button class="btn btn-sm btn-ghost" style="font-size:11px;" onclick="agregarGastoFijo('${mesActual}')">➕ Agregar</button>
+        <button class="btn btn-sm btn-ghost" style="font-size:11px;" onclick="editarTodosGastosFijos('${mesActual}')">✏️ Editar todos</button>
+      </div>
     </div>` +
     gastosMesData.map((g,i)=>`
     <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f0ecf8;">
@@ -3784,6 +3860,19 @@ function editarTodosGastosFijos(mes) {
   );
 }
 
+function agregarGastoFijo(mes) {
+  const label = prompt('Nombre del nuevo gasto fijo:');
+  if(!label || !label.trim()) return;
+  const valorStr = prompt(`Valor de "${label.trim()}" en ${mes}:`, '0');
+  if(valorStr === null) return;
+  const valor = parseFloat(valorStr)||0;
+  const data = getGastosFijosMes(mes);
+  data.push({ label: label.trim(), valor });
+  setGastosFijosMes(mes, data);
+  renderContabilidad();
+  toast(`"${label.trim()}" agregado ✅`);
+}
+
 // ── Editar salario individual ─────────────────────────────────
 function editarUnaSalario(mes, idx) {
   const data = getNominasMes(mes);
@@ -3830,24 +3919,57 @@ function switchContabTab(tab,el){
 
 function renderAsesores(){
   const asesores=[
-    {nombre:'YERSON',rol:'Asesor Senior',emoji:'🧑‍💼'},
-    {nombre:'JUAN',rol:'Asesor Senior',emoji:'👨‍💼'},
-    {nombre:'ANDREY',rol:'Asesor Comercial',emoji:'🧑‍💼'},
-    {nombre:'LESLY',rol:'Asesora Comercial',emoji:'👩‍💼'},
+    {nombre:'YERSON',  rol:'Asesor Senior',    emoji:'🧑‍💼'},
+    {nombre:'JUAN',    rol:'Asesor Senior',    emoji:'👨‍💼'},
+    {nombre:'ANDREY',  rol:'Asesor Comercial', emoji:'🧑‍💼'},
+    {nombre:'LESLY',   rol:'Asesora Comercial',emoji:'👩‍💼'},
     {nombre:'VALENTINA',rol:'Asesora Comercial',emoji:'👩‍💼'},
   ];
-  const comisiones={};
-  db.ventas.forEach(v=>{comisiones[v.asesor]=(comisiones[v.asesor]||0)+1;});
-  $('asesoresGrid').innerHTML=asesores.map(a=>`
-    <div class="card" style="text-align:center;">
-      <div style="font-size:48px;margin-bottom:12px;">${a.emoji}</div>
-      <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:18px;">${a.nombre}</div>
-      <div style="font-size:12px;color:var(--text2);margin-bottom:16px;">${a.rol}</div>
-      <hr class="divider">
-      <div style="display:flex;justify-content:space-around;margin-top:12px;">
-        <div><div style="font-size:22px;font-weight:700;color:var(--pink);">${comisiones[a.nombre]||0}</div><div style="font-size:11px;color:var(--text2);">Ventas</div></div>
+  const mesActual = new Date().toISOString().slice(0,7);
+  // Excluir ventas anuladas
+  const ventasValidas = db.ventas.filter(v => !v.anulada);
+  const ventasMes     = ventasValidas.filter(v => v.fecha && v.fecha.startsWith(mesActual));
+
+  $('asesoresGrid').innerHTML = asesores.map(a => {
+    const vTotales  = ventasValidas.filter(v => v.asesor === a.nombre);
+    const vMes      = ventasMes.filter(v => v.asesor === a.nombre);
+    const ganMes    = vMes.reduce((s,v)=>s+v.ganancia,0);
+    const ventaMes  = vMes.reduce((s,v)=>s+v.venta,0);
+    const comision  = Math.round(ganMes * PCT_COMISION_ASESOR / 100);
+    const credAct   = db.creditos.filter(c => (c.asesor||'').toUpperCase()===a.nombre && (c.estado==='al_dia'||c.estado==='mora')).length;
+    return `
+    <div class="card">
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;">
+        <div style="font-size:40px;">${a.emoji}</div>
+        <div>
+          <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:17px;">${a.nombre}</div>
+          <div style="font-size:12px;color:#888899;">${a.rol}</div>
+        </div>
       </div>
-    </div>`).join('');
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div style="background:#f7f5fb;border-radius:8px;padding:10px;text-align:center;">
+          <div style="font-size:10px;color:#888899;">VENTAS MES</div>
+          <div style="font-weight:700;font-size:22px;color:#6B2D8B;">${vMes.length}</div>
+        </div>
+        <div style="background:#f0fdf4;border-radius:8px;padding:10px;text-align:center;">
+          <div style="font-size:10px;color:#888899;">INGRESO MES</div>
+          <div style="font-weight:700;font-size:14px;color:#16a34a;">${fmt(ventaMes)}</div>
+        </div>
+        <div style="background:#fff7ed;border-radius:8px;padding:10px;text-align:center;">
+          <div style="font-size:10px;color:#888899;">GANANCIA MES</div>
+          <div style="font-weight:700;font-size:14px;color:#d97706;">${fmt(ganMes)}</div>
+        </div>
+        <div style="background:#f7f5fb;border-radius:8px;padding:10px;text-align:center;">
+          <div style="font-size:10px;color:#888899;">COMISIÓN (${PCT_COMISION_ASESOR}%)</div>
+          <div style="font-weight:700;font-size:14px;color:#6B2D8B;">${fmt(comision)}</div>
+        </div>
+      </div>
+      <div style="margin-top:10px;display:flex;justify-content:space-between;font-size:12px;color:#888899;padding:6px 0;border-top:1px solid #f0ecf8;">
+        <span>Créditos activos: <strong style="color:#6B2D8B;">${credAct}</strong></span>
+        <span>Total ventas: <strong>${vTotales.length}</strong></span>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function renderGarantias(){
@@ -4173,12 +4295,111 @@ async function guardarCredito(){
   } catch(e) { toast('Error: ' + e.message, 'error'); }
 }
 
-async function registrarPago(id){
-  try{
-    await registrarAbonoDB(id,0,'Efectivo');
+function registrarPago(id) {
+  const credito = db.creditos.find(c => c.id === id);
+  if(!credito) return;
+  // Llenar el modal con datos del crédito
+  document.getElementById('abonoCredId').value   = id;
+  document.getElementById('abonoClienteInfo').textContent = credito.cliente;
+  document.getElementById('abonoEquipoInfo').textContent  = credito.equipo || '—';
+  document.getElementById('abonoSaldoInfo').textContent   = fmt(credito.saldo);
+  document.getElementById('abonoCuotaInfo').textContent   = fmt(credito.valorCuota || 0);
+  document.getElementById('abonoNroCuota').textContent    = (credito.pagadas + 1);
+  document.getElementById('abonoValor').value             = credito.valorCuota || '';
+  document.getElementById('abonoMetodo').value            = 'Efectivo';
+  document.getElementById('abonoNroTransf').value         = '';
+  document.getElementById('abonoObs').value               = '';
+  document.getElementById('abonoNroTransfRow').style.display = 'none';
+  openModal('modalRegistrarAbono');
+}
+
+async function confirmarAbono() {
+  const id     = parseInt(document.getElementById('abonoCredId').value);
+  const valor  = parseFloat(document.getElementById('abonoValor').value)||0;
+  const metodo = document.getElementById('abonoMetodo').value;
+  const transf = document.getElementById('abonoNroTransf').value||'';
+  const obs    = document.getElementById('abonoObs').value||'';
+  if(valor <= 0) { toast('El valor del abono debe ser mayor a 0','error'); return; }
+  const credito = db.creditos.find(c => c.id === id);
+  if(!credito) return;
+  const nroCuota = credito.pagadas + 1;
+  try {
+    await registrarAbonoDB(id, valor, metodo);
+    closeModal('modalRegistrarAbono');
     renderCreditos();
-    toast('Pago registrado ✅');
-  }catch(e){}
+    // Mostrar recibo
+    mostrarReciboAbono({
+      cliente:   credito.cliente,
+      equipo:    credito.equipo || '—',
+      valor,
+      metodo,
+      transf,
+      obs,
+      nroCuota,
+      fecha:     new Date().toLocaleDateString('es-CO',{year:'numeric',month:'long',day:'numeric'}),
+      saldoAntes: credito.saldo,
+      saldoDespues: Math.max(0, credito.saldo - valor),
+      numero:    'REC-'+Date.now().toString().slice(-6)
+    });
+    toast('Abono registrado ✅');
+  } catch(e) { toast('Error: '+e.message,'error'); }
+}
+
+function toggleTransfAbono(metodo) {
+  const row = document.getElementById('abonoNroTransfRow');
+  if(row) row.style.display = (metodo === 'Transferencia' || metodo === 'Nequi' || metodo === 'Daviplata') ? 'block' : 'none';
+}
+
+function mostrarReciboAbono(d) {
+  const html = `
+  <div style="font-family:'DM Sans',sans-serif;color:#111;max-width:500px;margin:0 auto;">
+    <div style="text-align:center;margin-bottom:20px;padding-bottom:16px;border-bottom:2px solid #6B2D8B;">
+      <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:24px;color:#6B2D8B;">Play Móvil</div>
+      <div style="font-size:13px;color:#888899;">Recibo de Abono</div>
+      <div style="font-size:12px;color:#6B2D8B;font-weight:600;margin-top:4px;">${d.numero}</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;font-size:13px;">
+      <div><span style="color:#888899;">Cliente:</span> <strong>${d.cliente}</strong></div>
+      <div><span style="color:#888899;">Fecha:</span> <strong>${d.fecha}</strong></div>
+      <div><span style="color:#888899;">Equipo:</span> <strong>${d.equipo}</strong></div>
+      <div><span style="color:#888899;">N° Cuota:</span> <strong style="color:#6B2D8B;">Cuota ${d.nroCuota}</strong></div>
+    </div>
+    <div style="background:#f7f5fb;border-radius:12px;padding:16px;margin-bottom:16px;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px;">
+        <span style="color:#888899;">Saldo anterior:</span>
+        <span style="font-weight:600;">${fmt(d.saldoAntes)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px;">
+        <span style="color:#888899;">Forma de pago:</span>
+        <span style="font-weight:600;">${d.metodo}${d.transf?' — Ref: '+d.transf:''}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding-top:10px;border-top:2px solid #6B2D8B;margin-top:4px;">
+        <span style="font-size:16px;font-weight:700;">VALOR ABONADO</span>
+        <span style="font-size:22px;font-weight:800;color:#6B2D8B;">${fmt(d.valor)}</span>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:13px;padding:8px 0;border-top:1px solid #f0ecf8;">
+      <span style="color:#888899;">Saldo restante:</span>
+      <span style="font-weight:700;color:${d.saldoDespues<=0?'#16a34a':'#dc2626'};">${d.saldoDespues<=0?'✅ PAGADO':fmt(d.saldoDespues)}</span>
+    </div>
+    ${d.obs?`<div style="margin-top:10px;font-size:12px;color:#888899;">Obs: ${d.obs}</div>`:''}
+    <div style="margin-top:20px;font-size:10px;color:#aaa;text-align:center;">
+      Documento generado por Play Móvil Sistema de Gestión · ${d.fecha}
+    </div>
+  </div>`;
+  document.getElementById('reciboAbonoContenido').innerHTML = html;
+  openModal('modalReciboAbono');
+}
+
+function imprimirReciboAbono() {
+  const contenido = document.getElementById('reciboAbonoContenido')?.innerHTML;
+  if(!contenido) return;
+  const win = window.open('','_blank');
+  win.document.write(`<!DOCTYPE html><html><head><title>Recibo Abono Play Móvil</title>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;600&display=swap" rel="stylesheet">
+    <style>body{margin:24px;font-family:'DM Sans',sans-serif;}@media print{body{margin:0;}}</style>
+    </head><body>${contenido}<script>window.onload=()=>window.print();<\/script></body></html>`);
+  win.document.close();
 }
 
 async function guardarGasto(){
