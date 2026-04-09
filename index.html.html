@@ -1926,66 +1926,6 @@
   </div>
 </div>
 
-<!-- Modal Nueva Venta (alias) -->
-rgin-top:10px;font-size:12px;color:#888899;">La factura se generará automáticamente al guardar y podrás imprimirla.</div>
-        </div>
-
-        <!-- Documentos -->
-        <div class="card">
-          <div class="card-title" style="font-size:13px;margin-bottom:10px;">📎 Documentos</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-            <div>
-              <label class="form-label" style="font-size:10px;">Cédula Frente</label>
-              <label class="upload-zone" style="padding:10px;display:block;cursor:pointer;">
-                <input type="file" id="upCedFront" accept="image/*,application/pdf" onchange="handleUpload(this,'cedFrontPreview')" style="display:none;">
-                <div style="font-size:20px;">🪪</div>
-                <div style="font-size:11px;color:#888899;margin-top:2px;">Toca para subir</div>
-                <div id="cedFrontPreview" style="font-size:10px;color:#16a34a;margin-top:2px;word-break:break-all;"></div>
-              </label>
-            </div>
-            <div>
-              <label class="form-label" style="font-size:10px;">Cédula Reverso</label>
-              <label class="upload-zone" style="padding:10px;display:block;cursor:pointer;">
-                <input type="file" id="upCedBack" accept="image/*,application/pdf" onchange="handleUpload(this,'cedBackPreview')" style="display:none;">
-                <div style="font-size:20px;">🪪</div>
-                <div style="font-size:11px;color:#888899;margin-top:2px;">Toca para subir</div>
-                <div id="cedBackPreview" style="font-size:10px;color:#16a34a;margin-top:2px;word-break:break-all;"></div>
-              </label>
-            </div>
-            <div>
-              <label class="form-label" style="font-size:10px;">Foto con Producto</label>
-              <label class="upload-zone" style="padding:10px;display:block;cursor:pointer;">
-                <input type="file" id="upFotoEntrega" accept="image/*" onchange="handleUpload(this,'fotoEntregaPreview')" style="display:none;">
-                <div style="font-size:20px;">📸</div>
-                <div style="font-size:11px;color:#888899;margin-top:2px;">Toca para subir</div>
-                <div id="fotoEntregaPreview" style="font-size:10px;color:#16a34a;margin-top:2px;word-break:break-all;"></div>
-              </label>
-            </div>
-            <div>
-              <label class="form-label" style="font-size:10px;">Contrato / Acta</label>
-              <label class="upload-zone" style="padding:10px;display:block;cursor:pointer;">
-                <input type="file" id="upContrato" accept="image/*,application/pdf" onchange="handleUpload(this,'contratoPreview')" style="display:none;">
-                <div style="font-size:20px;">📝</div>
-                <div style="font-size:11px;color:#888899;margin-top:2px;">Toca para subir</div>
-                <div id="contratoPreview" style="font-size:10px;color:#16a34a;margin-top:2px;word-break:break-all;"></div>
-              </label>
-            </div>
-          </div>
-        </div>
-
-      </div>
-    </div><!-- /form-row -->
-
-    <div style="display:flex;gap:10px;justify-content:space-between;align-items:center;margin-top:16px;">
-      <div style="font-size:12px;color:#888899;">* Campos obligatorios</div>
-      <div style="display:flex;gap:10px;">
-        <button class="btn btn-ghost" onclick="closeModal('modalNuevoCredito')">Cancelar</button>
-        <button class="btn btn-primary" onclick="guardarCredito()">💾 Guardar Crédito</button>
-      </div>
-    </div>
-  </div>
-</div>
-
 <!-- Modal Factura -->
 <div class="modal-overlay" id="modalFactura">
   <div class="modal" style="max-width:700px;">
