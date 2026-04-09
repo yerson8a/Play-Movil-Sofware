@@ -803,6 +803,7 @@
         <button class="tab active" onclick="switchCreditosTab('activos',this)">Activos</button>
         <button class="tab" onclick="switchCreditosTab('mora',this)">En Mora</button>
         <button class="tab" onclick="switchCreditosTab('pagados',this)">Pagados</button>
+        <button class="tab" onclick="switchCreditosTab('anulados',this)">Anulados</button>
         <button class="tab" onclick="switchCreditosTab('reportados',this)">Reportados</button>
       </div>
 
@@ -3351,6 +3352,7 @@ function renderCreditos(filtro='activos'){
   let data=db.creditos;
   if(filtro==='mora')data=data.filter(c=>c.estado==='mora');
   else if(filtro==='pagados')data=data.filter(c=>c.estado==='pagado');
+  else if(filtro==='anulados')data=data.filter(c=>c.estado==='anulado');
   else if(filtro==='reportados')data=data.filter(c=>c.reportado);
   else data=data.filter(c=>c.estado==='al_dia'||c.estado==='mora');
   $('creditosGrid').innerHTML=data.length?data.map(c=>{
@@ -3694,6 +3696,10 @@ async function guardarVentaContado(){
 
   try{
     await guardarVentaDB(datos);
+    // Marcar producto como VENDIDO
+    const imeiVC2 = document.getElementById('vcIMEI')?.value||'';
+    const equipoVC2 = document.getElementById('vcEquipo')?.value||'';
+    await marcarProductoVendido(imeiVC2, equipoVC2);
     closeModal('modalVentaContado');
     renderVentas();renderInventario();
     toast('Venta registrada en Supabase ✅');
@@ -3749,11 +3755,17 @@ async function guardarCredito(){
 
   try {
     await guardarCreditoDB(datos);
+
+    const imeiVenta = document.getElementById('crdIMEI')?.value||'';
     await guardarVentaDB({
-      equipo:datos.equipo, cliente:datos.cliente, cedula:datos.cedula,
+      equipo:datos.equipo, imei:imeiVenta,
+      cliente:datos.cliente, cedula:datos.cedula,
       asesor:datos.asesor, costo, venta:precioFinal, ganancia,
       financiera:finSel, tipo:'credito', sede:sedeActual
     });
+
+    // Marcar producto como VENDIDO en Supabase usando IMEI o nombre
+    await marcarProductoVendido(imeiVenta, datos.equipo);
 
     const datosFactura = {
       tipo:'credito', cliente:datos.cliente, cedula:datos.cedula,
@@ -4300,31 +4312,74 @@ async function ejecutarAnulacion() {
 
     try {
       showLoader('Anulando venta...');
-      // Marcar crédito como anulado
+      const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+      const baseUrl = SUPABASE_URL + '/rest/v1';
+      const nota = 'ANULADO: ' + motivo + '. ' + obs;
+
+      // 1. Marcar crédito como ANULADO (estado propio, no pagado)
       await sbFetch(`creditos?id=eq.${id}`, {
         method: 'PATCH',
-        body: { estado: 'pagado', observaciones: 'ANULADO: ' + motivo + '. ' + obs }
+        body: { estado: 'anulado', observaciones: nota }
       });
 
-      // Devolver equipo al inventario si hay IMEI
-      if(credito.equipo) {
-        const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
-        const base = SUPABASE_URL + '/rest/v1/productos';
-        // Buscar el producto por nombre y marcarlo disponible
-        const res = await fetch(`${base}?select=id&producto=eq.${encodeURIComponent(credito.equipo)}&estado=eq.VENDIDO&limit=1`, {headers});
-        const rows = await res.json();
-        if(rows.length > 0) {
-          await sbFetch(`productos?id=eq.${rows[0].id}`, { method: 'PATCH', body: { estado: 'DISPONIBLE' } });
+      // 2. Anular la venta asociada en tabla ventas (buscar por cliente + equipo)
+      if(credito.equipo && credito.cliente) {
+        const resVenta = await fetch(
+          `${baseUrl}/ventas?select=id&cliente=eq.${encodeURIComponent(credito.cliente)}&observaciones=like.*${encodeURIComponent(credito.equipo.substring(0,15))}*&limit=5`,
+          {headers}
+        );
+        const ventas = await resVenta.json();
+        for(const v of ventas) {
+          await fetch(`${baseUrl}/ventas?id=eq.${v.id}`, {
+            method: 'PATCH',
+            headers: {...headers, 'Content-Type':'application/json'},
+            body: JSON.stringify({ observaciones: 'ANULADA: ' + nota })
+          });
+        }
+        // También anular por nombre del equipo directamente
+        const resVenta2 = await fetch(
+          `${baseUrl}/ventas?select=id&producto=eq.${encodeURIComponent(credito.equipo)}&asesor=eq.${encodeURIComponent(credito.asesor)}&limit=3`,
+          {headers}
+        );
+        const ventas2 = await resVenta2.json();
+        for(const v of ventas2) {
+          await fetch(`${baseUrl}/ventas?id=eq.${v.id}`, {
+            method: 'PATCH',
+            headers: {...headers, 'Content-Type':'application/json'},
+            body: JSON.stringify({ observaciones: 'ANULADA: ' + nota })
+          });
         }
       }
 
-      credito.estado = 'pagado';
+      // 3. Devolver equipo al inventario (estado DISPONIBLE)
+      if(credito.equipo) {
+        // Buscar por nombre exacto en estado VENDIDO
+        const resProd = await fetch(
+          `${baseUrl}/productos?select=id,producto,imei1&producto=eq.${encodeURIComponent(credito.equipo)}&estado=eq.VENDIDO&limit=1`,
+          {headers}
+        );
+        const prods = await resProd.json();
+        if(prods.length > 0) {
+          await fetch(`${baseUrl}/productos?id=eq.${prods[0].id}`, {
+            method: 'PATCH',
+            headers: {...headers, 'Content-Type':'application/json'},
+            body: JSON.stringify({ estado: 'DISPONIBLE' })
+          });
+          toast('✅ Venta anulada · Crédito anulado · ' + prods[0].producto + ' devuelto al inventario');
+        } else {
+          toast('✅ Venta anulada · Crédito anulado (equipo no encontrado en inventario)');
+        }
+      }
+
+      credito.estado = 'anulado';
       hideLoader();
       closeModal('modalAnularVenta');
+      // Recargar datos frescos
       await cargarDatosPorSede(sesionActiva);
       renderCreditos();
+      renderVentas();
       renderInventario();
-      toast('Venta anulada. Equipo devuelto al inventario ✅');
+
     } catch(e) { hideLoader(); toast('Error: ' + e.message, 'error'); }
 
   } else if(tipo === 'cambio') {
@@ -4394,6 +4449,58 @@ async function ejecutarSalidaInventario() {
     document.getElementById('salidaObs').value = '';
     toast('Equipo dado de baja del inventario ✅');
   } catch(e) { hideLoader(); toast('Error: ' + e.message, 'error'); }
+}
+
+// ============================================================
+// MARCAR PRODUCTO COMO VENDIDO EN INVENTARIO
+// ============================================================
+async function marcarProductoVendido(imei, nombreEquipo) {
+  const headers = {
+    'apikey': SUPABASE_KEY,
+    'Authorization': 'Bearer ' + SUPABASE_KEY,
+    'Content-Type': 'application/json'
+  };
+  const base = SUPABASE_URL + '/rest/v1/productos';
+
+  let productoId = null;
+
+  // Buscar por IMEI primero (más exacto)
+  if(imei && imei.length > 5) {
+    let res = await fetch(`${base}?select=id,estado&imei1=eq.${imei}&limit=1`, {headers});
+    let rows = await res.json();
+    if(!rows.length) {
+      res = await fetch(`${base}?select=id,estado&imei2=eq.${imei}&limit=1`, {headers});
+      rows = await res.json();
+    }
+    if(rows.length > 0) productoId = rows[0].id;
+  }
+
+  // Si no encontró por IMEI, buscar por nombre del equipo
+  if(!productoId && nombreEquipo && nombreEquipo.length > 3) {
+    const res = await fetch(
+      `${base}?select=id,estado&producto=eq.${encodeURIComponent(nombreEquipo)}&estado=eq.DISPONIBLE&limit=1`,
+      {headers}
+    );
+    const rows = await res.json();
+    if(rows.length > 0) productoId = rows[0].id;
+  }
+
+  // Marcar como VENDIDO
+  if(productoId) {
+    await fetch(`${base}?id=eq.${productoId}`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({ estado: 'VENDIDO' })
+    });
+    // Actualizar memoria local
+    const inv = db.inventario.find(i => i.id === productoId);
+    if(inv) inv.estado = 'VENDIDO';
+    const comp = db.compras.find(c => c.id === productoId);
+    if(comp) comp.estado = 'VENDIDO';
+    console.log('Producto marcado VENDIDO id:', productoId);
+  } else {
+    console.warn('No se encontró producto para marcar vendido. IMEI:', imei, 'Equipo:', nombreEquipo);
+  }
 }
 
 // ============================================================
