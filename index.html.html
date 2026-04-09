@@ -765,7 +765,7 @@
             <thead>
               <tr>
                 <th>Fecha</th><th>Equipo</th><th>Cliente</th><th>Asesor</th>
-                <th>V.Compra</th><th>V.Venta</th><th>Ganancia</th><th>Financiera</th><th>Estado</th>
+                <th>V.Compra</th><th>V.Venta</th><th>Ganancia</th><th>Comisión</th><th>Financiera</th><th>Estado</th>
               </tr>
             </thead>
             <tbody id="tbodyVentas"></tbody>
@@ -1085,7 +1085,7 @@
         <div class="card-title">📋 Detalle de Ventas por Asesor</div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Asesor</th><th>Ventas</th><th>Valor Total</th><th>Ganancia Generada</th><th>% Comisión</th><th>Comisión</th><th>Bonos</th><th>Total a Pagar</th><th>Descontar de Gastos</th></tr></thead>
+            <thead><tr><th>Asesor</th><th>Ventas</th><th>Valor Total</th><th>Ganancia</th><th>Comisiones</th><th>Bonos/Desc</th><th>Total a Pagar</th><th>Registrar</th></tr></thead>
             <tbody id="tbodyComisiones"></tbody>
           </table>
         </div>
@@ -2886,6 +2886,43 @@
   </div>
 </div>
 
+<!-- Modal Comisión post-venta -->
+<div class="modal-overlay" id="modalComisionVenta">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-header">
+      <div class="modal-title">💎 Comisión del Asesor</div>
+      <button class="modal-close" onclick="cerrarModalComision()">✕</button>
+    </div>
+    <input type="hidden" id="comisionVentaId">
+    <div style="background:#f7f5fb;border-radius:10px;padding:12px;margin-bottom:16px;font-size:13px;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+        <span style="color:#888899;">Asesor:</span>
+        <strong id="comisionAsesorNombre">—</strong>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+        <span style="color:#888899;">Equipo:</span>
+        <strong id="comisionEquipoNombre">—</strong>
+      </div>
+      <div style="display:flex;justify-content:space-between;">
+        <span style="color:#888899;">Ganancia de la venta:</span>
+        <strong style="color:#16a34a;" id="comisionGananciaRef">$0</strong>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Valor de comisión para este asesor ($)</label>
+      <input type="number" class="form-control" id="comisionValorInput" placeholder="0" min="0"
+             style="font-size:20px;font-weight:700;color:#6B2D8B;text-align:center;">
+      <div style="font-size:11px;color:#888899;margin-top:6px;text-align:center;">
+        Déjalo en 0 si no aplica comisión en esta venta
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
+      <button class="btn btn-ghost" onclick="cerrarModalComision()">Omitir</button>
+      <button class="btn btn-primary" onclick="guardarComisionVenta()">💎 Guardar Comisión</button>
+    </div>
+  </div>
+</div>
+
 <!-- TOASTS -->
 <div class="toast-container" id="toastContainer"></div>
 
@@ -3067,6 +3104,7 @@ function mapVenta(v) {
     ganancia: anulada ? 0 : (parseFloat(v.ganancia) || 0),
     financiera: v.financiera || 'CONTADO',
     tipo: v.forma_pago === 'Contado' ? 'contado' : 'credito',
+    comisionAsesor: parseFloat(v.comision_asesor) || 0,
     anulada: anulada,
     observaciones: v.observaciones || ''
   };
@@ -3208,6 +3246,7 @@ async function guardarVentaDB(datos) {
       ganancia: datos.ganancia,
       forma_pago: datos.tipo === 'contado' ? 'Contado' : 'Credito',
       financiera: datos.financiera || null,
+      comision_asesor: datos.comisionAsesor || 0,
       sede_id: sedeId,
       observaciones: datos.obs || null,
       fecha_venta: new Date().toISOString().split('T')[0]
@@ -3695,15 +3734,18 @@ function renderVentas(filtro){
       <td style="color:var(--text2);">${fmt(v.costo)}</td>
       <td style="font-weight:600;color:${v.anulada?'#dc2626':'inherit'};">${v.anulada?'ANULADA':fmt(v.venta)}</td>
       <td style="color:${v.anulada?'#dc2626':'var(--green)'};font-weight:600;">${v.anulada?'$0':fmt(v.ganancia)}</td>
+      <td style="color:#6B2D8B;font-weight:600;">
+        ${v.anulada?'$0':v.comisionAsesor>0?fmt(v.comisionAsesor):`<button class="btn btn-sm btn-ghost" style="font-size:10px;padding:2px 7px;" onclick="editarComisionVenta(${v.id})">+ Agregar</button>`}
+      </td>
       <td><span class="badge badge-blue">${v.financiera}</span></td>
       <td><span class="badge ${v.anulada?'badge-red':v.tipo==='contado'?'badge-green':'badge-pink'}">${v.anulada?'❌ ANULADA':v.tipo}</span></td>
-    </tr>`).join(''):'<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text2);">Sin ventas registradas</td></tr>';
+    </tr>`).join(''):'<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text2);">Sin ventas registradas</td></tr>';
 }
 
 function switchVentasTab(tab,el){document.querySelectorAll('#mod-ventas .tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');renderVentas(tab);}
 function filtrarVentas(q){q=q.toLowerCase();const f=db.ventas.filter(v=>(v.equipo||'').toLowerCase().includes(q)||(v.cliente||'').toLowerCase().includes(q)||(v.asesor||'').toLowerCase().includes(q));renderVentas_data(f);}
 function filtrarVentasPorAsesor(a){renderVentas_data(a?db.ventas.filter(v=>v.asesor===a):db.ventas);}
-function renderVentas_data(data){$('tbodyVentas').innerHTML=data.map(v=>`<tr style="${v.anulada?'opacity:0.5;background:#fff5f5;':''}"><td>${v.fecha}</td><td>${(v.equipo||'').substring(0,20)}</td><td>${v.cliente}</td><td>${v.asesor}</td><td>${fmt(v.costo)}</td><td>${v.anulada?'<span style="color:#dc2626;font-size:11px;">ANULADA</span>':fmt(v.venta)}</td><td style="color:${v.anulada?'#dc2626':'var(--green)'};">${v.anulada?'$0':fmt(v.ganancia)}</td><td>${v.financiera}</td><td><span class="badge ${v.anulada?'badge-red':v.tipo==='contado'?'badge-green':'badge-pink'}">${v.anulada?'ANULADA':v.tipo}</span></td></tr>`).join('');}
+function renderVentas_data(data){$('tbodyVentas').innerHTML=data.map(v=>`<tr style="${v.anulada?'opacity:0.5;background:#fff5f5;':''}"><td>${v.fecha}</td><td>${(v.equipo||'').substring(0,20)}</td><td>${v.cliente}</td><td>${v.asesor}</td><td>${fmt(v.costo)}</td><td>${v.anulada?'<span style="color:#dc2626;font-size:11px;">ANULADA</span>':fmt(v.venta)}</td><td style="color:${v.anulada?'#dc2626':'var(--green)'};">${v.anulada?'$0':fmt(v.ganancia)}</td><td style="color:#6B2D8B;">${v.anulada?'$0':v.comisionAsesor>0?fmt(v.comisionAsesor):'—'}</td><td>${v.financiera}</td><td><span class="badge ${v.anulada?'badge-red':v.tipo==='contado'?'badge-green':'badge-pink'}">${v.anulada?'ANULADA':v.tipo}</span></td></tr>`).join('');}
 
 function renderCreditos(filtro='activos'){
   // Actualizar badge del menu con creditos en mora
@@ -4367,8 +4409,11 @@ async function guardarVentaContado(){
     const equipoVC2 = document.getElementById('vcEquipo')?.value||'';
     await marcarProductoVendido(imeiVC2, equipoVC2);
     closeModal('modalVentaContado');
-    renderVentas();renderInventario();
-    toast('Venta registrada en Supabase ✅');
+    renderVentas(); renderInventario();
+    // Mostrar modal de comisión
+    const ventaNuevaC = db.ventas[0];
+    if(ventaNuevaC) abrirModalComision(ventaNuevaC.id, ventaNuevaC.asesor, ventaNuevaC.equipo, ventaNuevaC.ganancia);
+    else toast('Venta registrada en Supabase ✅');
   }catch(e){ toast('Error: '+e.message,'error'); }
 }
 
@@ -4452,7 +4497,10 @@ async function guardarCredito(){
     crdInicialSeleccionada = 0;
     renderCreditos(); renderVentas();
     mostrarFactura(datosFactura, enviarFact);
-    toast('Credito registrado en Supabase ✅');
+    // Mostrar modal de comisión
+    const ventaNueva = db.ventas[0];
+    if(ventaNueva) abrirModalComision(ventaNueva.id, ventaNueva.asesor, ventaNueva.equipo, ventaNueva.ganancia);
+    else toast('Credito registrado en Supabase ✅');
   } catch(e) { toast('Error: ' + e.message, 'error'); }
 }
 
@@ -6336,14 +6384,56 @@ async function cambiarEstadoServicio(id, nuevoEstado) {
 // ══════════════════════════════════════════════════════════════
 // COMISIONES
 // ══════════════════════════════════════════════════════════════
-const PCT_COMISION_ASESOR = 3; // % de comisión por defecto sobre ganancia
+const PCT_COMISION_ASESOR = 0; // Ya no se usa porcentaje — comisión manual por venta
+
+// ── Modal comisión post-venta ─────────────────────────────────
+function abrirModalComision(ventaId, asesor, equipo, ganancia) {
+  document.getElementById('comisionVentaId').value    = ventaId;
+  document.getElementById('comisionAsesorNombre').textContent = asesor || '—';
+  document.getElementById('comisionEquipoNombre').textContent = equipo || '—';
+  document.getElementById('comisionGananciaRef').textContent  = fmt(ganancia || 0);
+  document.getElementById('comisionValorInput').value = '';
+  openModal('modalComisionVenta');
+}
+
+async function guardarComisionVenta() {
+  const ventaId = parseInt(document.getElementById('comisionVentaId').value);
+  const valor   = parseFloat(document.getElementById('comisionValorInput').value) || 0;
+  try {
+    // Actualizar comision_asesor en la tabla ventas
+    await sbFetch(`ventas?id=eq.${ventaId}`, {
+      method: 'PATCH',
+      body: { comision_asesor: valor }
+    });
+    // Actualizar en memoria
+    const v = db.ventas.find(x => x.id === ventaId);
+    if(v) v.comisionAsesor = valor;
+    closeModal('modalComisionVenta');
+    renderVentas();
+    if(valor > 0) toast(`Comisión de ${fmt(valor)} registrada ✅`);
+    else toast('Venta registrada sin comisión ✅');
+  } catch(e) { toast('Error: '+e.message,'error'); }
+}
+
+async function editarComisionVenta(ventaId) {
+  const v = db.ventas.find(x => x.id === ventaId);
+  if(!v) return;
+  abrirModalComision(ventaId, v.asesor, v.equipo, v.ganancia);
+  // Pre-llenar con valor actual
+  setTimeout(()=>{ document.getElementById('comisionValorInput').value = v.comisionAsesor || 0; }, 50);
+}
+
+function cerrarModalComision() {
+  closeModal('modalComisionVenta');
+  toast('Venta registrada ✅');
+}
 
 function renderComisiones() {
   const mesSelect = document.getElementById('comisionesMes');
-  // Poblar selector de meses con últimos 6 meses
+  // Poblar selector de meses con últimos 12 meses
   if(mesSelect && mesSelect.options.length === 0) {
     const ahora = new Date();
-    for(let i=0; i<6; i++) {
+    for(let i=0; i<12; i++) {
       const d = new Date(ahora.getFullYear(), ahora.getMonth()-i, 1);
       const val = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
       const label = d.toLocaleDateString('es-CO',{month:'long',year:'numeric'});
@@ -6354,63 +6444,68 @@ function renderComisiones() {
   }
 
   const mesActual = mesSelect?.value || new Date().toISOString().slice(0,7);
+  // Solo ventas del mes, no anuladas
   const ventasMes = db.ventas.filter(v => v.fecha && v.fecha.startsWith(mesActual) && !v.anulada);
-  const asesores  = ASESORES_ACTIVOS.filter(a=>a.activo).map(a=>a.nombre.toUpperCase());
+  const asesores  = ASESORES_ACTIVOS.filter(a => a.activo).map(a => a.nombre.toUpperCase());
 
   let totalComisiones = 0;
   let totalBonos = 0;
 
   const filas = asesores.map(asesor => {
-    const ventasAsesor = ventasMes.filter(v => v.asesor === asesor);
-    const totalVentas  = ventasAsesor.length;
-    const valorTotal   = ventasAsesor.reduce((a,v)=>a+v.venta,0);
-    const ganancia     = ventasAsesor.reduce((a,v)=>a+v.ganancia,0);
-    const comision     = Math.round(ganancia * PCT_COMISION_ASESOR / 100);
-    const bonosAsesor  = dbE3.bonos.filter(b => b.asesor===asesor && b.mes===mesActual);
-    const totalBonosAsesor = bonosAsesor.reduce((a,b)=>a+(b.tipo==='bono'?b.valor:-b.valor),0);
-    const totalPagar   = comision + totalBonosAsesor;
+    const ventasAsesor     = ventasMes.filter(v => v.asesor === asesor);
+    const totalVentas      = ventasAsesor.length;
+    const valorTotal       = ventasAsesor.reduce((a,v)=>a+v.venta, 0);
+    const ganancia         = ventasAsesor.reduce((a,v)=>a+v.ganancia, 0);
+    // Comisión = suma de comisiones manuales registradas en cada venta
+    const comision         = ventasAsesor.reduce((a,v)=>a+(v.comisionAsesor||0), 0);
+    const bonosAsesor      = dbE3.bonos.filter(b => b.asesor===asesor && b.mes===mesActual);
+    const totalBonosAsesor = bonosAsesor.reduce((a,b)=>a+(b.tipo==='bono'?b.valor:-b.valor), 0);
+    const totalPagar       = comision + totalBonosAsesor;
 
     totalComisiones += comision;
-    totalBonos += totalBonosAsesor;
+    totalBonos += Math.abs(totalBonosAsesor);
 
     return { asesor, totalVentas, valorTotal, ganancia, comision, totalBonosAsesor, totalPagar };
   });
 
   const setEl = (id,v) => { const e=document.getElementById(id); if(e) e.textContent=v; };
   setEl('comTotalComisiones', fmt(totalComisiones));
-  setEl('comTotalBonos', fmt(totalBonos));
-  setEl('comTotalPagar', fmt(totalComisiones+totalBonos));
+  setEl('comTotalBonos',      fmt(totalBonos));
+  setEl('comTotalPagar',      fmt(filas.reduce((a,f)=>a+f.totalPagar,0)));
 
-  // Cards de asesores
+  // Cards por asesor
   const grid = document.getElementById('comisionesGrid');
   if(grid) grid.innerHTML = filas.map(f => `
     <div class="card">
-      <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:16px;margin-bottom:10px;">${f.asesor}</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;">
+      <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:16px;margin-bottom:12px;">
+        👤 ${f.asesor}
+        <span style="font-size:11px;color:#888899;font-weight:400;margin-left:6px;">${f.totalVentas} ventas</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
         <div style="background:#f7f5fb;border-radius:8px;padding:10px;text-align:center;">
-          <div style="font-size:10px;color:#888899;">VENTAS</div>
-          <div style="font-weight:700;font-size:20px;color:#6B2D8B;">${f.totalVentas}</div>
+          <div style="font-size:10px;color:#888899;">VALOR VENDIDO</div>
+          <div style="font-weight:700;font-size:13px;color:#6B2D8B;">${fmt(f.valorTotal)}</div>
         </div>
         <div style="background:#f0fdf4;border-radius:8px;padding:10px;text-align:center;">
           <div style="font-size:10px;color:#888899;">GANANCIA</div>
-          <div style="font-weight:700;font-size:14px;color:#16a34a;">${fmt(f.ganancia)}</div>
+          <div style="font-weight:700;font-size:13px;color:#16a34a;">${fmt(f.ganancia)}</div>
         </div>
-        <div style="background:#f7f5fb;border-radius:8px;padding:10px;text-align:center;">
-          <div style="font-size:10px;color:#888899;">COMISIÓN (${PCT_COMISION_ASESOR}%)</div>
-          <div style="font-weight:700;font-size:14px;color:#6B2D8B;">${fmt(f.comision)}</div>
+        <div style="background:#f3e8f9;border-radius:8px;padding:10px;text-align:center;">
+          <div style="font-size:10px;color:#888899;">COMISIONES</div>
+          <div style="font-weight:700;font-size:16px;color:#6B2D8B;">${fmt(f.comision)}</div>
         </div>
         <div style="background:${f.totalBonosAsesor>=0?'#f0fdf4':'#fff5f5'};border-radius:8px;padding:10px;text-align:center;">
           <div style="font-size:10px;color:#888899;">BONOS/DESC</div>
-          <div style="font-weight:700;font-size:14px;color:${f.totalBonosAsesor>=0?'#16a34a':'#dc2626'};">${fmt(f.totalBonosAsesor)}</div>
+          <div style="font-weight:700;font-size:13px;color:${f.totalBonosAsesor>=0?'#16a34a':'#dc2626'};">${f.totalBonosAsesor>=0?'+':''}${fmt(f.totalBonosAsesor)}</div>
         </div>
       </div>
-      <div style="margin-top:10px;background:#6B2D8B;border-radius:10px;padding:12px;text-align:center;">
+      <div style="background:#6B2D8B;border-radius:10px;padding:12px;text-align:center;">
         <div style="font-size:11px;color:rgba(255,255,255,0.7);">TOTAL A PAGAR</div>
-        <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:22px;color:#fff;">${fmt(f.totalPagar)}</div>
+        <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:24px;color:#fff;">${fmt(f.totalPagar)}</div>
       </div>
     </div>`).join('');
 
-  // Tabla detalle
+  // Tabla resumen
   const tbody = document.getElementById('tbodyComisiones');
   if(tbody) tbody.innerHTML = filas.map(f => `
     <tr>
@@ -6418,13 +6513,12 @@ function renderComisiones() {
       <td style="text-align:center;">${f.totalVentas}</td>
       <td>${fmt(f.valorTotal)}</td>
       <td style="color:#16a34a;">${fmt(f.ganancia)}</td>
-      <td style="text-align:center;">${PCT_COMISION_ASESOR}%</td>
       <td style="color:#6B2D8B;font-weight:600;">${fmt(f.comision)}</td>
       <td style="color:${f.totalBonosAsesor>=0?'#16a34a':'#dc2626'};">${fmt(f.totalBonosAsesor)}</td>
       <td style="font-weight:700;color:#6B2D8B;">${fmt(f.totalPagar)}</td>
       <td>
-        <button class="btn btn-sm btn-ghost" onclick="descontarDeGastos('${f.asesor}',${f.totalPagar},'${mesActual}')">
-          ➡️ Descontar
+        <button class="btn btn-sm btn-ghost" style="font-size:11px;" onclick="descontarDeGastos('${f.asesor}',${f.totalPagar},'${mesActual}')">
+          ➡️ A Gastos
         </button>
       </td>
     </tr>`).join('');
