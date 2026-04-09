@@ -765,7 +765,7 @@
             <thead>
               <tr>
                 <th>Fecha</th><th>Equipo</th><th>Cliente</th><th>Asesor</th>
-                <th>V.Compra</th><th>V.Venta</th><th>Ganancia</th><th>Comisión</th><th>Financiera</th><th>Estado</th>
+                <th>V.Compra</th><th>V.Venta</th><th>Ganancia</th><th>Comisión</th><th>Financiera</th><th>Estado</th><th></th>
               </tr>
             </thead>
             <tbody id="tbodyVentas"></tbody>
@@ -2133,12 +2133,8 @@
         </div>
         <div class="form-group">
           <label class="form-label">IVA (%)</label>
-          <select class="form-control" id="vcIVA" onchange="calcVContado()">
-            <option value="0">Sin IVA (0%)</option>
-            <option value="5">IVA 5%</option>
-            <option value="19" selected>IVA 19%</option>
-          </select>
-          <div style="font-size:11px;color:var(--text2);margin-top:4px;">Valor IVA: <span id="vcIVAval" style="color:var(--orange);">$0</span></div>
+          <input type="number" class="form-control" id="vcIVA" placeholder="0" value="0" min="0" max="100" step="0.1" oninput="calcVContado()">
+          <div style="font-size:11px;color:#888899;margin-top:4px;">Valor IVA: <span id="vcIVAval" style="color:#d97706;font-weight:600;">$0</span></div>
         </div>
         <div class="form-group">
           <label class="form-label">Descuento ($)</label>
@@ -2923,6 +2919,21 @@
   </div>
 </div>
 
+<!-- Modal Detalle Venta -->
+<div class="modal-overlay" id="modalDetalleVenta">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal-header">
+      <div class="modal-title">🔍 Detalle de Venta</div>
+      <button class="modal-close" onclick="closeModal('modalDetalleVenta')">✕</button>
+    </div>
+    <div id="detalleVentaContenido"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+      <button class="btn btn-ghost" onclick="closeModal('modalDetalleVenta')">Cerrar</button>
+      <button class="btn btn-outline" onclick="imprimirDetalleVenta()">🖨️ Imprimir</button>
+    </div>
+  </div>
+</div>
+
 <!-- TOASTS -->
 <div class="toast-container" id="toastContainer"></div>
 
@@ -3105,6 +3116,9 @@ function mapVenta(v) {
     financiera: v.financiera || 'CONTADO',
     tipo: v.forma_pago === 'Contado' ? 'contado' : 'credito',
     comisionAsesor: parseFloat(v.comision_asesor) || 0,
+    imei: v.imei || '',
+    cedula: v.cedula_cliente || '',
+    telefono: v.telefono_cliente || '',
     anulada: anulada,
     observaciones: v.observaciones || ''
   };
@@ -3739,7 +3753,8 @@ function renderVentas(filtro){
       </td>
       <td><span class="badge badge-blue">${v.financiera}</span></td>
       <td><span class="badge ${v.anulada?'badge-red':v.tipo==='contado'?'badge-green':'badge-pink'}">${v.anulada?'❌ ANULADA':v.tipo}</span></td>
-    </tr>`).join(''):'<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text2);">Sin ventas registradas</td></tr>';
+      <td><button class="btn btn-sm btn-ghost" style="font-size:11px;padding:3px 8px;" onclick="verDetalleVenta(${v.id})">🔍</button></td>
+    </tr>`).join(''):'<tr><td colspan="11" style="text-align:center;padding:40px;color:var(--text2);">Sin ventas registradas</td></tr>';
 }
 
 function switchVentasTab(tab,el){document.querySelectorAll('#mod-ventas .tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');renderVentas(tab);}
@@ -4552,6 +4567,57 @@ async function confirmarAbono() {
     });
     toast('Abono registrado ✅');
   } catch(e) { toast('Error: '+e.message,'error'); }
+}
+
+function verDetalleVenta(id) {
+  const v = db.ventas.find(x => x.id === id);
+  if(!v) return;
+  const contenido = document.getElementById('detalleVentaContenido');
+  if(!contenido) return;
+
+  const fila = (label, valor, color) =>
+    `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f0ecf8;">
+      <span style="font-size:13px;color:#888899;">${label}</span>
+      <strong style="font-size:13px;${color?'color:'+color+';':''}">${valor}</strong>
+    </div>`;
+
+  contenido.innerHTML = `
+    <div style="background:#f7f5fb;border-radius:12px;padding:16px;margin-bottom:16px;">
+      <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:16px;color:#6B2D8B;margin-bottom:4px;">
+        📱 ${v.equipo || '—'}
+      </div>
+      <div style="font-size:12px;color:#888899;">Venta registrada el ${v.fecha || '—'}</div>
+    </div>
+    <div style="margin-bottom:4px;">
+      ${fila('IMEI / Serial', v.imei || '—', '#0066cc')}
+      ${fila('Cliente', v.cliente || '—')}
+      ${fila('Cédula', v.cedula || '—')}
+      ${fila('Teléfono', v.telefono || '—')}
+      ${fila('Asesor', v.asesor || '—')}
+      ${fila('Financiera', v.financiera || '—')}
+      ${fila('Tipo', v.tipo === 'contado' ? '💵 Contado' : '🤝 Crédito')}
+    </div>
+    <div style="background:#f7f5fb;border-radius:12px;padding:14px;margin-top:12px;">
+      <div style="font-size:11px;color:#888899;margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:1px;">Resumen Financiero</div>
+      ${fila('Costo del equipo', fmt(v.costo), '#888899')}
+      ${fila('Precio de venta', fmt(v.venta), '#111')}
+      ${fila('Ganancia neta', fmt(v.ganancia), '#16a34a')}
+      ${fila('Comisión asesor', fmt(v.comisionAsesor || 0), '#6B2D8B')}
+    </div>
+    ${v.anulada ? '<div style="background:#fee2e2;border-radius:10px;padding:12px;margin-top:12px;text-align:center;font-weight:700;color:#dc2626;">❌ VENTA ANULADA</div>' : ''}`;
+
+  openModal('modalDetalleVenta');
+}
+
+function imprimirDetalleVenta() {
+  const contenido = document.getElementById('detalleVentaContenido')?.innerHTML;
+  if(!contenido) return;
+  const win = window.open('','_blank');
+  win.document.write(`<!DOCTYPE html><html><head><title>Detalle Venta Play Móvil</title>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;600&display=swap" rel="stylesheet">
+    <style>body{margin:24px;font-family:'DM Sans',sans-serif;max-width:480px;}@media print{body{margin:0;}}</style>
+    </head><body>${contenido}<script>window.onload=()=>window.print();<\/script></body></html>`);
+  win.document.close();
 }
 
 function toggleTransfAbono(metodo) {
