@@ -3302,9 +3302,14 @@ function mapCredito(c) {
     saldo: parseFloat(c.saldo_pendiente) || 0,
     cuotas: c.cuotas_total || 1,
     pagadas: c.cuotas_pagadas || 0,
+    valorCuota: parseFloat(c.valor_cuota) || 0,
     estado: c.estado || 'al_dia',
     reportado: false,
-    sede: c.sede_id === 1 ? 'LOCAL PEREIRA' : 'LOCAL ARMENIA'
+    sede: c.sede_id === 1 ? 'LOCAL PEREIRA' : 'LOCAL ARMENIA',
+    docCedFront:  c.doc_cedula_frente  || null,
+    docCedBack:   c.doc_cedula_reverso || null,
+    docFoto:      c.doc_foto_entrega   || null,
+    docContrato:  c.doc_contrato       || null
   };
 }
 
@@ -3475,7 +3480,11 @@ async function guardarCreditoDB(datos) {
       fecha_inicio: new Date().toISOString().split('T')[0],
       estado: 'al_dia',
       sede_id: sedeId,
-      observaciones: datos.obs || null
+      observaciones: datos.obs || null,
+      doc_cedula_frente:  datos.docCedFront  || null,
+      doc_cedula_reverso: datos.docCedBack   || null,
+      doc_foto_entrega:   datos.docFoto      || null,
+      doc_contrato:       datos.docContrato  || null
     };
     const res = await sbFetch('creditos', { method: 'POST', body: row });
     const nuevo = mapCredito(res[0]);
@@ -4119,6 +4128,14 @@ function renderCreditos(filtro='activos'){
           <div class="cc-asesor">Cédula: ${c.cedula}</div>
           <button class="btn btn-sm btn-outline" onclick="registrarPago(${c.id})">+ Pago</button>
         </div>
+        ${(c.docCedFront||c.docCedBack||c.docFoto||c.docContrato)?`
+        <div style="display:flex;gap:6px;flex-wrap:wrap;padding-top:6px;border-top:1px solid #f0ecf8;">
+          <span style="font-size:10px;color:#888899;width:100%;">📎 Documentos:</span>
+          ${c.docCedFront?`<a href="${c.docCedFront}" target="_blank" class="btn btn-sm btn-ghost" style="font-size:10px;padding:2px 8px;">🪪 Frente</a>`:''}
+          ${c.docCedBack?`<a href="${c.docCedBack}" target="_blank" class="btn btn-sm btn-ghost" style="font-size:10px;padding:2px 8px;">🪪 Reverso</a>`:''}
+          ${c.docFoto?`<a href="${c.docFoto}" target="_blank" class="btn btn-sm btn-ghost" style="font-size:10px;padding:2px 8px;">📸 Foto</a>`:''}
+          ${c.docContrato?`<a href="${c.docContrato}" target="_blank" class="btn btn-sm btn-ghost" style="font-size:10px;padding:2px 8px;">📝 Contrato</a>`:''}
+        </div>`:''}
         <div style="display:flex;gap:6px;border-top:1px solid #f0ecf8;padding-top:8px;">
           <button class="btn btn-sm btn-ghost" style="flex:1;font-size:11px;" onclick="abrirCambioEquipo(${c.id})" title="Cambiar equipo">🔄 Cambio equipo</button>
           <button class="btn btn-sm btn-ghost" style="flex:1;font-size:11px;color:#dc2626;" onclick="confirmarAnularCredito(${c.id})" title="Anular venta">❌ Anular</button>
@@ -4791,7 +4808,11 @@ async function guardarCredito(){
     total: precioFinal, inicial: ini,
     saldo: totalFinanciar, cuotas: quincenas, valorCuota,
     frecuencia: 'Quincenal', sede: sedeActual,
-    obs: prodAdicDesc ? 'Prod. adicional: '+prodAdicDesc+' ('+fmt(prodAdicVal)+')' : ''
+    obs: prodAdicDesc ? 'Prod. adicional: '+prodAdicDesc+' ('+fmt(prodAdicVal)+')' : '',
+    docCedFront:  getUrlArchivo('upCedFront'),
+    docCedBack:   getUrlArchivo('upCedBack'),
+    docFoto:      getUrlArchivo('upFotoEntrega'),
+    docContrato:  getUrlArchivo('upContrato')
   };
 
   try {
