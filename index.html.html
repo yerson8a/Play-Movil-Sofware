@@ -2521,7 +2521,7 @@
     </div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">Rol *</label>
-        <select class="form-control" id="editUsuRol">
+        <select class="form-control" id="editUsuRol" onchange="onCambioRolUsuario(this.value)">
           <option value="asesor">Asesor</option>
           <option value="admin">Administrador</option>
           <option value="bodega">Bodega</option>
@@ -2541,6 +2541,34 @@
           <option value="false">Inactivo</option>
         </select>
       </div>
+    </div>
+    <!-- Permisos de módulos -->
+    <div id="seccionPermisos" style="margin-top:16px;border-top:1px solid #f0ecf8;padding-top:14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <span style="font-size:13px;font-weight:600;color:#111;">📋 Módulos permitidos</span>
+        <div style="display:flex;gap:6px;">
+          <button type="button" class="btn btn-sm btn-ghost" style="font-size:11px;" onclick="marcarTodosPermisos(true)">✅ Todos</button>
+          <button type="button" class="btn btn-sm btn-ghost" style="font-size:11px;" onclick="marcarTodosPermisos(false)">❌ Ninguno</button>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;background:#f7f5fb;border-radius:12px;padding:10px;max-height:220px;overflow-y:auto;" id="permisosGrid">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;" class="perm-label"><input type="checkbox" name="permiso" value="dashboard" style="width:15px;height:15px;accent-color:#6B2D8B;"> 📊 Dashboard</label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;" class="perm-label"><input type="checkbox" name="permiso" value="compras" style="width:15px;height:15px;accent-color:#6B2D8B;"> 🛒 Compras</label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;" class="perm-label"><input type="checkbox" name="permiso" value="inventario" style="width:15px;height:15px;accent-color:#6B2D8B;"> 📦 Inventario</label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;" class="perm-label"><input type="checkbox" name="permiso" value="ventas" style="width:15px;height:15px;accent-color:#6B2D8B;"> 💰 Ventas</label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;" class="perm-label"><input type="checkbox" name="permiso" value="creditos" style="width:15px;height:15px;accent-color:#6B2D8B;"> 🤝 Créditos</label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;" class="perm-label"><input type="checkbox" name="permiso" value="simulador" style="width:15px;height:15px;accent-color:#6B2D8B;"> 🧮 Simulador</label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;" class="perm-label"><input type="checkbox" name="permiso" value="contabilidad" style="width:15px;height:15px;accent-color:#6B2D8B;"> 📒 Contabilidad</label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;" class="perm-label"><input type="checkbox" name="permiso" value="asesores" style="width:15px;height:15px;accent-color:#6B2D8B;"> 👥 Asesores</label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;" class="perm-label"><input type="checkbox" name="permiso" value="garantias" style="width:15px;height:15px;accent-color:#6B2D8B;"> 🛡️ Garantías</label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;" class="perm-label"><input type="checkbox" name="permiso" value="servicio" style="width:15px;height:15px;accent-color:#6B2D8B;"> 🔧 Servicio Técnico</label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;" class="perm-label"><input type="checkbox" name="permiso" value="comisiones" style="width:15px;height:15px;accent-color:#6B2D8B;"> 💎 Comisiones</label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;" class="perm-label"><input type="checkbox" name="permiso" value="sedes" style="width:15px;height:15px;accent-color:#6B2D8B;"> 🏢 Sedes</label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;" class="perm-label"><input type="checkbox" name="permiso" value="usuarios" style="width:15px;height:15px;accent-color:#6B2D8B;"> 👤 Usuarios</label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;" class="perm-label"><input type="checkbox" name="permiso" value="financieras" style="width:15px;height:15px;accent-color:#6B2D8B;"> 🏦 Financieras</label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;" class="perm-label"><input type="checkbox" name="permiso" value="cajas" style="width:15px;height:15px;accent-color:#6B2D8B;"> 💵 Cajas</label>
+      </div>
+      <div style="font-size:11px;color:#888899;margin-top:6px;">Sin selección = acceso completo según su rol.</div>
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
       <button class="btn btn-ghost" onclick="closeModal('modalEditarUsuario')">Cancelar</button>
@@ -3616,6 +3644,89 @@ function toast(msg, type='success') {
 
 function openModal(id) { $(id).classList.add('open'); }
 function closeModal(id) { $(id).classList.remove('open'); }
+
+// ============================================================
+// SISTEMA DE PERMISOS POR MÓDULO
+// ============================================================
+function aplicarPermisosNavegacion(user) {
+  // admin siempre ve todo
+  if(user.rol === 'admin') {
+    document.querySelectorAll('.nav-item').forEach(n => n.style.display = '');
+    return;
+  }
+
+  const permisos = user.modulos_permitidos
+    ? JSON.parse(user.modulos_permitidos)
+    : [];
+
+  // Si permisos vacíos = acceso completo según rol
+  if(permisos.length === 0) {
+    aplicarPermisosRol(user.rol);
+    return;
+  }
+
+  // Ocultar todos los nav-items primero
+  document.querySelectorAll('.nav-item').forEach(nav => {
+    const onclick = nav.getAttribute('onclick') || '';
+    const match = onclick.match(/showModule\('([^']+)'\)/);
+    if(match) {
+      const modulo = match[1];
+      nav.style.display = permisos.includes(modulo) ? '' : 'none';
+    }
+  });
+  // Dashboard siempre visible
+  const dashNav = document.querySelector('.nav-item[onclick*="dashboard"]');
+  if(dashNav) dashNav.style.display = '';
+}
+
+function aplicarPermisosRol(rol) {
+  // Permisos por defecto según rol
+  const porRol = {
+    asesor:   ['dashboard','inventario','ventas','creditos','simulador','garantias','servicio'],
+    bodega:   ['dashboard','inventario','compras','garantias'],
+    consulta: ['dashboard','inventario','ventas','creditos'],
+  };
+  const permitidos = porRol[rol] || [];
+  document.querySelectorAll('.nav-item').forEach(nav => {
+    const onclick = nav.getAttribute('onclick') || '';
+    const match = onclick.match(/showModule\('([^']+)'\)/);
+    if(match) {
+      nav.style.display = permitidos.includes(match[1]) ? '' : 'none';
+    }
+  });
+  const dashNav = document.querySelector('.nav-item[onclick*="dashboard"]');
+  if(dashNav) dashNav.style.display = '';
+}
+
+function onCambioRolUsuario(rol) {
+  const secPermisos = document.getElementById('seccionPermisos');
+  const esAdmin = rol === 'admin';
+
+  if(secPermisos) secPermisos.style.display = esAdmin ? 'none' : 'block';
+
+  document.querySelectorAll('#permisosGrid input[name="permiso"]').forEach(cb => {
+    if(esAdmin) {
+      cb.checked = true;
+      cb.disabled = true;
+    } else {
+      cb.disabled = false;
+      // Permisos por defecto según rol
+      const porRol = {
+        asesor:   ['dashboard','inventario','ventas','creditos','simulador','garantias','servicio'],
+        bodega:   ['dashboard','inventario','compras','garantias','servicio'],
+        consulta: ['dashboard','inventario','ventas','creditos'],
+      };
+      const defaults = porRol[rol] || [];
+      cb.checked = defaults.includes(cb.value);
+    }
+  });
+}
+
+function marcarTodosPermisos(marcar) {
+  document.querySelectorAll('#permisosGrid input[name="permiso"]').forEach(cb => {
+    cb.checked = marcar;
+  });
+}
 
 // Mostrar botón hamburguesa si es móvil
 function checkMobile() {
@@ -6096,37 +6207,80 @@ async function crearUsuario() {
 function abrirEditarUsuario(id) {
   const u = dbAdmin.usuarios.find(x => x.id === id);
   if (!u) return;
-  document.getElementById('editUsuId').value = id;
+  document.getElementById('editUsuId').value     = id;
   document.getElementById('editUsuNombre').value = u.nombre;
-  document.getElementById('editUsuUsuario').value = u.usuario;
-  document.getElementById('editUsuRol').value = u.rol;
+  document.getElementById('editUsuUsuario').value= u.usuario;
+  document.getElementById('editUsuRol').value    = u.rol;
   document.getElementById('editUsuActivo').value = u.activo ? 'true' : 'false';
   poblarSelectSedes();
-  document.getElementById('editUsuSede').value = u.sede_id || '';
+  document.getElementById('editUsuSede').value   = u.sede_id || '';
   document.getElementById('editUsuPassword').value = '';
   document.getElementById('editUsuPasswordConf').value = '';
+
+  const esAdmin = u.rol === 'admin';
+
+  // Mostrar u ocultar sección de permisos
+  const secPermisos = document.getElementById('seccionPermisos');
+  if(secPermisos) {
+    secPermisos.style.display = esAdmin ? 'none' : 'block';
+  }
+
+  // Cargar permisos guardados
+  let permisosSaved = [];
+  try {
+    const p = u.modulos_permitidos;
+    if(p) permisosSaved = typeof p === 'string' ? JSON.parse(p) : p;
+  } catch(e){}
+
+  document.querySelectorAll('#permisosGrid input[name="permiso"]').forEach(cb => {
+    if(esAdmin) {
+      cb.checked  = true;
+      cb.disabled = true;
+    } else {
+      cb.disabled = false;
+      // Sin permisos guardados = todos activos por defecto
+      cb.checked = permisosSaved.length === 0 ? true : permisosSaved.includes(cb.value);
+    }
+  });
+
   openModal('modalEditarUsuario');
 }
 
 async function actualizarUsuario() {
-  const id = document.getElementById('editUsuId').value;
+  const id   = document.getElementById('editUsuId').value;
   const pass = document.getElementById('editUsuPassword').value;
   const conf = document.getElementById('editUsuPasswordConf').value;
-  if (pass && pass !== conf) { toast('Las contraseñas no coinciden', 'error'); return; }
+  const rol  = document.getElementById('editUsuRol').value;
+  if(pass && pass !== conf) { toast('Las contraseñas no coinciden', 'error'); return; }
+
+  // Recolectar permisos (solo para no-admin)
+  let modulos_permitidos = null;
+  if(rol !== 'admin') {
+    const checked = Array.from(
+      document.querySelectorAll('#permisosGrid input[name="permiso"]:checked')
+    ).map(cb => cb.value);
+    const total = document.querySelectorAll('#permisosGrid input[name="permiso"]').length;
+    // Si están todos = null (acceso completo), si no = array con los seleccionados
+    modulos_permitidos = checked.length === total ? null : JSON.stringify(checked);
+  }
 
   const row = {
-    nombre: document.getElementById('editUsuNombre').value,
-    rol: document.getElementById('editUsuRol').value,
-    sede_id: document.getElementById('editUsuSede').value ? parseInt(document.getElementById('editUsuSede').value) : null,
-    activo: document.getElementById('editUsuActivo').value === 'true'
+    nombre:             document.getElementById('editUsuNombre').value,
+    rol,
+    sede_id:            document.getElementById('editUsuSede').value ? parseInt(document.getElementById('editUsuSede').value) : null,
+    activo:             document.getElementById('editUsuActivo').value === 'true',
+    modulos_permitidos
   };
-  if (pass) row.password_hash = await sha256(pass);
+  if(pass) row.password_hash = await sha256(pass);
 
   try {
     await sbFetch(`sistema_usuarios?id=eq.${id}`, { method: 'PATCH', body: row });
+    // Actualizar en memoria
+    const u = dbAdmin.usuarios.find(x => x.id === parseInt(id));
+    if(u) Object.assign(u, { ...row, modulos_permitidos: modulos_permitidos });
     closeModal('modalEditarUsuario');
     await cargarUsuarios();
-    toast('Usuario actualizado ✅');
+    toast('Permisos y datos actualizados ✅');
   } catch(e) { toast('Error: ' + e.message, 'error'); }
 }
 
@@ -6931,6 +7085,8 @@ async function activarSesion(user) {
   document.getElementById('userRolTop').textContent    = user.rol.toUpperCase();
   document.getElementById('userRolTop').className      = `user-role-badge role-${user.rol}`;
   document.getElementById('menuNombre').textContent    = user.nombre;
+  // Aplicar permisos de módulos
+  aplicarPermisosNavegacion(user);
   document.getElementById('menuRolSede').textContent   = `${user.rol.toUpperCase()} · ${sedeNombre}`;
 
   // Aplicar clase de rol al body para permisos CSS
