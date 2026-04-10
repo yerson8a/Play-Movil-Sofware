@@ -3051,6 +3051,7 @@
     <div id="detalleVentaContenido"></div>
     <div style="display:flex;gap:10px;justify-content:space-between;align-items:center;margin-top:16px;">
       <button class="btn btn-sm btn-ghost" id="btnAnularVentaDetalle" style="color:#dc2626;border:1px solid #dc2626;" onclick="confirmarAnularVentaContado()">❌ Anular Venta</button>
+      <!-- Visibilidad controlada por JS según rol -->
       <div style="display:flex;gap:10px;">
         <button class="btn btn-ghost" onclick="closeModal('modalDetalleVenta')">Cerrar</button>
         <button class="btn btn-outline" onclick="imprimirDetalleVenta()">🖨️ Imprimir</button>
@@ -4144,7 +4145,7 @@ function renderCreditos(filtro='activos'){
         </div>`:''}
         <div style="display:flex;gap:6px;border-top:1px solid #f0ecf8;padding-top:8px;">
           <button class="btn btn-sm btn-ghost" style="flex:1;font-size:11px;" onclick="abrirCambioEquipo(${c.id})" title="Cambiar equipo">🔄 Cambio equipo</button>
-          <button class="btn btn-sm btn-ghost" style="flex:1;font-size:11px;color:#dc2626;" onclick="confirmarAnularCredito(${c.id})" title="Anular venta">❌ Anular</button>
+          ${sesionActiva&&sesionActiva.rol==='admin'?`<button class="btn btn-sm btn-ghost" style="flex:1;font-size:11px;color:#dc2626;" onclick="confirmarAnularCredito(${c.id})" title="Anular venta">❌ Anular</button>`:''}
         </div>
       </div>
     </div>`;
@@ -4914,9 +4915,12 @@ function verDetalleVenta(id) {
   const contenido = document.getElementById('detalleVentaContenido');
   if(!contenido) return;
 
-  // Mostrar/ocultar botón anular según estado
+  // Mostrar botón anular solo para admin y si no está ya anulada
   const btnAnular = document.getElementById('btnAnularVentaDetalle');
-  if(btnAnular) btnAnular.style.display = v.anulada ? 'none' : 'inline-flex';
+  if(btnAnular) {
+    const esAdmin = sesionActiva && sesionActiva.rol === 'admin';
+    btnAnular.style.display = (!v.anulada && esAdmin) ? 'inline-flex' : 'none';
+  }
 
   const fila = (label, valor, color) =>
     `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f0ecf8;">
@@ -4953,6 +4957,7 @@ function verDetalleVenta(id) {
 }
 
 async function confirmarAnularVentaContado() {
+  if(sesionActiva?.rol !== 'admin') { toast('Solo el administrador puede anular ventas','error'); return; }
   if(!ventaDetalleActualId) return;
   const v = db.ventas.find(x => x.id === ventaDetalleActualId);
   if(!v) return;
@@ -5696,6 +5701,7 @@ async function buscarParaSalida(val) {
 }
 
 async function ejecutarAnulacion() {
+  if(sesionActiva?.rol !== 'admin') { toast('Solo el administrador puede anular ventas','error'); closeModal('modalAnularVenta'); return; }
   const id = parseInt(document.getElementById('anularCreditoId').value);
   const tipo = document.getElementById('anularTipo').value;
 
