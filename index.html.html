@@ -609,11 +609,7 @@
           <div class="stat-value pink" id="dashVentasMes">$0</div>
           <div class="stat-delta" id="dashVentasDelta">Este mes</div>
         </div>
-        <div class="stat-card green">
-          <div class="stat-label">Ganancia Neta</div>
-          <div class="stat-value green" id="dashGanancia">$0</div>
-          <div class="stat-delta" id="dashGananciaDelta">Este mes</div>
-        </div>
+
         <div class="stat-card blue">
           <div class="stat-label">Equipos en Stock</div>
           <div class="stat-value blue" id="dashEquipos">0</div>
@@ -643,7 +639,7 @@
           <div class="card-title">📱 Últimas Ventas</div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>Equipo</th><th>Cliente</th><th>Asesor</th><th>Tipo</th><th>Valor</th></tr></thead>
+              <thead><tr><th>Equipo</th><th>Cliente</th><th>Asesor</th><th>Tipo</th><th id="thValorVenta">Valor</th></tr></thead>
               <tbody id="ultVentas"></tbody>
             </table>
           </div>
@@ -1016,21 +1012,26 @@
       </div>
 
       <div id="contab-resumen">
-        <div class="grid-3" style="margin-bottom:24px;">
+        <div class="grid-4" style="margin-bottom:24px;">
           <div class="stat-card green">
-            <div class="stat-label">Ingresos Marzo</div>
+            <div class="stat-label">Ingresos Mes</div>
             <div class="stat-value green" id="contIngresos">$0</div>
             <div class="stat-delta">Ventas + Recaudos</div>
           </div>
           <div class="stat-card pink">
-            <div class="stat-label">Gastos Marzo</div>
+            <div class="stat-label">Gastos Mes</div>
             <div class="stat-value pink" id="contGastos">$0</div>
             <div class="stat-delta">Gastos registrados</div>
           </div>
           <div class="stat-card blue">
-            <div class="stat-label">Utilidad Marzo</div>
+            <div class="stat-label">Utilidad Mes</div>
             <div class="stat-value blue" id="contUtilidad">$0</div>
             <div class="stat-delta" id="contMargen">Margen del mes</div>
+          </div>
+          <div class="stat-card green">
+            <div class="stat-label">Ganancia Neta</div>
+            <div class="stat-value green" id="contGanancia">$0</div>
+            <div class="stat-delta" id="contGananciaDelta">Este mes</div>
           </div>
         </div>
         <div class="grid-2">
@@ -3836,8 +3837,7 @@ function renderDashboard() {
   const setEl = (id,val) => { const e=$(id); if(e) e.textContent=val; };
   setEl('dashVentasMes',    fmt(totalVentasMes));
   setEl('dashVentasDelta',  mesNombre);
-  setEl('dashGanancia',     fmt(totalGananciaMes));
-  setEl('dashGananciaDelta','Ganancia '+mesNombre);
+
   setEl('dashEquipos',      equiposDisp+'');
   setEl('dashEquiposDelta', equiposTotal+' en inventario total');
   setEl('dashCreditos',     creditosActivos+'');
@@ -4105,10 +4105,13 @@ function renderContabilidad(){
   const utilidad = ingresosMes - gastosMes;
   const margen = ingresosMes>0?((utilidad/ingresosMes)*100).toFixed(1):0;
   const setEl=(id,val)=>{const e=document.getElementById(id);if(e)e.textContent=val;};
-  setEl('contIngresos', fmt(ingresosMes));
-  setEl('contGastos',   fmt(gastosMes));
-  setEl('contUtilidad', fmt(utilidad));
-  setEl('contMargen',   margen+'% margen');
+  const gananciasMes = ventasMes.reduce((a,v)=>a+v.ganancia,0);
+  setEl('contIngresos',      fmt(ingresosMes));
+  setEl('contGastos',        fmt(gastosMes));
+  setEl('contUtilidad',      fmt(utilidad));
+  setEl('contMargen',        margen+'% margen');
+  setEl('contGanancia',      fmt(gananciasMes));
+  setEl('contGananciaDelta', 'Ganancia '+mesActual);
 
   // ── Gastos fijos editables por mes ──
   const gastosMesData = getGastosFijosMes(mesActual);
