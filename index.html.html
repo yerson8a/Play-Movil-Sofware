@@ -798,9 +798,7 @@
       </div>
 
       <div id="invTabsSedes" class="tabs" style="margin-bottom:16px;">
-        <button class="tab active" id="tabInvTodas"   onclick="switchInvSede('todas',this)">Todas las sedes</button>
-        <button class="tab"        id="tabInvPereira" onclick="switchInvSede('pereira',this)">Pereira <span id="badgePereira" style="margin-left:4px;background:rgba(233,30,140,0.2);color:var(--pink);font-size:10px;padding:1px 7px;border-radius:20px;font-weight:700;">0</span></button>
-        <button class="tab"        id="tabInvArmenia" onclick="switchInvSede('armenia',this)">Armenia <span id="badgeArmenia" style="margin-left:4px;background:rgba(68,138,255,0.2);color:var(--blue);font-size:10px;padding:1px 7px;border-radius:20px;font-weight:700;">0</span></button>
+        <!-- Se genera dinámicamente desde renderInventario -->
       </div>
 
       <div class="card">
@@ -1780,8 +1778,7 @@
       <div class="form-group">
         <label class="form-label">Sede</label>
         <select class="form-control" id="invSede">
-          <option>LOCAL PEREIRA</option>
-          <option>LOCAL ARMENIA LA 15</option>
+          <!-- Se llena dinámicamente -->
         </select>
       </div>
       <div class="form-group">
@@ -3775,20 +3772,28 @@ function renderDashboard() {
 let invSedeActiva = 'todas';
 
 function renderInventario() {
-  // Actualizar badges de conteo por sede
-  const perCount = db.inventario.filter(e=>e.sede.includes('PEREIRA')).length;
-  const arCount  = db.inventario.filter(e=>e.sede.includes('ARMENIA')).length;
-  const bp = $('badgePereira'); if(bp) bp.textContent = perCount;
-  const ba = $('badgeArmenia'); if(ba) ba.textContent = arCount;
-
-  // Si el usuario tiene sede fija, ocultar pestanas y auto-filtrar
   const tabsSedes = $('invTabsSedes');
-  if (sesionActiva && sesionActiva.rol !== 'admin' && sesionActiva.sede_id) {
+
+  // Generar tabs dinámicamente desde dbAdmin.sedes
+  if(tabsSedes) {
+    const sedesActivas = dbAdmin.sedes.filter(s => s.activa !== false);
+    tabsSedes.innerHTML = `<button class="tab ${invSedeActiva==='todas'?'active':''}" onclick="switchInvSede('todas',this)">Todas las sedes</button>` +
+      sedesActivas.map(s => {
+        const key = s.nombre.toLowerCase().replace(/\s+/g,'_');
+        const count = db.inventario.filter(e => e.sede_id === s.id || (e.sede||'').toUpperCase().includes(s.nombre.toUpperCase())).length;
+        return `<button class="tab ${invSedeActiva===key?'active':''}" onclick="switchInvSede('${key}',this)" data-sede-id="${s.id}">
+          ${s.nombre} <span style="margin-left:4px;background:rgba(107,45,139,0.15);color:#6B2D8B;font-size:10px;padding:1px 7px;border-radius:20px;font-weight:700;">${count}</span>
+        </button>`;
+      }).join('');
+  }
+
+  // Si el usuario tiene sede fija, ocultar tabs y auto-filtrar
+  if(sesionActiva && sesionActiva.rol !== 'admin' && sesionActiva.sede_id) {
     if(tabsSedes) tabsSedes.style.display = 'none';
-    const sedeNombre = sesionActiva.sede_id === 1 ? 'LOCAL PEREIRA' : 'LOCAL ARMENIA';
+    const sedeObj = dbAdmin.sedes.find(s => s.id === sesionActiva.sede_id);
     const sub = $('invSedeSubtitle');
-    if(sub) sub.textContent = 'Solo mostrando: ' + sedeNombre;
-    renderTablaInventario(db.inventario);
+    if(sub) sub.textContent = 'Solo mostrando: ' + (sedeObj ? sedeObj.nombre : 'Tu sede');
+    renderTablaInventario(db.inventario.filter(e => e.sede_id === sesionActiva.sede_id));
   } else {
     if(tabsSedes) tabsSedes.style.display = 'flex';
     const sub = $('invSedeSubtitle');
@@ -3796,17 +3801,20 @@ function renderInventario() {
     aplicarFiltroInvSede();
   }
 
-  // Stats del inventario visible actual
+  // Stats
   const dataVisible = getInvDataFiltrada();
-  $('totalEquipos').textContent = dataVisible.length;
-  $('dispEquipos').textContent  = dataVisible.filter(e=>e.estado==='DISPONIBLE').length;
-  $('vendEquipos').textContent  = dataVisible.filter(e=>e.estado==='VENDIDO').length;
-  $('garEquipos').textContent   = dataVisible.filter(e=>e.estado==='GARANTIA').length;
+  const setN = (id,v) => { const e=$(id); if(e) e.textContent=v; };
+  setN('totalEquipos', dataVisible.length);
+  setN('dispEquipos',  dataVisible.filter(e=>e.estado==='DISPONIBLE').length);
+  setN('vendEquipos',  dataVisible.filter(e=>e.estado==='VENDIDO').length);
+  setN('garEquipos',   dataVisible.filter(e=>e.estado==='GARANTIA').length);
 }
 
 function getInvDataFiltrada() {
-  if(invSedeActiva === 'pereira') return db.inventario.filter(e=>e.sede.includes('PEREIRA'));
-  if(invSedeActiva === 'armenia') return db.inventario.filter(e=>e.sede.includes('ARMENIA'));
+  if(invSedeActiva === 'todas') return db.inventario;
+  // Buscar la sede por clave dinámica
+  const sede = dbAdmin.sedes.find(s => s.nombre.toLowerCase().replace(/\s+/g,'_') === invSedeActiva);
+  if(sede) return db.inventario.filter(e => e.sede_id === sede.id || (e.sede||'').toUpperCase().includes(sede.nombre.toUpperCase()));
   return db.inventario;
 }
 
@@ -3838,7 +3846,7 @@ function renderTablaInventario(data) {
       <td style="font-family:monospace;font-size:11px;color:var(--text2);">${e.imei}</td>
       <td style="font-size:12px;">${e.proveedor}</td>
       <td style="color:var(--pink);font-weight:600;">${fmt(e.costo)}</td>
-      <td><span style="font-size:11px;padding:2px 8px;border-radius:8px;background:${e.sede.includes('PEREIRA')?'rgba(233,30,140,0.1)':'rgba(68,138,255,0.1)'};color:${e.sede.includes('PEREIRA')?'var(--pink)':'var(--blue)'};">${e.sede.includes('PEREIRA')?'Pereira':'Armenia'}</span></td>
+      <td><span style="font-size:11px;padding:2px 8px;border-radius:8px;background:rgba(107,45,139,0.1);color:#6B2D8B;">${(()=>{const s=dbAdmin.sedes.find(x=>x.id===e.sede_id||(e.sede||'').toUpperCase().includes((x.nombre||'').toUpperCase()));return s?s.nombre:e.sede||'—';})()}</span></td>
       <td><span class="badge ${e.estado==='DISPONIBLE'?'badge-green':e.estado==='VENDIDO'?'badge-pink':e.estado==='GARANTIA'?'badge-orange':'badge-red'}">${e.estado}</span></td>
       <td>
         <button class="btn btn-sm btn-ghost" onclick="eliminarEquipo(${e.id})" title="Eliminar">🗑️</button>
@@ -5962,11 +5970,23 @@ async function toggleEstadoSede(id) {
 
 function poblarSelectSedes() {
   const activas = dbAdmin.sedes.filter(s => s.activa !== false);
+  // Selectores con ID de sede
   ['cajaSede', 'usuSede', 'editUsuSede'].forEach(id => {
     const sel = document.getElementById(id);
     if (!sel) return;
     const emptyOpt = id.includes('usu') ? '<option value="">Todas las sedes (Admin)</option>' : '<option value="">Seleccionar sede...</option>';
     sel.innerHTML = emptyOpt + activas.map(s => `<option value="${s.id}">${s.nombre}</option>`).join('');
+  });
+  // Select de sede en modal agregar equipo (por nombre)
+  const invSedeSel = document.getElementById('invSede');
+  if(invSedeSel) {
+    invSedeSel.innerHTML = activas.map(s => `<option value="${s.nombre}">${s.nombre}</option>`).join('');
+  }
+  // Select de sedes en otros modales
+  ['sedeSelectVenta','vcSede','crdSede'].forEach(id => {
+    const sel = document.getElementById(id);
+    if(!sel) return;
+    sel.innerHTML = activas.map(s => `<option value="${s.nombre}">${s.nombre}</option>`).join('');
   });
 }
 
@@ -5995,10 +6015,11 @@ function renderUsuarios() {
   const tbody = document.getElementById('tbodyUsuarios');
   if (!tbody) return;
   const rolColors = { admin: 'badge-pink', asesor: 'badge-blue', bodega: 'badge-orange', consulta: 'badge-green' };
-  const sedes = { 1: 'Pereira', 2: 'Armenia' };
+  // Nombre de sede dinámico
+  const sedesMap = {}; dbAdmin.sedes.forEach(s => sedesMap[s.id] = s.nombre);
   tbody.innerHTML = data.length ? data.map(u => {
     const acceso = u.ultimo_acceso ? new Date(u.ultimo_acceso).toLocaleDateString('es-CO') : 'Nunca';
-    const sedeNombre = u.sede_id ? (sedes[u.sede_id] || 'Sede ' + u.sede_id) : 'Todas';
+    const sedeNombre = u.sede_id ? (sedesMap[u.sede_id] || 'Sede ' + u.sede_id) : 'Todas';
     return `<tr>
       <td style="font-weight:700;color:#6B2D8B;">${u.id}</td>
       <td style="font-weight:600;">${u.nombre}</td>
@@ -6024,7 +6045,7 @@ function filtrarUsuarios(q) {
   const data = dbAdmin.usuarios.filter(u => u.nombre.toLowerCase().includes(q) || u.usuario.toLowerCase().includes(q));
   if (!tbody) return;
   tbody.innerHTML = data.map(u => {
-    const sedeNombre = u.sede_id ? (sedes[u.sede_id] || 'Sede ' + u.sede_id) : 'Todas';
+    const sedeNombre = u.sede_id ? (sedesMap[u.sede_id] || 'Sede ' + u.sede_id) : 'Todas';
     return `<tr>
       <td style="font-weight:700;color:#6B2D8B;">${u.id}</td>
       <td style="font-weight:600;">${u.nombre}</td>
