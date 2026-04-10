@@ -537,6 +537,9 @@
     <div class="nav-item" onclick="showModule('proveedores')">
       <span class="icon">🏭</span> Proveedores
     </div>
+    <div class="nav-item" onclick="showModule('productos')">
+      <span class="icon">📦</span> Productos
+    </div>
     <div class="nav-item" onclick="showModule('inventario')">
       <span class="icon">📱</span> Inventario
     </div>
@@ -830,6 +833,57 @@
     </div>
 
     <!-- ==================== INVENTARIO ==================== -->
+    <!-- ==================== PRODUCTOS ==================== -->
+    <div id="mod-productos" class="module">
+      <div class="section-header">
+        <div>
+          <div class="section-title">📦 Registro de Productos</div>
+          <div class="section-sub">Ingreso individual de equipos al inventario</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="abrirModalProducto()">+ Nuevo Producto</button>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px;">
+        <div class="stat-card blue"><div class="stat-label">Total Productos</div><div class="stat-value blue" id="prodStatTotal">0</div></div>
+        <div class="stat-card green"><div class="stat-label">Disponibles</div><div class="stat-value green" id="prodStatDisp">0</div></div>
+        <div class="stat-card pink"><div class="stat-label">Vendidos</div><div class="stat-value pink" id="prodStatVend">0</div></div>
+        <div class="stat-card orange"><div class="stat-label">Garantía / Baja</div><div class="stat-value orange" id="prodStatOtros">0</div></div>
+      </div>
+
+      <div class="card">
+        <div class="flex items-center gap-12 mb-16" style="flex-wrap:wrap;">
+          <div class="search-wrap" style="flex:1;min-width:200px;">
+            <span class="search-icon">🔍</span>
+            <input type="text" class="form-control" id="searchProductosMod" placeholder="Buscar por nombre, IMEI, marca..." oninput="filtrarProductosMod(this.value)">
+          </div>
+          <select class="form-control" style="width:160px;" id="filtroProdEstado" onchange="filtrarProductosModEstado(this.value)">
+            <option value="">Todos los estados</option>
+            <option value="DISPONIBLE">Disponibles</option>
+            <option value="VENDIDO">Vendidos</option>
+            <option value="GARANTIA">Garantía</option>
+            <option value="DEVUELTO">Dados de baja</option>
+          </select>
+          <select class="form-control" style="width:160px;" id="filtroProdSede" onchange="filtrarProductosModSede(this.value)">
+            <option value="">Todas las sedes</option>
+          </select>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha</th><th>Producto / Modelo</th><th>Marca</th>
+                <th>IMEI 1</th><th>IMEI 2 / Serial</th>
+                <th>Color</th><th>Almacenamiento</th>
+                <th>V. Compra</th><th>Proveedor</th>
+                <th>Sede</th><th>Estado</th><th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="tbodyProductosMod"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <div id="mod-inventario" class="module">
       <div class="section-header">
         <div>
@@ -1902,15 +1956,278 @@
 </div>
 
 <!-- Modal Nuevo Equipo -->
-<div class="modal-overlay" id="modalNuevoEquipo">
-  <div class="modal">
+<!-- Modal Nuevo Producto (completo) -->
+<div class="modal-overlay" id="modalNuevoProducto">
+  <div class="modal" style="max-width:780px;">
     <div class="modal-header">
-      <div class="modal-title">📱 Agregar Equipo al Inventario</div>
-      <button class="modal-close" onclick="closeModal('modalNuevoEquipo')">✕</button>
+      <div class="modal-title">📦 Registrar Nuevo Producto</div>
+      <button class="modal-close" onclick="closeModal('modalNuevoProducto')">✕</button>
+    </div>
+
+    <div class="form-row" style="gap:16px;">
+      <!-- Columna izquierda -->
+      <div style="flex:1;display:flex;flex-direction:column;gap:14px;">
+
+        <div class="card">
+          <div class="card-title" style="font-size:13px;margin-bottom:10px;">📱 Datos del Producto</div>
+          <div class="form-group">
+            <label class="form-label">Nombre / Modelo *</label>
+            <input type="text" class="form-control" id="prodNombre" placeholder="Ej: Samsung Galaxy A55 128GB Negro">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Marca *</label>
+              <select class="form-control" id="prodMarca" onchange="actualizarMarcaCustom(this)">
+                <option value="">Seleccionar...</option>
+                <option>Samsung</option>
+                <option>Apple</option>
+                <option>Xiaomi</option>
+                <option>Redmi</option>
+                <option>Huawei</option>
+                <option>Motorola</option>
+                <option>LG</option>
+                <option>Nokia</option>
+                <option>Realme</option>
+                <option>OPPO</option>
+                <option>Vivo</option>
+                <option>Tecno</option>
+                <option value="otro">Otra marca...</option>
+              </select>
+            </div>
+            <div class="form-group" id="prodMarcaCustomDiv" style="display:none;">
+              <label class="form-label">Especificar marca</label>
+              <input type="text" class="form-control" id="prodMarcaCustom" placeholder="Nombre de la marca">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Color</label>
+              <input type="text" class="form-control" id="prodColor" placeholder="Ej: Negro, Azul, Blanco">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Almacenamiento</label>
+              <select class="form-control" id="prodAlmacenamiento">
+                <option value="">Sin especificar</option>
+                <option>32GB</option>
+                <option>64GB</option>
+                <option>128GB</option>
+                <option>256GB</option>
+                <option>512GB</option>
+                <option>1TB</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">RAM</label>
+              <select class="form-control" id="prodRAM">
+                <option value="">Sin especificar</option>
+                <option>2GB</option>
+                <option>3GB</option>
+                <option>4GB</option>
+                <option>6GB</option>
+                <option>8GB</option>
+                <option>12GB</option>
+                <option>16GB</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Condición</label>
+              <select class="form-control" id="prodCondicion">
+                <option value="Nuevo">Nuevo</option>
+                <option value="Usado A">Usado A (excelente)</option>
+                <option value="Usado B">Usado B (bueno)</option>
+                <option value="Usado C">Usado C (regular)</option>
+                <option value="Reacondicionado">Reacondicionado</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title" style="font-size:13px;margin-bottom:10px;">📡 Identificación</div>
+          <div class="form-group">
+            <label class="form-label">IMEI 1 *</label>
+            <input type="text" class="form-control" id="prodIMEI1" placeholder="IMEI principal (15 dígitos)" maxlength="20" oninput="validarIMEIProd()">
+            <div id="prodIMEI1Error" style="font-size:11px;color:#dc2626;margin-top:3px;display:none;">⚠️ Este IMEI ya está registrado</div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">IMEI 2 (si aplica)</label>
+              <input type="text" class="form-control" id="prodIMEI2" placeholder="Segundo IMEI" maxlength="20">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Serial / Código</label>
+              <input type="text" class="form-control" id="prodSerial" placeholder="Número de serie">
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Columna derecha -->
+      <div style="flex:1;display:flex;flex-direction:column;gap:14px;">
+
+        <div class="card">
+          <div class="card-title" style="font-size:13px;margin-bottom:10px;">💰 Compra y Ubicación</div>
+          <div class="form-group">
+            <label class="form-label">Proveedor *</label>
+            <select class="form-control" id="prodProveedorId" onchange="autoLlenarProveedorProd()">
+              <option value="">Seleccionar proveedor...</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Valor de Compra *</label>
+              <input type="number" class="form-control" id="prodValorCompra" placeholder="0" min="0">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Fecha de Compra</label>
+              <input type="date" class="form-control" id="prodFechaCompra">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Sede *</label>
+              <select class="form-control" id="invSede">
+                <!-- Dinámico -->
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Estado</label>
+              <select class="form-control" id="invEstado">
+                <option value="DISPONIBLE">DISPONIBLE</option>
+                <option value="VENDIDO">VENDIDO</option>
+                <option value="GARANTIA">GARANTÍA</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title" style="font-size:13px;margin-bottom:10px;">🛡️ Garantía y Observaciones</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Garantía (meses)</label>
+              <select class="form-control" id="prodGarantia">
+                <option value="0">Sin garantía</option>
+                <option value="1">1 mes</option>
+                <option value="3">3 meses</option>
+                <option value="6">6 meses</option>
+                <option value="12">12 meses</option>
+                <option value="24">24 meses</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Precio de Venta Sugerido</label>
+              <input type="number" class="form-control" id="prodPrecioVenta" placeholder="Opcional">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Observaciones</label>
+            <textarea class="form-control" id="prodObs" rows="2" placeholder="Accesorios incluidos, notas de estado, etc..."></textarea>
+          </div>
+        </div>
+
+        <!-- Imagen del producto -->
+        <div class="card">
+          <div class="card-title" style="font-size:13px;margin-bottom:10px;">📸 Foto del Producto</div>
+          <label class="upload-zone" style="padding:14px;display:block;cursor:pointer;">
+            <input type="file" id="upProductoFoto" accept="image/*" onchange="handleUpload(this,'prodFotoPreview')" style="display:none;">
+            <div style="font-size:28px;text-align:center;">📷</div>
+            <div style="font-size:12px;color:#888899;text-align:center;margin-top:4px;">Foto del equipo (opcional)</div>
+            <div id="prodFotoPreview" style="font-size:11px;color:#16a34a;margin-top:4px;text-align:center;"></div>
+          </label>
+        </div>
+
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;justify-content:space-between;align-items:center;margin-top:16px;">
+      <div style="font-size:12px;color:#888899;">* Campos obligatorios</div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-ghost" onclick="closeModal('modalNuevoProducto')">Cancelar</button>
+        <button class="btn btn-primary" onclick="guardarProductoNuevo()">💾 Guardar Producto</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Editar Producto -->
+<div class="modal-overlay" id="modalEditarProducto">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-header">
+      <div class="modal-title">✏️ Editar Producto</div>
+      <button class="modal-close" onclick="closeModal('modalEditarProducto')">✕</button>
+    </div>
+    <input type="hidden" id="editProdId">
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Nombre / Modelo *</label>
+        <input type="text" class="form-control" id="editProdNombre">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Marca</label>
+        <input type="text" class="form-control" id="editProdMarca">
+      </div>
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Producto / Modelo</label>
+        <label class="form-label">IMEI 1</label>
+        <input type="text" class="form-control" id="editProdIMEI1">
+      </div>
+      <div class="form-group">
+        <label class="form-label">IMEI 2 / Serial</label>
+        <input type="text" class="form-control" id="editProdIMEI2">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Valor Compra</label>
+        <input type="number" class="form-control" id="editProdValor">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Estado</label>
+        <select class="form-control" id="editProdEstado">
+          <option value="DISPONIBLE">DISPONIBLE</option>
+          <option value="VENDIDO">VENDIDO</option>
+          <option value="GARANTIA">GARANTÍA</option>
+          <option value="DEVUELTO">DADO DE BAJA</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Sede</label>
+        <select class="form-control" id="editProdSede"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Color</label>
+        <input type="text" class="form-control" id="editProdColor">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Observaciones</label>
+      <textarea class="form-control" id="editProdObs" rows="2"></textarea>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+      <button class="btn btn-ghost" onclick="closeModal('modalEditarProducto')">Cancelar</button>
+      <button class="btn btn-primary" onclick="actualizarProducto()">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal antiguo (compatibilidad desde inventario) -->
+<div class="modal-overlay" id="modalNuevoEquipo">
+  <div class="modal" style="max-width:400px;">
+    <div class="modal-header">
+      <div class="modal-title">📱 Agregar Equipo Rápido</div>
+      <button class="modal-close" onclick="closeModal('modalNuevoEquipo')">✕</button>
+    </div>
+    <p style="font-size:13px;color:#888899;margin-bottom:16px;">Para un registro completo usa el módulo <strong>📦 Productos</strong>.</p>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Producto / Modelo *</label>
         <input type="text" class="form-control" id="invProducto" placeholder="Ej: iPhone 15 Pro 256GB Negro">
       </div>
       <div class="form-group">
@@ -1920,33 +2237,18 @@
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Proveedor</label>
-        <input type="text" class="form-control" id="invProveedor" placeholder="Nombre del proveedor">
-      </div>
-      <div class="form-group">
         <label class="form-label">Valor de Compra</label>
         <input type="number" class="form-control" id="invValor" placeholder="0">
       </div>
-    </div>
-    <div class="form-row">
       <div class="form-group">
         <label class="form-label">Sede</label>
-        <select class="form-control" id="invSede">
-          <!-- Se llena dinámicamente -->
-        </select>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Estado</label>
-        <select class="form-control" id="invEstado">
-          <option>DISPONIBLE</option>
-          <option>VENDIDO</option>
-          <option>GARANTIA</option>
-        </select>
+        <select class="form-control" id="invSedeRapido"></select>
       </div>
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
       <button class="btn btn-ghost" onclick="closeModal('modalNuevoEquipo')">Cancelar</button>
-      <button class="btn btn-primary" onclick="agregarEquipo()">Guardar Equipo</button>
+      <button class="btn btn-outline" onclick="closeModal('modalNuevoEquipo');openModal('modalNuevoProducto')">📦 Registro Completo</button>
+      <button class="btn btn-primary" onclick="agregarEquipo()">Guardar Rápido</button>
     </div>
   </div>
 </div>
@@ -3998,6 +4300,7 @@ function showModule(name) {
   else if(name==='contabilidad') renderContabilidad();
   else if(name==='compras') { renderCompras(); renderTablaProveedores(db.proveedores); poblarSelectProveedores(); }
   else if(name==='proveedores') { renderProveedoresMod(); }
+  else if(name==='productos') { renderProductosMod(); }
   else if(name==='asesores') { cargarAsesoresActivos().then(()=>renderAsesores()); }
   else if(name==='garantias') { cargarGarantias(); }
   else if(name==='servicio')  { cargarServicio(); }
@@ -5033,23 +5336,253 @@ async function guardarCompra(){
 }
 
 async function agregarEquipo(){
+  // Modal rápido desde inventario
   const datos={
     tipo:'Celular',
-    producto:$('invProducto').value||'Sin nombre',
-    imei1:$('invIMEI').value||'',
-    valorCompra:parseFloat($('invValor').value)||0,
-    sede:$('invSede').value,
-    estado:$('invEstado').value,
-    condicion:'Nuevo',cantidad:1,
-    proveedorId:null,garantiaMeses:0,obs:''
+    producto:$('invProducto')?.value||'Sin nombre',
+    imei1:$('invIMEI')?.value||'',
+    valorCompra:parseFloat($('invValor')?.value)||0,
+    sede: document.getElementById('invSedeRapido')?.value || $('invSede')?.value || '',
+    estado:$('invEstado')?.value||'DISPONIBLE',
+    condicion:'Nuevo', cantidad:1,
+    proveedorId:null, garantiaMeses:0, obs:''
   };
   try{
     await guardarCompraDB(datos);
     closeModal('modalNuevoEquipo');
     renderInventario();
+    renderProveedoresMod && renderProductosMod && renderProductosMod();
     toast('Equipo agregado ✅');
     ['invProducto','invIMEI','invValor'].forEach(id=>{const e=$(id);if(e)e.value='';});
-  }catch(e){}
+  }catch(e){ toast('Error: '+e.message,'error'); }
+}
+
+// ============================================================
+// MÓDULO PRODUCTOS
+// ============================================================
+function actualizarMarcaCustom(sel) {
+  const div = document.getElementById('prodMarcaCustomDiv');
+  if(div) div.style.display = sel.value === 'otro' ? 'block' : 'none';
+}
+
+async function validarIMEIProd() {
+  const imei = document.getElementById('prodIMEI1')?.value?.trim();
+  const errEl = document.getElementById('prodIMEI1Error');
+  if(!imei || imei.length < 8) { if(errEl) errEl.style.display='none'; return; }
+  const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/productos?select=id,producto&imei1=eq.${imei}&limit=1`, {headers});
+  const rows = await res.json();
+  if(errEl) errEl.style.display = (rows && rows.length > 0) ? 'block' : 'none';
+  if(rows && rows.length > 0 && errEl) {
+    errEl.textContent = `⚠️ IMEI ya registrado: ${rows[0].producto}`;
+  }
+}
+
+function autoLlenarProveedorProd() {
+  // Al seleccionar proveedor, podría auto-llenar campos en el futuro
+}
+
+function abrirModalProducto() {
+  // Llenar selectores dinámicos
+  const sedeEl = document.getElementById('invSede');
+  const sedeRapEl = document.getElementById('invSedeRapido');
+  const editSedeEl = document.getElementById('editProdSede');
+  const provEl = document.getElementById('prodProveedorId');
+  const activas = dbAdmin.sedes.filter(s => s.activa !== false);
+
+  [sedeEl, sedeRapEl].forEach(sel => {
+    if(sel) sel.innerHTML = activas.map(s=>`<option value="${s.nombre}">${s.nombre}</option>`).join('');
+  });
+  if(editSedeEl) editSedeEl.innerHTML = activas.map(s=>`<option value="${s.id}">${s.nombre}</option>`).join('');
+  if(provEl) provEl.innerHTML = '<option value="">Seleccionar proveedor...</option>' +
+    db.proveedores.filter(p=>p.estado==='activo').map(p=>`<option value="${p.id}">${p.nombre}</option>`).join('');
+
+  // Fecha de hoy por defecto
+  const fechaEl = document.getElementById('prodFechaCompra');
+  if(fechaEl) fechaEl.value = new Date().toISOString().split('T')[0];
+
+  openModal('modalNuevoProducto');
+}
+
+async function guardarProductoNuevo() {
+  const nombre   = document.getElementById('prodNombre')?.value?.trim();
+  const imei1    = document.getElementById('prodIMEI1')?.value?.trim();
+  const valor    = parseFloat(document.getElementById('prodValorCompra')?.value)||0;
+  const sedeNom  = document.getElementById('invSede')?.value;
+  const provId   = parseInt(document.getElementById('prodProveedorId')?.value)||null;
+
+  if(!nombre) { toast('El nombre del producto es obligatorio','error'); return; }
+  if(!imei1)  { toast('El IMEI 1 es obligatorio','error'); return; }
+  if(!valor)  { toast('El valor de compra es obligatorio','error'); return; }
+  if(!sedeNom){ toast('Selecciona la sede','error'); return; }
+
+  // Verificar IMEI duplicado
+  const errEl = document.getElementById('prodIMEI1Error');
+  if(errEl && errEl.style.display !== 'none') {
+    toast('El IMEI ya está registrado. Corrígelo antes de guardar','error'); return;
+  }
+
+  const marcaSel = document.getElementById('prodMarca')?.value;
+  const marca    = marcaSel === 'otro' ? document.getElementById('prodMarcaCustom')?.value : marcaSel;
+
+  const datos = {
+    tipo:          'Celular',
+    producto:      nombre,
+    marca:         marca||'',
+    imei1,
+    imei2:         document.getElementById('prodIMEI2')?.value||'',
+    serial:        document.getElementById('prodSerial')?.value||'',
+    color:         document.getElementById('prodColor')?.value||'',
+    almacenamiento:document.getElementById('prodAlmacenamiento')?.value||'',
+    ram:           document.getElementById('prodRAM')?.value||'',
+    condicion:     document.getElementById('prodCondicion')?.value||'Nuevo',
+    valorCompra:   valor,
+    sede:          sedeNom,
+    estado:        document.getElementById('invEstado')?.value||'DISPONIBLE',
+    garantiaMeses: parseInt(document.getElementById('prodGarantia')?.value)||0,
+    precioVenta:   parseFloat(document.getElementById('prodPrecioVenta')?.value)||0,
+    obs:           document.getElementById('prodObs')?.value||'',
+    proveedorId:   provId,
+    cantidad:      1,
+    fecha:         document.getElementById('prodFechaCompra')?.value||new Date().toISOString().split('T')[0],
+    fotoUrl:       getUrlArchivo('upProductoFoto')||null
+  };
+
+  try {
+    showLoader('Registrando producto...');
+    await guardarCompraDB(datos);
+    hideLoader();
+    closeModal('modalNuevoProducto');
+    // Limpiar campos
+    ['prodNombre','prodIMEI1','prodIMEI2','prodSerial','prodColor','prodValorCompra','prodPrecioVenta','prodObs'].forEach(id=>{
+      const el=document.getElementById(id); if(el) el.value='';
+    });
+    archivosSubidos['upProductoFoto'] = null;
+    renderProductosMod();
+    renderInventario();
+    toast('Producto registrado ✅');
+  } catch(e) { hideLoader(); toast('Error: '+e.message,'error'); }
+}
+
+function renderProductosMod(data) {
+  const lista = data || db.inventario;
+
+  // Stats
+  const setEl = (id,v) => { const e=document.getElementById(id); if(e) e.textContent=v; };
+  setEl('prodStatTotal', lista.length);
+  setEl('prodStatDisp',  lista.filter(p=>p.estado==='DISPONIBLE').length);
+  setEl('prodStatVend',  lista.filter(p=>p.estado==='VENDIDO').length);
+  setEl('prodStatOtros', lista.filter(p=>p.estado==='GARANTIA'||p.estado==='DEVUELTO').length);
+
+  // Poblar filtro de sedes
+  const filtroSede = document.getElementById('filtroProdSede');
+  if(filtroSede && filtroSede.options.length <= 1) {
+    dbAdmin.sedes.filter(s=>s.activa!==false).forEach(s=>{
+      const opt = document.createElement('option');
+      opt.value = s.id; opt.textContent = s.nombre;
+      filtroSede.appendChild(opt);
+    });
+  }
+
+  const tbody = document.getElementById('tbodyProductosMod');
+  if(!tbody) return;
+
+  tbody.innerHTML = lista.length ? lista.map(p => {
+    const prov   = db.proveedores.find(x=>x.id===p.proveedorId);
+    const sedeObj= dbAdmin.sedes.find(s=>s.id===p.sede_id||(p.sede||'').toUpperCase().includes((s.nombre||'').toUpperCase()));
+    const estadoColor = {DISPONIBLE:'badge-green',VENDIDO:'badge-pink',GARANTIA:'badge-orange',DEVUELTO:'badge-red'};
+    return `<tr>
+      <td style="font-size:11px;">${p.fecha||'—'}</td>
+      <td style="font-weight:600;">${p.producto}</td>
+      <td style="font-size:12px;">${p.marca||'—'}</td>
+      <td style="font-family:monospace;font-size:11px;color:#0066cc;">${p.imei||'—'}</td>
+      <td style="font-family:monospace;font-size:11px;">${p.imei2||p.serial||'—'}</td>
+      <td style="font-size:12px;">${p.color||'—'}</td>
+      <td style="font-size:12px;">${p.almacenamiento||'—'}</td>
+      <td style="color:#6B2D8B;font-weight:600;">${fmt(p.costo)}</td>
+      <td style="font-size:12px;">${prov?prov.nombre:'—'}</td>
+      <td><span style="font-size:11px;padding:2px 8px;border-radius:8px;background:rgba(107,45,139,0.1);color:#6B2D8B;">${sedeObj?sedeObj.nombre:p.sede||'—'}</span></td>
+      <td><span class="badge ${estadoColor[p.estado]||'badge-blue'}">${p.estado}</span></td>
+      <td style="display:flex;gap:4px;">
+        <button class="btn btn-sm btn-ghost" onclick="abrirEditarProducto(${p.id})" title="Editar">✏️</button>
+      </td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="12" style="text-align:center;padding:40px;color:#888899;">Sin productos registrados</td></tr>';
+}
+
+function filtrarProductosMod(q) {
+  q = q.toLowerCase();
+  renderProductosMod(db.inventario.filter(p =>
+    (p.producto||'').toLowerCase().includes(q) ||
+    (p.imei||'').includes(q) ||
+    (p.marca||'').toLowerCase().includes(q) ||
+    (p.serial||'').includes(q)
+  ));
+}
+function filtrarProductosModEstado(e) {
+  const base = e ? db.inventario.filter(p=>p.estado===e) : db.inventario;
+  renderProductosMod(base);
+}
+function filtrarProductosModSede(sedeId) {
+  const base = sedeId ? db.inventario.filter(p=>p.sede_id===parseInt(sedeId)) : db.inventario;
+  renderProductosMod(base);
+}
+
+function abrirEditarProducto(id) {
+  const p = db.inventario.find(x=>x.id===id);
+  if(!p) return;
+  document.getElementById('editProdId').value      = id;
+  document.getElementById('editProdNombre').value  = p.producto||'';
+  document.getElementById('editProdMarca').value   = p.marca||'';
+  document.getElementById('editProdIMEI1').value   = p.imei||'';
+  document.getElementById('editProdIMEI2').value   = p.imei2||p.serial||'';
+  document.getElementById('editProdValor').value   = p.costo||0;
+  document.getElementById('editProdEstado').value  = p.estado||'DISPONIBLE';
+  document.getElementById('editProdColor').value   = p.color||'';
+  document.getElementById('editProdObs').value     = p.obs||'';
+  // Sedes en el select de editar
+  const sedeEl = document.getElementById('editProdSede');
+  if(sedeEl) {
+    sedeEl.innerHTML = dbAdmin.sedes.filter(s=>s.activa!==false).map(s=>`<option value="${s.id}" ${s.id===p.sede_id?'selected':''}>${s.nombre}</option>`).join('');
+  }
+  openModal('modalEditarProducto');
+}
+
+async function actualizarProducto() {
+  const id     = parseInt(document.getElementById('editProdId').value);
+  const nombre = document.getElementById('editProdNombre')?.value?.trim();
+  if(!nombre) { toast('El nombre es obligatorio','error'); return; }
+
+  const sedeId = parseInt(document.getElementById('editProdSede')?.value)||null;
+  const sedeObj= dbAdmin.sedes.find(s=>s.id===sedeId);
+
+  const row = {
+    producto:    nombre,
+    marca:       document.getElementById('editProdMarca')?.value||null,
+    imei1:       document.getElementById('editProdIMEI1')?.value||null,
+    imei2:       document.getElementById('editProdIMEI2')?.value||null,
+    valor_compra:parseFloat(document.getElementById('editProdValor')?.value)||0,
+    estado:      document.getElementById('editProdEstado')?.value||'DISPONIBLE',
+    sede_id:     sedeId,
+    observaciones:document.getElementById('editProdObs')?.value||null
+  };
+
+  try {
+    showLoader('Actualizando...');
+    await sbFetch(`productos?id=eq.${id}`, { method:'PATCH', body:row });
+    const p = db.inventario.find(x=>x.id===id);
+    if(p) {
+      p.producto=row.producto; p.marca=row.marca||'';
+      p.imei=row.imei1||''; p.costo=row.valor_compra;
+      p.estado=row.estado; p.sede_id=sedeId;
+      p.sede=sedeObj?sedeObj.nombre.toUpperCase():'';
+    }
+    hideLoader();
+    closeModal('modalEditarProducto');
+    renderProductosMod();
+    renderInventario();
+    toast('Producto actualizado ✅');
+  } catch(e) { hideLoader(); toast('Error: '+e.message,'error'); }
 }
 
 async function guardarVentaContado(){
