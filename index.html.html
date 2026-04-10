@@ -4161,8 +4161,12 @@ function renderContabilidad(){
 
   // ── Nómina editable por mes ──
   const nominasMes = getNominasMes(mesActual);
+  // Comisión = suma real de comision_asesor registrada en cada venta del mes
   const comisionesMes = {};
-  ventasMes.forEach(v=>{ comisionesMes[v.asesor]=(comisionesMes[v.asesor]||0)+Math.round(v.ganancia*PCT_COMISION_ASESOR/100); });
+  ventasMes.forEach(v=>{
+    const key = (v.asesor||'').toUpperCase();
+    comisionesMes[key] = (comisionesMes[key]||0) + (v.comisionAsesor||0);
+  });
   const nc = $('nominaContent');
   if(nc) nc.innerHTML=`
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
@@ -4170,9 +4174,9 @@ function renderContabilidad(){
       <button class="btn btn-sm btn-ghost" style="font-size:11px;" onclick="editarTodasNominas('${mesActual}')">✏️ Editar salarios</button>
     </div>
     <div class="table-wrap"><table>
-      <thead><tr><th>Asesor</th><th>Salario Base</th><th>Comisión (${PCT_COMISION_ASESOR}%)</th><th>Total a Pagar</th><th></th></tr></thead>
+      <thead><tr><th>Asesor</th><th>Salario Base</th><th>Comisión</th><th>Total a Pagar</th><th></th></tr></thead>
       <tbody>${nominasMes.map((n,i)=>{
-        const com = comisionesMes[n.nombre]||0;
+        const com = comisionesMes[n.nombre.toUpperCase()]||0;
         const total = n.salario + com;
         return `<tr>
           <td style="font-weight:600;">${n.nombre}</td>
@@ -4326,7 +4330,8 @@ function renderAsesores(){
     const vMes     = ventasMes.filter(v => v.asesor === nombre);
     const ganMes   = vMes.reduce((s,v)=>s+v.ganancia,0);
     const ventaMes = vMes.reduce((s,v)=>s+v.venta,0);
-    const comision = Math.round(ganMes * PCT_COMISION_ASESOR / 100);
+    // Comisión = suma real registrada en ventas
+    const comision = vMes.reduce((s,v)=>s+(v.comisionAsesor||0),0);
     const credAct  = db.creditos.filter(c => (c.asesor||'').toUpperCase()===nombre && (c.estado==='al_dia'||c.estado==='mora')).length;
     const activo   = a.activo !== false;
     return `
@@ -4356,7 +4361,7 @@ function renderAsesores(){
           <div style="font-weight:700;font-size:13px;color:#d97706;">${fmt(ganMes)}</div>
         </div>
         <div style="background:#f7f5fb;border-radius:8px;padding:10px;text-align:center;">
-          <div style="font-size:10px;color:#888899;">COMISIÓN ${PCT_COMISION_ASESOR}%</div>
+          <div style="font-size:10px;color:#888899;">COMISIÓN MES</div>
           <div style="font-weight:700;font-size:13px;color:#6B2D8B;">${fmt(comision)}</div>
         </div>
       </div>
