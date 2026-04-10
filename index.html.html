@@ -1050,7 +1050,7 @@
           </div>
           <div class="form-group">
             <label class="form-label">Valor de Costo (P.L)</label>
-            <input type="number" class="form-control" id="simCosto" placeholder="0" oninput="calcularSim()">
+            <div class="input-money-wrap"><input type="text" class="form-control" id="simCosto" placeholder="0" oninput="fmtMoneyInput(this);calcularSim()" inputmode="numeric"></div>
           </div>
           <div class="form-group">
             <label class="form-label">Margen de Ganancia</label>
@@ -1859,7 +1859,7 @@
         </div>
         <div class="form-group">
           <label class="form-label">Valor Unitario de Compra *</label>
-          <input type="number" class="form-control" id="cmpValorCompra" placeholder="0" oninput="calcTotalCompra()">
+          <div class="input-money-wrap"><input type="text" class="form-control" id="cmpValorCompra" placeholder="0" oninput="fmtMoneyInput(this);calcTotalCompra()" inputmode="numeric"></div>
         </div>
         <div class="form-group">
           <label class="form-label">Total a Pagar</label>
@@ -2079,7 +2079,7 @@
           <div class="form-row">
             <div class="form-group">
               <label class="form-label">Valor de Compra *</label>
-              <input type="number" class="form-control" id="prodValorCompra" placeholder="0" min="0">
+              <div class="input-money-wrap"><input type="text" class="form-control" id="prodValorCompra" placeholder="0" min="0" oninput="fmtMoneyInput(this)" inputmode="numeric"></div>
             </div>
             <div class="form-group">
               <label class="form-label">Fecha de Compra</label>
@@ -2120,7 +2120,7 @@
             </div>
             <div class="form-group">
               <label class="form-label">Precio de Venta Sugerido</label>
-              <input type="number" class="form-control" id="prodPrecioVenta" placeholder="Opcional">
+              <div class="input-money-wrap"><input type="text" class="form-control" id="prodPrecioVenta" placeholder="Opcional" oninput="fmtMoneyInput(this)" inputmode="numeric"></div>
             </div>
           </div>
           <div class="form-group">
@@ -2184,7 +2184,7 @@
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">Valor Compra</label>
-        <input type="number" class="form-control" id="editProdValor">
+        <div class="input-money-wrap"><input type="text" class="form-control" id="editProdValor" oninput="fmtMoneyInput(this)" inputmode="numeric"></div>
       </div>
       <div class="form-group">
         <label class="form-label">Estado</label>
@@ -2238,7 +2238,7 @@
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">Valor de Compra</label>
-        <input type="number" class="form-control" id="invValor" placeholder="0">
+        <div class="input-money-wrap"><input type="text" class="form-control" id="invValor" placeholder="0" oninput="fmtMoneyInput(this)" inputmode="numeric"></div>
       </div>
       <div class="form-group">
         <label class="form-label">Sede</label>
@@ -2294,11 +2294,11 @@
           <div class="form-row">
             <div class="form-group">
               <label class="form-label">Costo (P.L) *</label>
-              <input type="number" class="form-control" id="crdCosto" placeholder="0" oninput="recalcCredito()">
+              <div class="input-money-wrap"><input type="text" class="form-control" id="crdCosto" placeholder="0" oninput="fmtMoneyInput(this);recalcCredito()" inputmode="numeric"></div>
             </div>
             <div class="form-group">
               <label class="form-label">Precio Venta *</label>
-              <input type="number" class="form-control" id="crdVentaBase" placeholder="0" oninput="recalcCredito()">
+              <div class="input-money-wrap"><input type="text" class="form-control" id="crdVentaBase" placeholder="0" oninput="fmtMoneyInput(this);recalcCredito()" inputmode="numeric"></div>
             </div>
           </div>
           <div class="form-row">
@@ -2324,7 +2324,7 @@
             </div>
             <div class="form-group">
               <label class="form-label">Valor ($)</label>
-              <input type="number" class="form-control" id="crdProdAdicVal" placeholder="0" oninput="recalcCredito()" min="0">
+              <div class="input-money-wrap"><input type="text" class="form-control" id="crdProdAdicVal" placeholder="0" oninput="fmtMoneyInput(this);recalcCredito()" min="0" inputmode="numeric"></div>
             </div>
           </div>
         </div>
@@ -2485,7 +2485,7 @@
           </div>
           <div style="margin-top:10px;">
             <label class="form-label">Inicial personalizada ($)</label>
-            <input type="number" class="form-control" id="crdInicialManual" placeholder="O escribe el valor de inicial" oninput="recalcCredito()">
+            <div class="input-money-wrap"><input type="text" class="form-control" id="crdInicialManual" placeholder="O escribe el valor de inicial" oninput="fmtMoneyInput(this);recalcCredito()" inputmode="numeric"></div>
           </div>
           <!-- Cuota quincenal resultado -->
           <div id="crdCuotaResultado" style="margin-top:10px;display:none;background:#f0ecf8;border-radius:10px;padding:12px;">
@@ -2664,7 +2664,7 @@
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Costo del Equipo (P.L) *</label>
-          <input type="number" class="form-control" id="vcCompra" placeholder="0" oninput="calcVContado()">
+          <div class="input-money-wrap"><input type="text" class="form-control" id="vcCompra" placeholder="0" oninput="fmtMoneyInput(this);calcVContado()" inputmode="numeric"></div>
         </div>
         <div class="form-group">
           <label class="form-label">Sede</label>
@@ -2679,7 +2679,7 @@
       <div class="form-row-3">
         <div class="form-group">
           <label class="form-label">Precio Base de Venta *</label>
-          <input type="number" class="form-control" id="vcVenta" placeholder="0" oninput="calcVContado()">
+          <div class="input-money-wrap"><input type="text" class="form-control" id="vcVenta" placeholder="0" oninput="fmtMoneyInput(this);calcVContado()" inputmode="numeric"></div>
         </div>
         <div class="form-group">
           <label class="form-label">IVA (%)</label>
@@ -2688,7 +2688,7 @@
         </div>
         <div class="form-group">
           <label class="form-label">Descuento ($)</label>
-          <input type="number" class="form-control" id="vcDescuento" placeholder="0" oninput="calcVContado()" min="0">
+          <div class="input-money-wrap"><input type="text" class="form-control" id="vcDescuento" placeholder="0" oninput="fmtMoneyInput(this);calcVContado()" min="0" inputmode="numeric"></div>
           <div style="font-size:11px;color:var(--text2);margin-top:4px;">Desc %: <span id="vcDescPct" style="color:var(--yellow);">0%</span></div>
         </div>
       </div>
@@ -2811,7 +2811,7 @@
     </div>
     <div class="form-group">
       <label class="form-label">Valor</label>
-      <input type="number" class="form-control" id="gastoValor" placeholder="0">
+      <div class="input-money-wrap"><input type="text" class="form-control" id="gastoValor" placeholder="0" oninput="fmtMoneyInput(this)" inputmode="numeric"></div>
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
       <button class="btn btn-ghost" onclick="closeModal('modalNuevoGasto')">Cancelar</button>
@@ -3094,7 +3094,7 @@
       </div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label class="form-label">Saldo Inicial ($)</label><input type="number" class="form-control" id="cajaSaldo" placeholder="0" min="0"></div>
+      <div class="form-group"><label class="form-label">Saldo Inicial ($)</label><div class="input-money-wrap"><input type="text" class="form-control" id="cajaSaldo" placeholder="0" min="0" oninput="fmtMoneyInput(this)" inputmode="numeric"></div></div>
       <div class="form-group"><label class="form-label">Estado</label>
         <select class="form-control" id="cajaEstado"><option value="activa">Activa</option><option value="inactiva">Inactiva</option></select>
       </div>
@@ -3121,7 +3121,7 @@
         <option value="egreso">➖ Egreso</option>
       </select>
     </div>
-    <div class="form-group"><label class="form-label">Valor *</label><input type="number" class="form-control" id="movValor" placeholder="0" min="0"></div>
+    <div class="form-group"><label class="form-label">Valor *</label><div class="input-money-wrap"><input type="text" class="form-control" id="movValor" placeholder="0" min="0" oninput="fmtMoneyInput(this)" inputmode="numeric"></div></div>
     <div class="form-group"><label class="form-label">Concepto *</label><input type="text" class="form-control" id="movConcepto" placeholder="Describe el movimiento"></div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
       <button class="btn btn-ghost" onclick="closeModal('modalMovimientoCaja')">Cancelar</button>
@@ -3293,11 +3293,11 @@
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">Costo del Arreglo ($)</label>
-        <input type="number" class="form-control" id="stCostoArreglo" placeholder="0" min="0">
+        <div class="input-money-wrap"><input type="text" class="form-control" id="stCostoArreglo" placeholder="0" min="0" oninput="fmtMoneyInput(this)" inputmode="numeric"></div>
       </div>
       <div class="form-group">
         <label class="form-label">Cobro al Cliente ($)</label>
-        <input type="number" class="form-control" id="stCobroCliente" placeholder="0" min="0">
+        <div class="input-money-wrap"><input type="text" class="form-control" id="stCobroCliente" placeholder="0" min="0" oninput="fmtMoneyInput(this)" inputmode="numeric"></div>
       </div>
     </div>
     <div class="form-group">
@@ -3346,7 +3346,7 @@
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">Valor ($) *</label>
-        <input type="number" class="form-control" id="bonoValor" placeholder="0" min="0">
+        <div class="input-money-wrap"><input type="text" class="form-control" id="bonoValor" placeholder="0" min="0" oninput="fmtMoneyInput(this)" inputmode="numeric"></div>
       </div>
       <div class="form-group">
         <label class="form-label">Concepto *</label>
@@ -3388,7 +3388,7 @@
     </div>
     <div class="form-group">
       <label class="form-label">Valor del Abono ($) *</label>
-      <input type="number" class="form-control" id="abonoValor" placeholder="0" min="0" style="font-size:18px;font-weight:700;color:#6B2D8B;">
+      <div class="input-money-wrap"><input type="text" class="form-control" id="abonoValor" placeholder="0" min="0" style="font-size:18px;font-weight:700;color:#6B2D8B;" oninput="fmtMoneyInput(this)" inputmode="numeric"></div>
       <div style="font-size:11px;color:#888899;margin-top:4px;">Puede abonar más del valor de la cuota</div>
     </div>
     <div class="form-row">
@@ -3482,8 +3482,8 @@
     </div>
     <div class="form-group">
       <label class="form-label">Valor de comisión para este asesor ($)</label>
-      <input type="number" class="form-control" id="comisionValorInput" placeholder="0" min="0"
-             style="font-size:20px;font-weight:700;color:#6B2D8B;text-align:center;">
+      <div class="input-money-wrap"><input type="text" class="form-control" id="comisionValorInput" placeholder="0" min="0"
+             style="font-size:20px;font-weight:700;color:#6B2D8B;text-align:center;" oninput="fmtMoneyInput(this)" inputmode="numeric"></div>
       <div style="font-size:11px;color:#888899;margin-top:6px;text-align:center;">
         Déjalo en 0 si no aplica comisión en esta venta
       </div>
@@ -5132,7 +5132,7 @@ function seleccionarTipoProducto(tipo,el){
 }
 
 function calcTotalCompra(){
-  const val=parseFloat(document.getElementById('cmpValorCompra').value)||0;
+  const val=getMoneyValue('cmpValorCompra');
   const cant=parseFloat(document.getElementById('cmpCantidad').value)||1;
   document.getElementById('cmpTotalDisplay').textContent=fmt(val*cant);
 }
@@ -5368,7 +5368,7 @@ async function guardarCompra(){
     cantidad:parseInt(document.getElementById('cmpCantidad').value)||1,
     proveedorId:provId,
     facturaProv:document.getElementById('cmpFacturaProv').value||'',
-    valorCompra:parseFloat(document.getElementById('cmpValorCompra').value)||0,
+    valorCompra:getMoneyValue('cmpValorCompra'),
     formaPago:document.getElementById('cmpFormaPago').value,
     sede:document.getElementById('cmpSede').value,
     garantiaMeses:parseInt(document.getElementById('cmpGarantiaMeses').value)||0,
@@ -5455,7 +5455,7 @@ function abrirModalProducto() {
 async function guardarProductoNuevo() {
   const nombre   = document.getElementById('prodNombre')?.value?.trim();
   const imei1    = document.getElementById('prodIMEI1')?.value?.trim();
-  const valor    = parseFloat(document.getElementById('prodValorCompra')?.value)||0;
+  const valor    = getMoneyValue('prodValorCompra');
   const sedeNom  = document.getElementById('invSede')?.value;
   const provId   = parseInt(document.getElementById('prodProveedorId')?.value)||null;
 
@@ -5488,7 +5488,7 @@ async function guardarProductoNuevo() {
     sede:          sedeNom,
     estado:        document.getElementById('invEstado')?.value||'DISPONIBLE',
     garantiaMeses: parseInt(document.getElementById('prodGarantia')?.value)||0,
-    precioVenta:   parseFloat(document.getElementById('prodPrecioVenta')?.value)||0,
+    precioVenta:   getMoneyValue('prodPrecioVenta'),
     obs:           document.getElementById('prodObs')?.value||'',
     proveedorId:   provId,
     cantidad:      1,
@@ -5609,7 +5609,7 @@ async function actualizarProducto() {
     marca:       document.getElementById('editProdMarca')?.value||null,
     imei1:       document.getElementById('editProdIMEI1')?.value||null,
     imei2:       document.getElementById('editProdIMEI2')?.value||null,
-    valor_compra:parseFloat(document.getElementById('editProdValor')?.value)||0,
+    valor_compra:getMoneyValue('editProdValor'),
     estado:      document.getElementById('editProdEstado')?.value||'DISPONIBLE',
     sede_id:     sedeId,
     observaciones:document.getElementById('editProdObs')?.value||null
@@ -5634,10 +5634,10 @@ async function actualizarProducto() {
 }
 
 async function guardarVentaContado(){
-  const costo=parseFloat($('vcCompra').value)||0;
-  const base=parseFloat($('vcVenta').value)||0;
+  const costo=getMoneyValue('vcCompra');
+  const base=getMoneyValue('vcVenta');
   const ivaPct=parseFloat($('vcIVA')?.value)||0;
-  const desc=parseFloat($('vcDescuento')?.value)||0;
+  const desc=getMoneyValue('vcDescuento');
   const comPct=parseFloat($('vcComFinanciera')?.value)||0;
   const ivaVal=Math.round(base*ivaPct/100);
   const precioFinal=base+ivaVal-desc;
@@ -5678,12 +5678,12 @@ async function guardarVentaContado(){
 }
 
 async function guardarCredito(){
-  const costo        = parseFloat($('crdCosto')?.value)||0;
-  const base         = parseFloat($('crdVentaBase')?.value)||0;
+  const costo        = getMoneyValue('crdCosto');
+  const base         = getMoneyValue('crdVentaBase');
   const ivaPct       = parseFloat($('crdIVA')?.value)||0;
-  const desc         = parseFloat($('crdDescuento')?.value)||0;
+  const desc         = getMoneyValue('crdDescuento');
   const comPct       = parseFloat($('crdComFinanciera')?.value)||0;
-  const prodAdicVal  = parseFloat($('crdProdAdicVal')?.value)||0;
+  const prodAdicVal  = getMoneyValue('crdProdAdicVal');
   const prodAdicDesc = $('crdProdAdicDesc')?.value||'';
   const quincenas    = parseInt($('crdPlazoQuincenas')?.value)||12;
   const aplicaInt    = $('crdAplicaIntereses')?.checked||false;
@@ -5775,7 +5775,7 @@ function registrarPago(id) {
   document.getElementById('abonoSaldoInfo').textContent   = fmt(credito.saldo);
   document.getElementById('abonoCuotaInfo').textContent   = fmt(credito.valorCuota || 0);
   document.getElementById('abonoNroCuota').textContent    = (credito.pagadas + 1);
-  document.getElementById('abonoValor').value             = credito.valorCuota || '';
+  setMoneyValue('abonoValor', credito.valorCuota || 0);
   document.getElementById('abonoMetodo').value            = 'Efectivo';
   document.getElementById('abonoNroTransf').value         = '';
   document.getElementById('abonoObs').value               = '';
@@ -5785,7 +5785,7 @@ function registrarPago(id) {
 
 async function confirmarAbono() {
   const id     = parseInt(document.getElementById('abonoCredId').value);
-  const valor  = parseFloat(document.getElementById('abonoValor').value)||0;
+  const valor  = getMoneyValue('abonoValor');
   const metodo = document.getElementById('abonoMetodo').value;
   const transf = document.getElementById('abonoNroTransf').value||'';
   const obs    = document.getElementById('abonoObs').value||'';
@@ -6182,7 +6182,7 @@ function imprimirReciboAbono() {
 
 async function guardarGasto(){
   const tipo=$('gastoTipo').value;
-  const val=parseFloat($('gastoValor').value)||0;
+  const val=getMoneyValue('gastoValor');
   const datos={tipo,detalle:$('gastoDetalle').value||'—',valor:val};
   try{
     await guardarGastoDB(datos);
@@ -6307,7 +6307,7 @@ function verTrazabilidad(id){
 // SIMULADOR (igual que el original)
 // ============================================================
 function calcularSim(){
-  const costo=parseFloat($('simCosto').value)||0;
+  const costo=getMoneyValue('simCosto');
   const margen=parseFloat($('simMargen').value)||0.45;
   const asesor=$('simAsesor').value;
   const tipo=$('simTipoCliente').value;
@@ -6360,7 +6360,7 @@ function buscarIMEIVenta(val){
     $('vcInfoIMEI').textContent=found.imei1||found.serial||'—';
     $('vcEquipo').value=found.producto;
     $('vcIMEI').value=found.imei1||found.serial||'';
-    $('vcCompra').value=found.valorCompra;
+    setMoneyValue('vcCompra', found.valorCompra);
     $('vcSede').value=found.sede;
     const precio=Math.round(found.valorCompra/0.55);
     $('vcVenta').value=precio;
@@ -6433,10 +6433,8 @@ async function buscarIMEICredito(val){
         elCosto.dispatchEvent(new Event('input'));
       }
 
-      if(elVentaBase) {
-        elVentaBase.value = Math.round(costo / 0.55);
-        elVentaBase.dispatchEvent(new Event('input'));
-      }
+      setMoneyValue('crdVentaBase', Math.round(costo / 0.55));
+      setTimeout(()=>recalcCredito(), 50);
 
       setTimeout(()=>recalcCredito(), 50);
       toast('✅ ' + p.producto + ' — Costo: ' + fmt(costo));
@@ -6454,8 +6452,8 @@ function autoComisionFinanciera(){const sel=$('vcFinanciera').value;const pct=pa
 function autoComisionCredito(){const sel=$('crdFinanciera').value;const pct=parseFloat(sel.split(':')[1])||0;$('crdComFinanciera').value=pct;recalcCredito();}
 
 function calcVContado(){
-  const costo=parseFloat($('vcCompra').value)||0;
-  const base=parseFloat($('vcVenta').value)||0;
+  const costo=getMoneyValue('vcCompra');
+  const base=getMoneyValue('vcVenta');
   const ivaPct=parseFloat($('vcIVA').value)||0;
   const desc=parseFloat($('vcDescuento').value)||0;
   const comPct=parseFloat($('vcComFinanciera').value)||0;
@@ -6481,14 +6479,14 @@ function calcVContado(){
 }
 
 function recalcCredito(){
-  const costo    = parseFloat($('crdCosto')?.value)||0;
-  const base     = parseFloat($('crdVentaBase')?.value)||0;
+  const costo    = getMoneyValue('crdCosto');
+  const base     = getMoneyValue('crdVentaBase');
   const ivaPct   = parseFloat($('crdIVA')?.value)||0;
-  const desc     = parseFloat($('crdDescuento')?.value)||0;
+  const desc     = getMoneyValue('crdDescuento');
   const comPct   = parseFloat($('crdComFinanciera')?.value)||0;
   const tipo     = $('crdTipo')?.value||'normal';
   const quincenas = parseInt($('crdPlazoQuincenas')?.value)||12;
-  const prodAdicVal = parseFloat($('crdProdAdicVal')?.value)||0;
+  const prodAdicVal = getMoneyValue('crdProdAdicVal');
   const aplicaIntereses = $('crdAplicaIntereses')?.checked||false;
   const tasaInteres = parseFloat($('crdTasaInteres')?.value)||2.5;
 
@@ -6534,7 +6532,7 @@ function recalcCredito(){
   }).join('');
 
   // Calcular con la inicial que haya — personalizada tiene prioridad
-  const inicialManual = parseFloat($('crdInicialManual')?.value)||0;
+  const inicialManual = getMoneyValue('crdInicialManual');
   const inicialUsada = inicialManual > 0 ? inicialManual : (crdInicialSeleccionada > 0 ? crdInicialSeleccionada : Math.round(precioFinal * pcts[0]));
   const saldoFinanciar = Math.max(0, precioFinal - inicialUsada);
 
@@ -6965,6 +6963,34 @@ function mostrarErrorVenta(titulo, mensaje) {
       <button onclick="this.closest('div[style*=fixed]').remove()" style="background:#6B2D8B;color:#fff;border:none;border-radius:10px;padding:12px 32px;font-size:14px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;">Entendido</button>
     </div>`;
   document.body.appendChild(overlay);
+}
+
+// ============================================================
+// FORMATO DE INPUTS MONETARIOS ($  puntos de miles)
+// ============================================================
+function fmtMoneyInput(el) {
+  // Quitar todo lo que no sea dígito
+  let raw = el.value.replace(/[^0-9]/g, '');
+  if(!raw) { el.value = ''; return; }
+  // Formatear con puntos de miles
+  el.value = parseInt(raw, 10).toLocaleString('es-CO');
+}
+
+// Leer el valor numérico de un input monetario (sin puntos)
+function getMoneyValue(id) {
+  const el = document.getElementById(id);
+  if(!el) return 0;
+  return parseFloat((el.value || '0').replace(/[^0-9]/g, '')) || 0;
+}
+
+// Establecer valor en un input monetario
+function setMoneyValue(id, num) {
+  const el = document.getElementById(id);
+  if(!el) return;
+  if(!num && num !== 0) { el.value = ''; return; }
+  el.value = Math.round(num).toLocaleString('es-CO');
+  el.style.background = '#f0fdf4';
+  el.style.borderColor = '#16a34a';
 }
 
 // ============================================================
@@ -8035,8 +8061,8 @@ async function guardarServicio() {
     danio_reportado: danio,
     tecnico:         document.getElementById('stTecnico')?.value||null,
     fecha_promesa:   document.getElementById('stFechaPromesa')?.value||null,
-    costo_arreglo:   parseFloat(document.getElementById('stCostoArreglo')?.value)||0,
-    cobro_cliente:   parseFloat(document.getElementById('stCobroCliente')?.value)||0,
+    costo_arreglo:   getMoneyValue('stCostoArreglo'),
+    cobro_cliente:   getMoneyValue('stCobroCliente'),
     observaciones:   document.getElementById('stObservaciones')?.value||null,
     estado:          'recibido',
     fecha_ingreso:   new Date().toISOString().split('T')[0],
@@ -8209,7 +8235,7 @@ function renderComisiones() {
 function guardarBonoComision() {
   const asesor   = document.getElementById('bonoAsesor')?.value;
   const tipo     = document.getElementById('bonoTipo')?.value;
-  const valor    = parseFloat(document.getElementById('bonoValor')?.value)||0;
+  const valor    = getMoneyValue('bonoValor');
   const concepto = document.getElementById('bonoConcepto')?.value?.trim();
   if(!valor||!concepto) { toast('Completa valor y concepto','error'); return; }
   const mesSelect = document.getElementById('comisionesMes');
