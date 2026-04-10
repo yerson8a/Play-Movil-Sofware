@@ -6752,11 +6752,11 @@ async function hacerLogin() {
     // Guardar sesion en sessionStorage
     sessionStorage.setItem('pm_sesion', JSON.stringify(user));
 
-    // Actualizar ultimo acceso
-    await sbFetch(`sistema_usuarios?id=eq.${user.id}`, {
+    // Actualizar ultimo acceso (silencioso, no bloquea el login)
+    sbFetch(`sistema_usuarios?id=eq.${user.id}`, {
       method: 'PATCH',
       body: { ultimo_acceso: new Date().toISOString() }
-    });
+    }).catch(() => null);
 
     await activarSesion(user);
 
