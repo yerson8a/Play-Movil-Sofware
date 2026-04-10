@@ -534,6 +534,9 @@
     <div class="nav-item" onclick="showModule('compras')">
       <span class="icon">🛒</span> Compras
     </div>
+    <div class="nav-item" onclick="showModule('proveedores')">
+      <span class="icon">🏭</span> Proveedores
+    </div>
     <div class="nav-item" onclick="showModule('inventario')">
       <span class="icon">📱</span> Inventario
     </div>
@@ -652,6 +655,72 @@
     </div>
 
     <!-- ==================== COMPRAS ==================== -->
+    <!-- ==================== PROVEEDORES ==================== -->
+    <div id="mod-proveedores" class="module">
+      <div class="section-header">
+        <div>
+          <div class="section-title">🏭 Proveedores</div>
+          <div class="section-sub">Gestión de proveedores y empresas suministradoras</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="openModal('modalNuevoProveedor')">+ Nuevo Proveedor</button>
+      </div>
+
+      <!-- Stats -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px;">
+        <div class="stat-card blue">
+          <div class="stat-label">Total Proveedores</div>
+          <div class="stat-value blue" id="provStatTotal">0</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-label">Activos</div>
+          <div class="stat-value green" id="provStatActivos">0</div>
+        </div>
+        <div class="stat-card pink">
+          <div class="stat-label">Total Comprado</div>
+          <div class="stat-value pink" id="provStatComprado">$0</div>
+        </div>
+        <div class="stat-card orange">
+          <div class="stat-label">Con Compras</div>
+          <div class="stat-value orange" id="provStatConCompras">0</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="flex items-center gap-12 mb-16" style="flex-wrap:wrap;">
+          <div class="search-wrap" style="flex:1;min-width:200px;">
+            <span class="search-icon">🔍</span>
+            <input type="text" class="form-control" id="searchProveedores" placeholder="Buscar por nombre, NIT, cédula, ciudad..." oninput="filtrarProveedoresMod(this.value)">
+          </div>
+          <select class="form-control" style="width:160px;" onchange="filtrarProveedoresPorEstado(this.value)">
+            <option value="">Todos</option>
+            <option value="activo">Activos</option>
+            <option value="inactivo">Inactivos</option>
+          </select>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Nombre / Empresa</th>
+                <th>Tipo Doc.</th>
+                <th>NIT / Cédula</th>
+                <th>Teléfono</th>
+                <th>Correo</th>
+                <th>Ciudad</th>
+                <th>Categoría</th>
+                <th>Compras</th>
+                <th>Total Comprado</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="tbodyProveedoresMod"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <div id="mod-compras" class="module">
       <div class="section-header">
         <div>
@@ -1467,6 +1536,89 @@
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
       <button class="btn btn-ghost" onclick="closeModal('modalNuevoProveedor')">Cancelar</button>
       <button class="btn btn-primary" onclick="guardarProveedor()">💾 Guardar Proveedor</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Editar Proveedor -->
+<div class="modal-overlay" id="modalEditarProveedor">
+  <div class="modal" style="max-width:640px;">
+    <div class="modal-header">
+      <div class="modal-title">✏️ Editar Proveedor</div>
+      <button class="modal-close" onclick="closeModal('modalEditarProveedor')">✕</button>
+    </div>
+    <input type="hidden" id="editProvId">
+    <div class="card" style="margin-bottom:14px;">
+      <div class="card-title" style="font-size:13px;margin-bottom:10px;">👤 Datos de Identificación</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Nombre / Razón Social *</label>
+          <input type="text" class="form-control" id="editProvNombre">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tipo de Identificación</label>
+          <select class="form-control" id="editProvTipoDoc">
+            <option value="NIT">NIT (Empresa)</option>
+            <option value="CC">Cédula de Ciudadanía</option>
+            <option value="CE">Cédula de Extranjería</option>
+            <option value="PAS">Pasaporte</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">NIT / Número de Documento *</label>
+          <input type="text" class="form-control" id="editProvNIT">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Dígito Verificación</label>
+          <input type="text" class="form-control" id="editProvDV" maxlength="1" style="max-width:80px;">
+        </div>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:14px;">
+      <div class="card-title" style="font-size:13px;margin-bottom:10px;">📞 Contacto</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Teléfono Principal</label>
+          <input type="text" class="form-control" id="editProvTel1">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Teléfono Secundario</label>
+          <input type="text" class="form-control" id="editProvTel2">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Correo</label>
+          <input type="email" class="form-control" id="editProvCorreo">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Ciudad</label>
+          <input type="text" class="form-control" id="editProvCiudad">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Dirección</label>
+        <input type="text" class="form-control" id="editProvDireccion">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Estado</label>
+        <select class="form-control" id="editProvEstado">
+          <option value="activo">Activo</option>
+          <option value="inactivo">Inactivo</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Observaciones</label>
+        <input type="text" class="form-control" id="editProvObs">
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+      <button class="btn btn-ghost" onclick="closeModal('modalEditarProveedor')">Cancelar</button>
+      <button class="btn btn-primary" onclick="actualizarProveedor()">💾 Guardar Cambios</button>
     </div>
   </div>
 </div>
@@ -3845,6 +3997,7 @@ function showModule(name) {
   else if(name==='creditos') renderCreditos();
   else if(name==='contabilidad') renderContabilidad();
   else if(name==='compras') { renderCompras(); renderTablaProveedores(db.proveedores); poblarSelectProveedores(); }
+  else if(name==='proveedores') { renderProveedoresMod(); }
   else if(name==='asesores') { cargarAsesoresActivos().then(()=>renderAsesores()); }
   else if(name==='garantias') { cargarGarantias(); }
   else if(name==='servicio')  { cargarServicio(); }
@@ -4644,12 +4797,44 @@ function autocompletarProveedor(id){
 // ACCIONES — CONECTADAS A SUPABASE
 // ============================================================
 async function guardarProveedor(){
+  const nombre = document.getElementById('provNombre').value.trim();
+  const nit    = document.getElementById('provNIT').value.trim();
+  const tipoDoc= document.getElementById('provTipoDoc').value;
+
+  // Validación: campos obligatorios
+  if(!nombre) { toast('El nombre es obligatorio','error'); return; }
+  if(!nit)    { toast('El NIT o cédula es obligatorio','error'); return; }
+
+  // Validación: NIT/cédula duplicado
+  const yaExiste = db.proveedores.find(p =>
+    p.nit.replace(/[^0-9]/g,'') === nit.replace(/[^0-9]/g,'')
+  );
+  if(yaExiste) {
+    mostrarErrorVenta(
+      '⚠️ NIT / Cédula duplicado',
+      `El número <strong>${nit}</strong> ya está registrado para el proveedor <strong>${yaExiste.nombre}</strong>. No se puede registrar el mismo documento dos veces.`
+    );
+    return;
+  }
+
+  // También verificar en Supabase por si hay datos más nuevos
+  try {
+    const nitLimpio = nit.replace(/[^0-9]/g,'');
+    const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/proveedores?select=id,nombre,nit&nit=eq.${nitLimpio}`, {headers});
+    const rows = await res.json();
+    if(rows && rows.length > 0) {
+      mostrarErrorVenta(
+        '⚠️ NIT / Cédula ya registrado',
+        `El número <strong>${nit}</strong> ya está registrado para el proveedor <strong>${rows[0].nombre}</strong>. No se puede duplicar.`
+      );
+      return;
+    }
+  } catch(e) { console.error('Error verificando NIT:', e); }
+
   const cats=[...document.getElementById('provCategoria').selectedOptions].map(o=>o.value);
   const datos={
-    nombre:document.getElementById('provNombre').value||'Sin nombre',
-    tipoDoc:document.getElementById('provTipoDoc').value,
-    nit:document.getElementById('provNIT').value||'',
-    dv:document.getElementById('provDV').value||'',
+    nombre, tipoDoc, nit, dv:document.getElementById('provDV').value||'',
     tel1:document.getElementById('provTel1').value||'',
     tel2:document.getElementById('provTel2').value||'',
     correo:document.getElementById('provCorreo').value||'',
@@ -4661,13 +4846,156 @@ async function guardarProveedor(){
     garantiaMeses:parseInt(document.getElementById('provGarantiaMeses').value)||0,
     obs:document.getElementById('provObservaciones').value||''
   };
-  try{
+  try {
+    showLoader('Registrando proveedor...');
     await guardarProveedorDB(datos);
+    hideLoader();
     closeModal('modalNuevoProveedor');
+    // Limpiar formulario
+    ['provNombre','provNIT','provDV','provTel1','provTel2','provCorreo','provWeb','provCiudad','provDireccion','provObservaciones'].forEach(id=>{
+      const el=document.getElementById(id); if(el) el.value='';
+    });
+    renderProveedoresMod();
     renderTablaProveedores(db.proveedores);
     poblarSelectProveedores();
-    toast('Proveedor registrado en Supabase ✅');
-  }catch(e){}
+    toast('Proveedor registrado ✅');
+  } catch(e) { hideLoader(); toast('Error: '+e.message,'error'); }
+}
+
+// ── Módulo Proveedores independiente ──────────────────────────
+function renderProveedoresMod(data) {
+  const lista = data || db.proveedores;
+
+  // Stats
+  const setEl = (id,v) => { const e=document.getElementById(id); if(e) e.textContent=v; };
+  const activos = lista.filter(p=>p.estado==='activo').length;
+  const conCompras = lista.filter(p=>db.compras.some(c=>c.proveedorId===p.id)).length;
+  const totalComprado = db.compras.reduce((a,c)=>a+c.valorCompra,0);
+  setEl('provStatTotal',      lista.length);
+  setEl('provStatActivos',    activos);
+  setEl('provStatComprado',   fmt(totalComprado));
+  setEl('provStatConCompras', conCompras);
+
+  const tbody = document.getElementById('tbodyProveedoresMod');
+  if(!tbody) return;
+
+  tbody.innerHTML = lista.length ? lista.map(p => {
+    const compras = db.compras.filter(c=>c.proveedorId===p.id);
+    const total   = compras.reduce((a,c)=>a+c.valorCompra,0);
+    return `<tr>
+      <td style="font-weight:700;color:#6B2D8B;">${p.id}</td>
+      <td style="font-weight:600;">${p.nombre}</td>
+      <td><span class="badge badge-blue" style="font-size:10px;">${p.tipoDoc}</span></td>
+      <td style="font-family:monospace;font-size:12px;">${p.nit}${p.dv?'-'+p.dv:''}</td>
+      <td style="font-size:12px;">${p.tel1||'—'}</td>
+      <td style="font-size:12px;">${p.correo||'—'}</td>
+      <td style="font-size:12px;">${p.ciudad||'—'}</td>
+      <td style="font-size:11px;">${(p.categoria||[]).join(', ')||'—'}</td>
+      <td style="text-align:center;font-weight:700;color:#0066cc;">${compras.length}</td>
+      <td style="color:#6B2D8B;font-weight:600;">${fmt(total)}</td>
+      <td><span class="badge ${p.estado==='activo'?'badge-green':'badge-red'}">${p.estado}</span></td>
+      <td style="display:flex;gap:4px;">
+        <button class="btn btn-sm btn-ghost" onclick="abrirEditarProveedor(${p.id})" title="Editar">✏️</button>
+        <button class="btn btn-sm btn-ghost" onclick="toggleEstadoProveedor(${p.id})" title="${p.estado==='activo'?'Inactivar':'Activar'}">${p.estado==='activo'?'⏸️':'▶️'}</button>
+      </td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="12" style="text-align:center;padding:40px;color:#888899;">Sin proveedores registrados</td></tr>';
+}
+
+function filtrarProveedoresMod(q) {
+  q = q.toLowerCase();
+  const f = db.proveedores.filter(p =>
+    p.nombre.toLowerCase().includes(q) ||
+    p.nit.includes(q) ||
+    (p.ciudad||'').toLowerCase().includes(q) ||
+    (p.correo||'').toLowerCase().includes(q)
+  );
+  renderProveedoresMod(f);
+}
+
+function filtrarProveedoresPorEstado(estado) {
+  const f = estado ? db.proveedores.filter(p=>p.estado===estado) : db.proveedores;
+  renderProveedoresMod(f);
+}
+
+function abrirEditarProveedor(id) {
+  const p = db.proveedores.find(x=>x.id===id);
+  if(!p) return;
+  document.getElementById('editProvId').value      = id;
+  document.getElementById('editProvNombre').value  = p.nombre;
+  document.getElementById('editProvTipoDoc').value = p.tipoDoc||'NIT';
+  document.getElementById('editProvNIT').value     = p.nit;
+  document.getElementById('editProvDV').value      = p.dv||'';
+  document.getElementById('editProvTel1').value    = p.tel1||'';
+  document.getElementById('editProvTel2').value    = p.tel2||'';
+  document.getElementById('editProvCorreo').value  = p.correo||'';
+  document.getElementById('editProvCiudad').value  = p.ciudad||'';
+  document.getElementById('editProvDireccion').value = p.direccion||'';
+  document.getElementById('editProvEstado').value  = p.estado||'activo';
+  document.getElementById('editProvObs').value     = p.obs||'';
+  openModal('modalEditarProveedor');
+}
+
+async function actualizarProveedor() {
+  const id     = parseInt(document.getElementById('editProvId').value);
+  const nombre = document.getElementById('editProvNombre').value.trim();
+  const nit    = document.getElementById('editProvNIT').value.trim();
+
+  if(!nombre) { toast('El nombre es obligatorio','error'); return; }
+  if(!nit)    { toast('El NIT o cédula es obligatorio','error'); return; }
+
+  // Verificar duplicado excluyendo el proveedor actual
+  const nitLimpio = nit.replace(/[^0-9]/g,'');
+  const duplicado = db.proveedores.find(p =>
+    p.id !== id && p.nit.replace(/[^0-9]/g,'') === nitLimpio
+  );
+  if(duplicado) {
+    mostrarErrorVenta('⚠️ NIT / Cédula duplicado',
+      `El número <strong>${nit}</strong> ya está registrado para <strong>${duplicado.nombre}</strong>.`);
+    return;
+  }
+
+  const row = {
+    nombre,
+    tipo_doc:  document.getElementById('editProvTipoDoc').value,
+    nit,
+    dv:        document.getElementById('editProvDV').value||null,
+    telefono1: document.getElementById('editProvTel1').value||null,
+    telefono2: document.getElementById('editProvTel2').value||null,
+    correo:    document.getElementById('editProvCorreo').value||null,
+    ciudad:    document.getElementById('editProvCiudad').value||null,
+    direccion: document.getElementById('editProvDireccion').value||null,
+    estado:    document.getElementById('editProvEstado').value,
+    observaciones: document.getElementById('editProvObs').value||null
+  };
+
+  try {
+    showLoader('Actualizando...');
+    await sbFetch(`proveedores?id=eq.${id}`, { method:'PATCH', body:row });
+    const p = db.proveedores.find(x=>x.id===id);
+    if(p) Object.assign(p, { nombre, tipoDoc:row.tipo_doc, nit, dv:row.dv||'',
+      tel1:row.telefono1||'', correo:row.correo||'', ciudad:row.ciudad||'',
+      direccion:row.direccion||'', estado:row.estado, obs:row.observaciones||'' });
+    hideLoader();
+    closeModal('modalEditarProveedor');
+    renderProveedoresMod();
+    renderTablaProveedores(db.proveedores);
+    poblarSelectProveedores();
+    toast('Proveedor actualizado ✅');
+  } catch(e) { hideLoader(); toast('Error: '+e.message,'error'); }
+}
+
+async function toggleEstadoProveedor(id) {
+  const p = db.proveedores.find(x=>x.id===id);
+  if(!p) return;
+  const nuevo = p.estado === 'activo' ? 'inactivo' : 'activo';
+  try {
+    await sbFetch(`proveedores?id=eq.${id}`, { method:'PATCH', body:{ estado: nuevo } });
+    p.estado = nuevo;
+    renderProveedoresMod();
+    renderTablaProveedores(db.proveedores);
+    toast(`Proveedor ${nuevo} ✅`);
+  } catch(e) { toast('Error: '+e.message,'error'); }
 }
 
 async function guardarCompra(){
