@@ -4065,7 +4065,13 @@ function renderVentas(filtro){
       <td style="font-weight:600;color:${v.anulada?'#dc2626':'inherit'};">${v.anulada?'ANULADA':fmt(v.venta)}</td>
       <td style="color:${v.anulada?'#dc2626':'var(--green)'};font-weight:600;">${v.anulada?'$0':fmt(v.ganancia)}</td>
       <td style="color:#6B2D8B;font-weight:600;">
-        ${v.anulada?'$0':v.comisionAsesor>0?fmt(v.comisionAsesor):`<button class="btn btn-sm btn-ghost" style="font-size:10px;padding:2px 7px;" onclick="editarComisionVenta(${v.id})">+ Agregar</button>`}
+        ${v.anulada?'$0':v.comisionAsesor>0?
+          (sesionActiva&&sesionActiva.rol==='admin'?
+            `<span style="cursor:pointer;" onclick="editarComisionVenta(${v.id})" title="Editar comisión">${fmt(v.comisionAsesor)} ✏️</span>`:
+            fmt(v.comisionAsesor))
+          :(sesionActiva&&sesionActiva.rol==='admin'?
+            `<button class="btn btn-sm btn-ghost" style="font-size:10px;padding:2px 7px;" onclick="editarComisionVenta(${v.id})">+ Agregar</button>`:
+            '—')}
       </td>
       <td><span class="badge badge-blue">${v.financiera}</span></td>
       <td><span class="badge ${v.anulada?'badge-red':v.tipo==='contado'?'badge-green':'badge-pink'}">${v.anulada?'❌ ANULADA':v.tipo}</span></td>
@@ -4757,10 +4763,7 @@ async function guardarVentaContado(){
     await marcarProductoVendido(imeiVC2, equipoVC2);
     closeModal('modalVentaContado');
     renderVentas(); renderInventario();
-    // Mostrar modal de comisión
-    const ventaNuevaC = db.ventas[0];
-    if(ventaNuevaC) abrirModalComision(ventaNuevaC.id, ventaNuevaC.asesor, ventaNuevaC.equipo, ventaNuevaC.ganancia);
-    else toast('Venta registrada en Supabase ✅');
+    toast('Venta registrada ✅');
   }catch(e){ toast('Error: '+e.message,'error'); }
 }
 
@@ -4848,10 +4851,7 @@ async function guardarCredito(){
     crdInicialSeleccionada = 0;
     renderCreditos(); renderVentas();
     mostrarFactura(datosFactura, enviarFact);
-    // Mostrar modal de comisión
-    const ventaNueva = db.ventas[0];
-    if(ventaNueva) abrirModalComision(ventaNueva.id, ventaNueva.asesor, ventaNueva.equipo, ventaNueva.ganancia);
-    else toast('Credito registrado en Supabase ✅');
+    toast('Crédito registrado ✅');
   } catch(e) { toast('Error: ' + e.message, 'error'); }
 }
 
