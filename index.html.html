@@ -5036,6 +5036,24 @@ function poblarSelectProveedores(){
 }
 
 function renderCompras(){
+  // Actualizar widgets de stats
+  const hoy = new Date();
+  const total     = db.compras.length;
+  const inversion = db.compras.reduce((a,c)=>a+(c.valorCompra||0),0);
+  const provCount = db.proveedores.length;
+  const garantia  = db.compras.filter(c=>{
+    if(!c.garantiaMeses || c.garantiaMeses===0) return false;
+    const fechaCompra = new Date(c.fecha);
+    const mesesPasados = (hoy - fechaCompra) / (1000*60*60*24*30);
+    return mesesPasados <= c.garantiaMeses;
+  }).length;
+
+  const setEl = (id,v) => { const e=document.getElementById(id); if(e) e.textContent=v; };
+  setEl('cmpTotal',       total);
+  setEl('cmpInversion',   fmt(inversion));
+  setEl('cmpProveedores', provCount);
+  setEl('cmpGarantia',    garantia);
+
   renderTablaCompras(db.compras);
   poblarSelectProveedores();
 }
