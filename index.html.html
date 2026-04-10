@@ -69,6 +69,7 @@
     padding:16px 32px; display:flex; align-items:center; justify-content:space-between;
   }
   .topbar-title { font-family:'Syne',sans-serif; font-weight:700; font-size:20px; color:#111111; }
+  .topbar { display:flex; align-items:center; }
   .topbar-right { display:flex; align-items:center; gap:16px; }
   .avatar { width:36px; height:36px; border-radius:50%; background:#6B2D8B; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; cursor:pointer; color:#fff; }
   .content { padding:32px; }
@@ -284,13 +285,105 @@
   @media (max-width:1200px) {
     .grid-4 { grid-template-columns:repeat(2,1fr); }
   }
+
+  /* ── TABLET ── */
   @media (max-width:900px) {
-    .sidebar { transform:translateX(-100%); }
-    .main { margin-left:0; }
-    .grid-3 { grid-template-columns:1fr; }
+    .sidebar { transform:translateX(-100%); transition:transform .3s; }
+    .sidebar.open { transform:translateX(0); z-index:500; }
+    .main { margin-left:0 !important; }
+    .grid-3 { grid-template-columns:1fr 1fr; }
+    .grid-4 { grid-template-columns:1fr 1fr; }
     .form-row { grid-template-columns:1fr; }
     .form-row-3 { grid-template-columns:1fr; }
-    .inicial-cards { grid-template-columns:repeat(3,1fr); }
+    .section-header { flex-wrap:wrap; gap:10px; }
+    .section-header > div:last-child { width:100%; display:flex; gap:8px; flex-wrap:wrap; }
+    #creditosGrid { grid-template-columns:1fr 1fr !important; }
+    #comisionesGrid { grid-template-columns:1fr 1fr !important; }
+    #asesoresGrid { grid-template-columns:1fr 1fr !important; }
+    .modal { max-width:95vw !important; max-height:92vh; overflow-y:auto; }
+    .table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    .stat-card { padding:16px 12px; }
+  }
+
+  /* ── MÓVIL ── */
+  @media (max-width:600px) {
+    /* Sidebar como drawer */
+    .sidebar { width:260px; transform:translateX(-100%); transition:transform .3s ease; }
+    .sidebar.open { transform:translateX(0); box-shadow:8px 0 32px rgba(0,0,0,0.3); }
+    .main { margin-left:0 !important; padding:0; }
+    .topbar { padding:0 12px; height:56px; }
+    .topbar-title { font-size:14px; }
+
+    /* Botón menú hamburguesa */
+    .menu-toggle { display:flex !important; }
+
+    /* Overlay para cerrar sidebar */
+    .sidebar-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:499; }
+    .sidebar-overlay.show { display:block; }
+
+    /* Contenido */
+    .content { padding:12px; }
+    .module { padding:0; }
+    .section-header { padding:12px 0; flex-wrap:wrap; gap:8px; }
+    .section-header button { font-size:12px; padding:8px 12px; }
+
+    /* Grids a 1 columna */
+    .grid-2, .grid-3, .grid-4 { grid-template-columns:1fr !important; }
+    #creditosGrid { grid-template-columns:1fr !important; }
+    #comisionesGrid { grid-template-columns:1fr !important; }
+    #asesoresGrid { grid-template-columns:1fr !important; }
+
+    /* Stats */
+    .stat-card { padding:14px 12px; }
+    .stat-value { font-size:22px !important; }
+
+    /* Formularios */
+    .form-row, .form-row-3 { grid-template-columns:1fr !important; }
+    .form-control { font-size:16px; } /* evita zoom en iOS */
+
+    /* Modales full screen en móvil */
+    .modal-overlay { align-items:flex-end; padding:0; }
+    .modal {
+      max-width:100vw !important;
+      width:100vw !important;
+      max-height:93vh !important;
+      border-radius:20px 20px 0 0 !important;
+      margin:0 !important;
+      overflow-y:auto;
+    }
+    .modal-header { padding:16px 16px 12px; position:sticky; top:0; background:#fff; z-index:10; border-radius:20px 20px 0 0; }
+
+    /* Tablas scrolleables */
+    .table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; font-size:12px; }
+    .table-wrap th, .table-wrap td { padding:8px 6px; white-space:nowrap; }
+
+    /* Tabs scrolleables */
+    .tabs { overflow-x:auto; flex-wrap:nowrap !important; -webkit-overflow-scrolling:touch; padding-bottom:4px; }
+    .tab { white-space:nowrap; flex-shrink:0; }
+
+    /* Cards de crédito */
+    .credito-card { padding:14px; }
+    .cc-name { font-size:14px; }
+    .cc-total { font-size:18px; }
+
+    /* Botones en cards */
+    .cc-footer { flex-direction:column; gap:8px; }
+    .cc-footer .btn { width:100%; justify-content:center; }
+
+    /* Upload zones */
+    .upload-zone { padding:12px !important; }
+
+    /* Login */
+    .login-box { padding:28px 20px; border-radius:16px; }
+    .login-title { font-size:22px; }
+
+    /* Toast en móvil */
+    .toast-container { bottom:16px; right:8px; left:8px; }
+    .toast { font-size:13px; padding:10px 14px; }
+
+    /* Topbar usuario */
+    .user-info span:not(.user-role-badge) { display:none; }
+    .user-role-badge { display:none; }
   }
 
 
@@ -485,10 +578,16 @@
     </div>
   </nav>
 </aside>
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
 
 <!-- MAIN -->
 <main class="main">
   <header class="topbar">
+    <button id="menuToggle" onclick="toggleSidebar()" style="display:none;background:none;border:none;cursor:pointer;padding:8px;margin-right:4px;color:#111;flex-shrink:0;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+      </svg>
+    </button>
     <div class="topbar-title" id="pageTitle">Dashboard</div>
     <div class="topbar-right">
       <button class="btn btn-sm btn-primary" onclick="openModal('modalNuevaCreditoVenta')">+ Nueva Venta</button>
@@ -3520,6 +3619,33 @@ function toast(msg, type='success') {
 
 function openModal(id) { $(id).classList.add('open'); }
 function closeModal(id) { $(id).classList.remove('open'); }
+
+// Mostrar botón hamburguesa si es móvil
+function checkMobile() {
+  const toggle = document.getElementById('menuToggle');
+  if(toggle) toggle.style.display = window.innerWidth <= 600 ? 'flex' : 'none';
+}
+window.addEventListener('resize', checkMobile);
+window.addEventListener('load', checkMobile);
+
+function toggleSidebar() {
+  const sidebar  = document.querySelector('.sidebar');
+  const overlay  = document.getElementById('sidebarOverlay');
+  const toggle   = document.getElementById('menuToggle');
+  if(!sidebar) return;
+  const isOpen = sidebar.classList.toggle('open');
+  if(overlay) overlay.classList.toggle('show', isOpen);
+}
+
+// Cerrar sidebar al seleccionar módulo en móvil
+function closeSidebarMobile() {
+  if(window.innerWidth <= 600) {
+    const sidebar = document.querySelector('.sidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    if(sidebar) sidebar.classList.remove('open');
+    if(overlay) overlay.classList.remove('show');
+  }
+}
 
 function showModule(name) {
   document.querySelectorAll('.module').forEach(m=>m.classList.remove('active'));
