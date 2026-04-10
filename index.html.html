@@ -3553,6 +3553,21 @@
   </div>
 </div>
 
+<!-- Modal Detalle Producto -->
+<div class="modal-overlay" id="modalDetalleProducto">
+  <div class="modal" style="max-width:580px;">
+    <div class="modal-header">
+      <div class="modal-title">🔍 Detalle del Equipo</div>
+      <button class="modal-close" onclick="closeModal('modalDetalleProducto')">✕</button>
+    </div>
+    <div id="detalleProductoContenido"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+      <button class="btn btn-ghost" onclick="closeModal('modalDetalleProducto')">Cerrar</button>
+      <button class="btn btn-outline" id="btnEditarDesdeDetalle" onclick="closeModal('modalDetalleProducto')">✏️ Editar</button>
+    </div>
+  </div>
+</div>
+
 <!-- TOASTS -->
 <div class="toast-container" id="toastContainer"></div>
 
@@ -3713,10 +3728,24 @@ function mapProductoAInventario(p) {
     id: p.id,
     fecha: p.fecha_compra,
     producto: p.producto,
+    marca: p.marca || '',
+    modelo: p.modelo || '',
+    color: p.color || '',
     imei: p.imei1 || p.serial || '—',
+    imei1: p.imei1 || '',
+    imei2: p.imei2 || '',
+    serial: p.serial || '',
+    almacenamiento: p.almacenamiento || '',
+    ram: p.ram || '',
+    condicion: p.condicion || 'Nuevo',
     proveedor: prov ? prov.nombre : '—',
+    proveedorId: p.proveedor_id,
     costo: parseFloat(p.valor_compra) || 0,
+    garantiaMeses: p.garantia_meses || 0,
+    formaPago: p.forma_pago || '',
+    obs: p.observaciones || '',
     sede: p.sede_id === 1 ? 'LOCAL PEREIRA' : p.sede_id === 2 ? 'LOCAL ARMENIA' : '',
+    sede_id: p.sede_id,
     estado: p.estado
   };
 }
@@ -4484,6 +4513,7 @@ function renderTablaInventario(data) {
       <td><span style="font-size:11px;padding:2px 8px;border-radius:8px;background:rgba(107,45,139,0.1);color:#6B2D8B;">${(()=>{const s=dbAdmin.sedes.find(x=>x.id===e.sede_id||(e.sede||'').toUpperCase().includes((x.nombre||'').toUpperCase()));return s?s.nombre:e.sede||'—';})()}</span></td>
       <td><span class="badge ${e.estado==='DISPONIBLE'?'badge-green':e.estado==='VENDIDO'?'badge-pink':e.estado==='GARANTIA'?'badge-orange':'badge-red'}">${e.estado}</span></td>
       <td style="display:flex;gap:4px;">
+        <button class="btn btn-sm btn-ghost" onclick="verDetalleProducto(${e.id})" title="Ver detalle">🔍</button>
         ${sesionActiva && sesionActiva.rol==='admin' ? `<button class="btn btn-sm btn-ghost" style="color:#6B2D8B;" onclick="abrirTrasladoEquipo(${e.id},'${e.producto?.replace(/'/g,"\'")}')" title="Trasladar">🔄</button>` : ''}
         <button class="btn btn-sm btn-ghost" onclick="eliminarEquipo(${e.id})" title="Eliminar">🗑️</button>
       </td>
@@ -5768,6 +5798,79 @@ async function confirmarAbono() {
 }
 
 let ventaDetalleActualId = null;
+
+function verDetalleProducto(id) {
+  // Buscar en inventario y también en compras para tener todos los campos
+  const inv = db.inventario.find(x => x.id === id);
+  const comp = db.compras.find(x => x.id === id);
+  const p = { ...( comp || {}), ...(inv || {}) };
+  if(!p.id) { toast('Producto no encontrado','error'); return; }
+
+  const prov = db.proveedores.find(x => x.id === (p.proveedorId || p.proveedor_id));
+  const sedeObj = dbAdmin.sedes.find(s => s.id === (p.sede_id) ||
+    (p.sede||'').toUpperCase().includes((s.nombre||'').toUpperCase()));
+
+  const fila = (label, valor, color) => valor ? `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:9px 0;border-bottom:1px solid #f0ecf8;">
+      <span style="font-size:12px;color:#888899;min-width:140px;">${label}</span>
+      <strong style="font-size:13px;text-align:right;${color?'color:'+color+';':''}">${valor}</strong>
+    </div>` : '';
+
+  const estadoColor = {DISPONIBLE:'#16a34a',VENDIDO:'#E91E8C',GARANTIA:'#d97706',DEVUELTO:'#dc2626'};
+
+  const contenido = document.getElementById('detalleProductoContenido');
+  if(!contenido) return;
+
+  contenido.innerHTML = `
+    <!-- Header -->
+    <div style="background:linear-gradient(135deg,#1a0a2e,#6B2D8B);border-radius:14px;padding:18px;margin-bottom:16px;color:#fff;">
+      <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:18px;margin-bottom:4px;">${p.producto || '—'}</div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;opacity:0.85;">
+        ${p.marca ? `<span>🏷️ ${p.marca}</span>` : ''}
+        ${(p.color) ? `<span>🎨 ${p.color}</span>` : ''}
+        ${(p.almacenamiento||p.ram) ? `<span>💾 ${[p.almacenamiento,p.ram].filter(Boolean).join(' / ')}</span>` : ''}
+        <span style="background:${estadoColor[p.estado]||'#888'};padding:2px 10px;border-radius:20px;font-weight:700;">${p.estado||'—'}</span>
+      </div>
+    </div>
+
+    <!-- Identificación -->
+    <div style="background:#f7f5fb;border-radius:12px;padding:14px;margin-bottom:12px;">
+      <div style="font-size:11px;font-weight:700;color:#6B2D8B;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">📡 Identificación</div>
+      ${fila('IMEI 1', p.imei1||p.imei||'—', '#0066cc')}
+      ${p.imei2 ? fila('IMEI 2', p.imei2, '#0066cc') : ''}
+      ${p.serial ? fila('Serial', p.serial) : ''}
+    </div>
+
+    <!-- Compra -->
+    <div style="background:#f7f5fb;border-radius:12px;padding:14px;margin-bottom:12px;">
+      <div style="font-size:11px;font-weight:700;color:#6B2D8B;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">💰 Datos de Compra</div>
+      ${fila('Fecha ingreso', p.fecha||'—')}
+      ${fila('Proveedor', prov ? prov.nombre : (p.proveedor||'—'))}
+      ${fila('Valor de compra', fmt(p.costo||p.valorCompra||0), '#6B2D8B')}
+      ${fila('Condición', p.condicion||'—')}
+      ${fila('Garantía proveedor', p.garantiaMeses ? p.garantiaMeses+' meses' : 'Sin garantía')}
+      ${fila('Forma de pago', p.formaPago||'—')}
+      ${fila('Sede', sedeObj ? sedeObj.nombre : (p.sede||'—'))}
+    </div>
+
+    <!-- Observaciones -->
+    ${(p.obs||p.observaciones) ? `
+    <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:14px;margin-bottom:12px;">
+      <div style="font-size:11px;font-weight:700;color:#d97706;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">📝 Observaciones</div>
+      <div style="font-size:13px;color:#555577;line-height:1.6;">${p.obs||p.observaciones}</div>
+    </div>` : ''}
+  `;
+
+  // Botón editar apunta al producto
+  const btnEditar = document.getElementById('btnEditarDesdeDetalle');
+  if(btnEditar) btnEditar.onclick = () => {
+    closeModal('modalDetalleProducto');
+    showModule('productos');
+    setTimeout(()=>abrirEditarProducto(id), 300);
+  };
+
+  openModal('modalDetalleProducto');
+}
 
 function verDetalleVenta(id) {
   const v = db.ventas.find(x => x.id === id);
