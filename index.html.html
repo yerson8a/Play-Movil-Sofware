@@ -3649,53 +3649,70 @@ function closeModal(id) { $(id).classList.remove('open'); }
 // SISTEMA DE PERMISOS POR MÓDULO
 // ============================================================
 function aplicarPermisosNavegacion(user) {
-  // admin siempre ve todo
+  // admin siempre ve todo sin restricciones
   if(user.rol === 'admin') {
     document.querySelectorAll('.nav-item').forEach(n => n.style.display = '');
     return;
   }
 
-  const permisos = user.modulos_permitidos
-    ? JSON.parse(user.modulos_permitidos)
-    : [];
+  // Leer permisos guardados
+  let permisos = [];
+  try {
+    const raw = user.modulos_permitidos;
+    if(raw && raw !== '[]' && raw !== 'null') {
+      permisos = JSON.parse(raw);
+    }
+  } catch(e) { permisos = []; }
 
-  // Si permisos vacíos = acceso completo según rol
-  if(permisos.length === 0) {
+  // Si no hay permisos configurados → usar permisos por defecto del rol
+  if(!permisos || permisos.length === 0) {
     aplicarPermisosRol(user.rol);
     return;
   }
 
-  // Ocultar todos los nav-items primero
+  // Aplicar permisos exactos — mostrar solo los marcados
   document.querySelectorAll('.nav-item').forEach(nav => {
     const onclick = nav.getAttribute('onclick') || '';
-    const match = onclick.match(/showModule\('([^']+)'\)/);
-    if(match) {
-      const modulo = match[1];
+    const modulo = (onclick.match(/showModule\('([^']+)'\)/) || [])[1];
+    if(modulo) {
       nav.style.display = permisos.includes(modulo) ? '' : 'none';
     }
   });
-  // Dashboard siempre visible
-  const dashNav = document.querySelector('.nav-item[onclick*="dashboard"]');
-  if(dashNav) dashNav.style.display = '';
+
+  // También ocultar nav-sections que queden vacías
+  document.querySelectorAll('.nav-section').forEach(sec => {
+    let siguiente = sec.nextElementSibling;
+    let tieneVisibles = false;
+    while(siguiente && !siguiente.classList.contains('nav-section')) {
+      if(siguiente.style.display !== 'none') { tieneVisibles = true; break; }
+      siguiente = siguiente.nextElementSibling;
+    }
+    sec.style.display = tieneVisibles ? '' : 'none';
+  });
 }
 
 function aplicarPermisosRol(rol) {
-  // Permisos por defecto según rol
   const porRol = {
     asesor:   ['dashboard','inventario','ventas','creditos','simulador','garantias','servicio'],
     bodega:   ['dashboard','inventario','compras','garantias'],
     consulta: ['dashboard','inventario','ventas','creditos'],
   };
-  const permitidos = porRol[rol] || [];
+  const permitidos = porRol[rol] || ['dashboard'];
   document.querySelectorAll('.nav-item').forEach(nav => {
     const onclick = nav.getAttribute('onclick') || '';
-    const match = onclick.match(/showModule\('([^']+)'\)/);
-    if(match) {
-      nav.style.display = permitidos.includes(match[1]) ? '' : 'none';
-    }
+    const modulo = (onclick.match(/showModule\('([^']+)'\)/) || [])[1];
+    if(modulo) nav.style.display = permitidos.includes(modulo) ? '' : 'none';
   });
-  const dashNav = document.querySelector('.nav-item[onclick*="dashboard"]');
-  if(dashNav) dashNav.style.display = '';
+  // Ocultar secciones vacías
+  document.querySelectorAll('.nav-section').forEach(sec => {
+    let siguiente = sec.nextElementSibling;
+    let tieneVisibles = false;
+    while(siguiente && !siguiente.classList.contains('nav-section')) {
+      if(siguiente.style.display !== 'none') { tieneVisibles = true; break; }
+      siguiente = siguiente.nextElementSibling;
+    }
+    sec.style.display = tieneVisibles ? '' : 'none';
+  });
 }
 
 function onCambioRolUsuario(rol) {
@@ -3756,6 +3773,14 @@ function closeSidebarMobile() {
 }
 
 function showModule(name) {
+  // Bloquear acceso a módulos sin permiso
+  if(sesionActiva && sesionActiva.rol !== 'admin' && name !== 'dashboard') {
+    let permisos = [];
+    try { const r=sesionActiva.modulos_permitidos; if(r&&r!=='[]'&&r!=='null') permisos=JSON.parse(r); } catch(e){}
+    if(permisos.length > 0 && !permisos.includes(name)) {
+      toast('No tienes permiso para este módulo','error'); return;
+    }
+  }
   document.querySelectorAll('.module').forEach(m=>m.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const mod = $('mod-'+name);
