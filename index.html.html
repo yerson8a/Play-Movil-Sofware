@@ -770,6 +770,7 @@
         <div style="display:flex;gap:10px;">
           <button class="btn btn-outline btn-sm" onclick="exportarInventario()">↓ Exportar</button>
           <button class="btn btn-ghost btn-sm" style="color:#dc2626;border-color:#dc2626;" onclick="openModal('modalSalidaInventario')">📤 Salida sin Venta</button>
+          <button class="btn btn-ghost btn-sm" id="btnTrasladoEquipo" style="color:#6B2D8B;border:1px solid #6B2D8B;display:none;" onclick="openModal('modalTrasladoEquipo')">🔄 Trasladar Equipo</button>
           <button class="btn btn-primary btn-sm" onclick="openModal('modalNuevoEquipo')">+ Agregar Equipo</button>
         </div>
       </div>
@@ -3062,6 +3063,45 @@
   </div>
 </div>
 
+<!-- Modal Trasladar Equipo -->
+<div class="modal-overlay" id="modalTrasladoEquipo">
+  <div class="modal" style="max-width:460px;">
+    <div class="modal-header">
+      <div class="modal-title">🔄 Trasladar Equipo</div>
+      <button class="modal-close" onclick="closeModal('modalTrasladoEquipo')">✕</button>
+    </div>
+    <input type="hidden" id="trasladoProductoId">
+
+    <div style="background:#f7f5fb;border-radius:10px;padding:12px;margin-bottom:16px;font-size:13px;">
+      <div style="font-size:11px;color:#888899;margin-bottom:4px;">Equipo a trasladar</div>
+      <div style="font-weight:600;font-size:15px;" id="trasladoProductoNombre">—</div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Buscar por IMEI (opcional)</label>
+      <input type="text" class="form-control" id="trasladoIMEIBusca" placeholder="Escribe el IMEI para buscar un equipo..." oninput="buscarParaTraslado(this.value)">
+      <div id="trasladoBuscaInfo" style="margin-top:8px;display:none;background:#f0fdf4;border-radius:8px;padding:10px;font-size:13px;"></div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Sede destino *</label>
+      <select class="form-control" id="trasladoSedeDestino" style="font-size:14px;">
+        <option value="">Selecciona la sede destino...</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Motivo del traslado</label>
+      <input type="text" class="form-control" id="trasladoMotivo" placeholder="Ej: Solicitud de sede, rebalanceo de stock...">
+    </div>
+
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
+      <button class="btn btn-ghost" onclick="closeModal('modalTrasladoEquipo')">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmarTraslado()">🔄 Confirmar Traslado</button>
+    </div>
+  </div>
+</div>
+
 <!-- TOASTS -->
 <div class="toast-container" id="toastContainer"></div>
 
@@ -3924,18 +3964,15 @@ function renderInventario() {
   }
 
   // Si el usuario tiene sede fija, ocultar tabs y auto-filtrar
-  if(sesionActiva && sesionActiva.rol !== 'admin' && sesionActiva.sede_id) {
-    if(tabsSedes) tabsSedes.style.display = 'none';
-    const sedeObj = dbAdmin.sedes.find(s => s.id === sesionActiva.sede_id);
-    const sub = $('invSedeSubtitle');
-    if(sub) sub.textContent = 'Solo mostrando: ' + (sedeObj ? sedeObj.nombre : 'Tu sede');
-    renderTablaInventario(db.inventario.filter(e => e.sede_id === sesionActiva.sede_id));
-  } else {
-    if(tabsSedes) tabsSedes.style.display = 'flex';
-    const sub = $('invSedeSubtitle');
-    if(sub) sub.textContent = 'Gestión de stock por sede';
-    aplicarFiltroInvSede();
-  }
+  // Todos los usuarios ven todas las sedes — tabs siempre visibles
+  if(tabsSedes) tabsSedes.style.display = 'flex';
+  const sub = $('invSedeSubtitle');
+  if(sub) sub.textContent = 'Gestión de stock por sede';
+  aplicarFiltroInvSede();
+
+  // Botón traslado: solo visible para admin
+  const btnTraslado = document.getElementById('btnTrasladoEquipo');
+  if(btnTraslado) btnTraslado.style.display = (sesionActiva && sesionActiva.rol === 'admin') ? '' : 'none';
 
   // Stats
   const dataVisible = getInvDataFiltrada();
@@ -3984,7 +4021,8 @@ function renderTablaInventario(data) {
       <td style="color:var(--pink);font-weight:600;">${fmt(e.costo)}</td>
       <td><span style="font-size:11px;padding:2px 8px;border-radius:8px;background:rgba(107,45,139,0.1);color:#6B2D8B;">${(()=>{const s=dbAdmin.sedes.find(x=>x.id===e.sede_id||(e.sede||'').toUpperCase().includes((x.nombre||'').toUpperCase()));return s?s.nombre:e.sede||'—';})()}</span></td>
       <td><span class="badge ${e.estado==='DISPONIBLE'?'badge-green':e.estado==='VENDIDO'?'badge-pink':e.estado==='GARANTIA'?'badge-orange':'badge-red'}">${e.estado}</span></td>
-      <td>
+      <td style="display:flex;gap:4px;">
+        ${sesionActiva && sesionActiva.rol==='admin' ? `<button class="btn btn-sm btn-ghost" style="color:#6B2D8B;" onclick="abrirTrasladoEquipo(${e.id},'${e.producto?.replace(/'/g,"\'")}')" title="Trasladar">🔄</button>` : ''}
         <button class="btn btn-sm btn-ghost" onclick="eliminarEquipo(${e.id})" title="Eliminar">🗑️</button>
       </td>
     </tr>`).join(''):'<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text2);">Sin equipos en este filtro</td></tr>';
@@ -4968,6 +5006,96 @@ function imprimirDetalleVenta() {
     <style>body{margin:24px;font-family:'DM Sans',sans-serif;max-width:480px;}@media print{body{margin:0;}}</style>
     </head><body>${contenido}<script>window.onload=()=>window.print();<\/script></body></html>`);
   win.document.close();
+}
+
+// ============================================================
+// TRASLADO DE EQUIPOS ENTRE SEDES
+// ============================================================
+function abrirTrasladoEquipo(productoId, nombre) {
+  document.getElementById('trasladoProductoId').value = productoId;
+  document.getElementById('trasladoProductoNombre').textContent = nombre || '—';
+  document.getElementById('trasladoIMEIBusca').value = '';
+  document.getElementById('trasladoBuscaInfo').style.display = 'none';
+  document.getElementById('trasladoMotivo').value = '';
+  // Poblar sedes destino (todas menos la sede actual del equipo)
+  const prod = db.inventario.find(e => e.id === productoId);
+  const sedeActualId = prod ? prod.sede_id : null;
+  const sel = document.getElementById('trasladoSedeDestino');
+  sel.innerHTML = '<option value="">Selecciona la sede destino...</option>' +
+    dbAdmin.sedes.filter(s => s.activa !== false && s.id !== sedeActualId)
+      .map(s => `<option value="${s.id}">${s.nombre}</option>`).join('');
+  openModal('modalTrasladoEquipo');
+}
+
+async function buscarParaTraslado(val) {
+  if(val.length < 5) { document.getElementById('trasladoBuscaInfo').style.display='none'; return; }
+  const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+  const base = SUPABASE_URL + '/rest/v1/productos';
+  let res = await fetch(`${base}?select=id,producto,imei1,estado,sede_id&imei1=eq.${val}`, {headers});
+  let rows = await res.json();
+  if(!rows.length) {
+    res = await fetch(`${base}?select=id,producto,imei1,estado,sede_id&imei2=eq.${val}`, {headers});
+    rows = await res.json();
+  }
+  const info = document.getElementById('trasladoBuscaInfo');
+  if(rows.length > 0) {
+    const p = rows[0];
+    const sedeObj = dbAdmin.sedes.find(s => s.id === p.sede_id);
+    document.getElementById('trasladoProductoId').value = p.id;
+    document.getElementById('trasladoProductoNombre').textContent = p.producto;
+    // Actualizar sedes destino excluyendo la sede actual
+    const sel = document.getElementById('trasladoSedeDestino');
+    sel.innerHTML = '<option value="">Selecciona la sede destino...</option>' +
+      dbAdmin.sedes.filter(s => s.activa !== false && s.id !== p.sede_id)
+        .map(s => `<option value="${s.id}">${s.nombre}</option>`).join('');
+    info.style.display = 'block';
+    info.innerHTML = `✅ <strong>${p.producto}</strong> — Sede actual: <strong>${sedeObj ? sedeObj.nombre : '—'}</strong> — Estado: ${p.estado}`;
+  } else {
+    info.style.display = 'none';
+  }
+}
+
+async function confirmarTraslado() {
+  const productoId  = parseInt(document.getElementById('trasladoProductoId').value);
+  const sedeDestinoId = parseInt(document.getElementById('trasladoSedeDestino').value);
+  const motivo      = document.getElementById('trasladoMotivo').value || 'Traslado entre sedes';
+
+  if(!productoId) { toast('Selecciona o busca un equipo','error'); return; }
+  if(!sedeDestinoId) { toast('Selecciona la sede destino','error'); return; }
+
+  const sedeDestino = dbAdmin.sedes.find(s => s.id === sedeDestinoId);
+  const prod = db.inventario.find(e => e.id === productoId);
+  const sedeOrigen = dbAdmin.sedes.find(s => s.id === prod?.sede_id);
+
+  try {
+    showLoader('Trasladando equipo...');
+    const headers = {
+      'apikey': SUPABASE_KEY,
+      'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'Content-Type': 'application/json'
+    };
+    // Actualizar sede_id del producto
+    await fetch(`${SUPABASE_URL}/rest/v1/productos?id=eq.${productoId}`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({
+        sede_id: sedeDestinoId,
+        observaciones: `Traslado: ${sedeOrigen?.nombre||'—'} → ${sedeDestino?.nombre||'—'}. ${motivo}`
+      })
+    });
+    // Actualizar en memoria
+    if(prod) {
+      prod.sede_id = sedeDestinoId;
+      prod.sede    = sedeDestino?.nombre?.toUpperCase() || '';
+    }
+    hideLoader();
+    closeModal('modalTrasladoEquipo');
+    renderInventario();
+    toast(`✅ Equipo trasladado a ${sedeDestino?.nombre}`);
+  } catch(e) {
+    hideLoader();
+    toast('Error: ' + e.message, 'error');
+  }
 }
 
 function toggleTransfAbono(metodo) {
