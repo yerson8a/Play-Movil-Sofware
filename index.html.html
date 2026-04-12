@@ -2383,7 +2383,21 @@
 
         <!-- Financiera y comisión -->
         <div class="card">
-          <div class="card-title" style="font-size:13px;margin-bottom:10px;">🏦 Financiera</div>
+          <div class="card-title" style="font-size:13px;margin-bottom:10px;">🏦 Financiera y Forma de Pago</div>
+
+          <!-- Tipo de pago -->
+          <div class="form-group" style="margin-bottom:10px;">
+            <label class="form-label">Tipo de pago</label>
+            <div style="display:flex;gap:8px;">
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;flex:1;background:#f7f5fb;border-radius:8px;padding:8px 10px;" onclick="toggleTipoPago('financiera')">
+                <input type="radio" name="tipoPagoCrd" id="tipoPagoFin" value="financiera" checked onchange="toggleTipoPago('financiera')" style="accent-color:#6B2D8B;"> Solo financiera
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;flex:1;background:#f7f5fb;border-radius:8px;padding:8px 10px;" onclick="toggleTipoPago('mixto')">
+                <input type="radio" name="tipoPagoCrd" id="tipoPagoMixto" value="mixto" onchange="toggleTipoPago('mixto')" style="accent-color:#6B2D8B;"> Financiera + Efectivo
+              </label>
+            </div>
+          </div>
+
           <div class="form-group">
             <label class="form-label">Financiera *</label>
             <select class="form-control" id="crdFinanciera" onchange="autoComisionCredito()">
@@ -2392,7 +2406,7 @@
           </div>
           <div class="form-row">
             <div class="form-group">
-              <label class="form-label">% Comisión</label>
+              <label class="form-label">% Comisión financiera</label>
               <input type="number" class="form-control" id="crdComFinanciera" placeholder="0" oninput="recalcCredito()" min="0" max="100" step="0.1">
               <div style="font-size:11px;color:#888899;margin-top:3px;">Comisión: <span id="crdComFinVal" style="color:#dc2626;font-weight:600;">$0</span></div>
             </div>
@@ -2438,6 +2452,38 @@
               </select>
             </div>
           </div>
+
+          <!-- Pago mixto: valor financiado + efectivo -->
+          <div id="crdPagoMixtoSection" style="display:none;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px;margin-top:10px;">
+            <div style="font-size:12px;font-weight:700;color:#16a34a;margin-bottom:10px;">💳 Distribución del Pago Mixto</div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Valor por financiera ($)</label>
+                <div class="input-money-wrap"><input type="text" class="form-control" id="crdValorFinanciero" placeholder="0" oninput="fmtMoneyInput(this);recalcCredito()" inputmode="numeric"></div>
+                <div style="font-size:10px;color:#888899;margin-top:2px;">Sobre este valor se cobra la comisión %</div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Valor en efectivo ($)</label>
+                <div class="input-money-wrap"><input type="text" class="form-control" id="crdValorEfectivo" placeholder="0" oninput="fmtMoneyInput(this);recalcCredito()" inputmode="numeric"></div>
+                <div style="font-size:10px;color:#888899;margin-top:2px;">Sin comisión</div>
+              </div>
+            </div>
+            <div id="crdMixtoResumen" style="background:#fff;border-radius:8px;padding:10px;font-size:12px;margin-top:6px;display:none;">
+              <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                <span style="color:#888899;">Total recibido:</span>
+                <strong id="crdMixtoTotal">$0</strong>
+              </div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                <span style="color:#888899;">Comisión (solo financiera):</span>
+                <strong style="color:#dc2626;" id="crdMixtoComision">$0</strong>
+              </div>
+              <div style="display:flex;justify-content:space-between;border-top:1px solid #f0ecf8;padding-top:4px;margin-top:4px;">
+                <span style="color:#888899;">Ganancia real:</span>
+                <strong style="color:#16a34a;" id="crdMixtoGanancia">$0</strong>
+              </div>
+            </div>
+          </div>
+
           <!-- Intereses -->
           <div style="background:#f7f5fb;border-radius:10px;padding:12px;margin-top:4px;">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
@@ -5808,10 +5854,15 @@ async function guardarCredito(){
   const enviarFact   = $('crdEnviarFactura')?.checked||false;
   const finSel       = ($('crdFinanciera')?.value||'CONTADO:0').split(':')[0];
 
-  const ivaVal       = Math.round(base * ivaPct/100);   // Solo informativo
-  const precioFinal  = base - desc + prodAdicVal;        // IVA NO suma
-  const comVal       = Math.round(precioFinal * comPct/100);
-  const ganancia     = precioFinal - costo - comVal;
+  const ivaVal         = Math.round(base * ivaPct/100);   // Solo informativo
+  const precioFinal    = base - desc + prodAdicVal;        // IVA NO suma
+  // Pago mixto: comisión solo sobre la parte financiera
+  const esMixto        = document.getElementById('tipoPagoMixto')?.checked || false;
+  const valorFinanciero = esMixto ? getMoneyValue('crdValorFinanciero') : precioFinal;
+  const comVal         = Math.round(valorFinanciero * comPct/100);
+  const ganancia       = precioFinal - costo - comVal;
+  // Para la factura: comisión "display" se calcula sobre el total (visual)
+  const comValFactura  = esMixto ? Math.round(precioFinal * comPct/100) : comVal;
   const sinInicial   = document.getElementById('crdSinInicial')?.checked || false;
   const inicialManualG = getMoneyValue('crdInicialManual');
   const ini = sinInicial ? 0 : (inicialManualG > 0 ? inicialManualG : (crdInicialSeleccionada > 0 ? crdInicialSeleccionada : Math.round(precioFinal * 0.20)));
@@ -5867,7 +5918,10 @@ async function guardarCredito(){
       equipo:datos.equipo, imei:$('crdIMEI')?.value||'',
       asesor:datos.asesor, sede:sedeActual,
       precioBase:base, iva:ivaVal, descuento:desc,
-      prodAdicDesc, prodAdicVal, comision:comVal,
+      prodAdicDesc, prodAdicVal, comision:comValFactura,
+      comisionReal:comVal, esMixto,
+      valorFinanciero: esMixto ? valorFinanciero : 0,
+      valorEfectivo:   esMixto ? getMoneyValue('crdValorEfectivo') : 0,
       precioFinal, ganancia, inicial:ini,
       saldoFinanciar:totalFinanciar, cuotas:quincenas,
       valorCuota, financiera:finSel,
@@ -6557,6 +6611,20 @@ function selectInicial(el,pct,ini,saldo){document.querySelectorAll('.inicial-car
 
 let crdInicialSeleccionada=0;
 
+function toggleTipoPago(tipo) {
+  const seccion = document.getElementById('crdPagoMixtoSection');
+  const esMixto = tipo === 'mixto';
+  if(seccion) seccion.style.display = esMixto ? 'block' : 'none';
+  // Reset valores mixtos al cambiar
+  if(!esMixto) {
+    const vf = document.getElementById('crdValorFinanciero');
+    const ve = document.getElementById('crdValorEfectivo');
+    if(vf) vf.value = '';
+    if(ve) ve.value = '';
+  }
+  recalcCredito();
+}
+
 function toggleSinInicial(sinInicial) {
   const grid = document.getElementById('crdInicialesGrid');
   const manualRow = document.getElementById('crdInicialManualRow');
@@ -6740,11 +6808,28 @@ function recalcCredito(){
   }
 
   // IVA NO se suma al precio — solo se muestra como línea informativa
-  const ivaVal       = Math.round(base * ivaPct/100);
-  const precioFinal  = base - desc + prodAdicVal;          // sin IVA
-  const comVal       = Math.round(precioFinal * comPct/100);
-  const gananciaNeta = precioFinal - costo - comVal;
-  const margen       = precioFinal > 0 ? ((gananciaNeta/precioFinal)*100).toFixed(1) : 0;
+  const ivaVal      = Math.round(base * ivaPct/100);
+  const precioFinal = base - desc + prodAdicVal;   // sin IVA
+
+  // Pago mixto: comisión solo sobre la parte financiera
+  const esMixto        = document.getElementById('tipoPagoMixto')?.checked || false;
+  const valorFinanciero = esMixto ? getMoneyValue('crdValorFinanciero') : precioFinal;
+  const valorEfectivo   = esMixto ? getMoneyValue('crdValorEfectivo')   : 0;
+  // Comisión solo sobre el valor que va por la financiera
+  const comVal          = Math.round(valorFinanciero * comPct/100);
+  const gananciaNeta    = precioFinal - costo - comVal;
+  const margen          = precioFinal > 0 ? ((gananciaNeta/precioFinal)*100).toFixed(1) : 0;
+
+  // Actualizar resumen mixto
+  if(esMixto) {
+    const mixtoTotal = valorFinanciero + valorEfectivo;
+    const setM = (id,v) => { const e=document.getElementById(id); if(e) e.textContent=v; };
+    setM('crdMixtoTotal',    fmt(mixtoTotal));
+    setM('crdMixtoComision', fmt(comVal));
+    setM('crdMixtoGanancia', fmt(precioFinal - costo - comVal));
+    const mr = document.getElementById('crdMixtoResumen');
+    if(mr) mr.style.display = (valorFinanciero > 0 || valorEfectivo > 0) ? 'block' : 'none';
+  }
 
   const setEl = (id,v,color) => {
     const e=$(id); if(!e)return;
@@ -7438,7 +7523,8 @@ function generarHTMLFactura(d) {
       <div>
         <div style="font-size:12px;font-weight:700;color:#6B2D8B;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Asesor</div>
         <div style="font-size:14px;font-weight:600;">${d.asesor}</div>
-        <div style="font-size:13px;color:#555;">Modalidad: ${d.tipo === 'credito' ? 'Crédito — '+d.financiera : 'Contado'}</div>
+        <div style="font-size:13px;color:#555;">Modalidad: ${d.tipo === 'credito' ? 'Crédito — '+d.financiera : 'Contado'}${d.esMixto?' (Pago Mixto)':''}</div>
+        ${d.esMixto && d.valorFinanciero > 0 ? `<div style="font-size:12px;color:#888;margin-top:2px;">Financiera: ${fmt(d.valorFinanciero)} + Efectivo: ${fmt(d.valorEfectivo)}</div>` : ''}
         ${d.tipo === 'credito' ? `<div style="font-size:13px;color:#555;">${d.cuotas} quincenas · Cuota: ${fmt(d.valorCuota)}</div>` : ''}
       </div>
     </div>
