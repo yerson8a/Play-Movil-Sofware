@@ -1199,6 +1199,12 @@
         </div>
         <button class="btn btn-primary btn-sm" onclick="abrirModalAsignarAsesor()">+ Asignar Asesor</button>
       </div>
+      <div class="card" style="margin-bottom:20px;">
+        <div class="card-title">🏆 Ranking del Mes</div>
+        <div id="rankingAsesoresMod" style="padding:4px 0;">
+          <div style="text-align:center;padding:20px;color:#888899;font-size:13px;">Cargando ranking...</div>
+        </div>
+      </div>
       <div class="grid-3" id="asesoresGrid"></div>
     </div>
 
@@ -8080,7 +8086,7 @@ async function guardarCaja() {
   const nueva = {
     nombre: nombre.toUpperCase(),
     sede_id: sedeId ? parseInt(sedeId) : null,
-    saldo: parseFloat(document.getElementById('cajaSaldo').value) || 0,
+    saldo: getMoneyValue('cajaSaldo'),
     estado: document.getElementById('cajaEstado').value,
     descripcion: document.getElementById('cajaDesc').value || ''
   };
@@ -8110,7 +8116,7 @@ function abrirMovimientoCaja(id, nombre) {
 async function registrarMovimientoCaja() {
   const id = parseInt(document.getElementById('movCajaId').value);
   const tipo = document.getElementById('movTipo').value;
-  const valor = parseFloat(document.getElementById('movValor').value) || 0;
+  const valor = getMoneyValue('movValor');
   const concepto = document.getElementById('movConcepto').value.trim();
   if (!valor || !concepto) { toast('Completa valor y concepto', 'error'); return; }
 
@@ -8120,7 +8126,21 @@ async function registrarMovimientoCaja() {
   if (nuevoSaldo < 0) { toast('Saldo insuficiente en caja', 'error'); return; }
 
   try {
+    // Actualizar saldo de la caja
     await sbFetch(`cajas?id=eq.${id}`, { method: 'PATCH', body: { saldo: nuevoSaldo } }).catch(() => null);
+    // Registrar movimiento en historial
+    await sbFetch('movimientos_caja', {
+      method: 'POST',
+      body: {
+        caja_id:       id,
+        tipo:          tipo === 'ingreso' ? 'entrada' : 'salida',
+        concepto:      concepto,
+        valor:         valor,
+        saldo_despues: nuevoSaldo,
+        fecha:         new Date().toISOString().split('T')[0],
+        usuario:       sesionActiva?.nombre || 'Sistema'
+      }
+    }).catch(() => null); // No bloquear si falla
     caja.saldo = nuevoSaldo;
     closeModal('modalMovimientoCaja');
     renderCajas();
