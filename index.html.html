@@ -4957,19 +4957,29 @@ function renderAsesores(){
   const rankEl = document.getElementById('rankingAsesoresMod');
   if(rankEl) {
     const topAsesores = asesores.map(a => {
-      const nombre = a.nombre.toUpperCase();
-      const vMesA  = db.ventas.filter(v => v.asesor===nombre && v.fecha && v.fecha.startsWith(mesActual) && !v.anulada);
-      return { nombre, ventas: vMesA.length, comision: vMesA.reduce((s,v)=>s+(v.comisionAsesor||0),0) };
+      const nombre  = a.nombre.toUpperCase();
+      const vMesA   = db.ventas.filter(v => v.asesor===nombre && v.fecha && v.fecha.startsWith(mesActual) && !v.anulada);
+      return {
+        nombre,
+        ventas:   vMesA.length,
+        ganancia: vMesA.reduce((s,v)=>s+(v.ganancia||0),0),
+        ingresos: vMesA.reduce((s,v)=>s+(v.venta||0),0),
+        comision: vMesA.reduce((s,v)=>s+(v.comisionAsesor||0),0)
+      };
     }).sort((a,b)=>b.ventas-a.ventas);
+    const medallas = ['🥇','🥈','🥉'];
     rankEl.innerHTML = topAsesores.map((a,i)=>`
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f0ecf8;">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #f0ecf8;">
         <div style="display:flex;align-items:center;gap:10px;">
-          <div style="width:26px;height:26px;border-radius:50%;background:${i===0?'rgba(233,30,140,0.2)':i===1?'rgba(107,45,139,0.15)':'#f7f5fb'};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#6B2D8B;">${i+1}</div>
-          <span style="font-weight:600;">${a.nombre}</span>
+          <div style="font-size:20px;">${medallas[i]||'#'+(i+1)}</div>
+          <div>
+            <div style="font-weight:700;font-size:14px;">${a.nombre}</div>
+            <div style="font-size:11px;color:#888899;">${a.ventas} venta${a.ventas!==1?'s':''} · Ingresos: ${fmt(a.ingresos)}</div>
+          </div>
         </div>
         <div style="text-align:right;">
-          <div style="font-size:13px;color:#888899;">${a.ventas} venta${a.ventas!==1?'s':''}</div>
-          ${a.comision>0?`<div style="font-size:11px;color:#6B2D8B;">${fmt(a.comision)}</div>`:''}
+          <div style="font-size:13px;font-weight:700;color:#16a34a;">Ganancia: ${fmt(a.ganancia)}</div>
+          ${a.comision>0?`<div style="font-size:11px;color:#6B2D8B;">Comisión: ${fmt(a.comision)}</div>`:''}
         </div>
       </div>`).join('') || '<div style="text-align:center;padding:20px;color:#888899;font-size:13px;">Sin ventas este mes</div>';
   }
