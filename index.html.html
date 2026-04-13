@@ -151,6 +151,8 @@
     transition:border-color .2s; outline:none;
   }
   .form-control:focus { border-color:#6B2D8B; box-shadow:0 0 0 3px rgba(107,45,139,0.1); }
+  input.form-control:not([type="email"]):not([type="date"]):not([type="password"]):not([type="number"]),
+  textarea.form-control { text-transform:uppercase; }
   .form-control::placeholder { color:var(--text2); }
   select.form-control option { background:var(--bg2); }
   .form-row { display:grid; grid-template-columns:repeat(2,1fr); gap:16px; }
@@ -2677,24 +2679,26 @@
             <span style="color:#16a34a;font-weight:600;">✅ Cliente seleccionado: </span><span id="crdClienteSelNombre"></span>
             <button type="button" onclick="limpiarClienteVenta('crd')" style="float:right;background:none;border:none;color:#dc2626;cursor:pointer;font-size:12px;">✕ Cambiar</button>
           </div>
+          <!-- Búsqueda por cédula — auto-llena los demás campos -->
           <div class="form-row">
             <div class="form-group">
-              <label class="form-label">Nombre *</label>
-              <input type="text" class="form-control" id="crdCliente" placeholder="Nombre completo">
+              <label class="form-label">Cédula / Documento *</label>
+              <input type="text" class="form-control" id="crdCedula" placeholder="Escribe la cédula para buscar cliente..." oninput="buscarClientePorCedula(this.value,'crd')">
+              <div id="crdCedulaInfo" style="font-size:11px;margin-top:3px;display:none;"></div>
             </div>
             <div class="form-group">
-              <label class="form-label">Cédula</label>
-              <input type="text" class="form-control" id="crdCedula" placeholder="No. cédula">
+              <label class="form-label">Nombre completo *</label>
+              <input type="text" class="form-control" id="crdCliente" placeholder="Se llena al buscar por cédula" readonly style="background:#f7f5fb;">
             </div>
           </div>
           <div class="form-row">
             <div class="form-group">
               <label class="form-label">Teléfono</label>
-              <input type="text" class="form-control" id="crdTelefono" placeholder="300 000 0000">
+              <input type="text" class="form-control" id="crdTelefono" placeholder="—" readonly style="background:#f7f5fb;">
             </div>
             <div class="form-group">
               <label class="form-label">Correo</label>
-              <input type="email" class="form-control" id="crdCorreo" placeholder="correo@email.com">
+              <input type="email" class="form-control" id="crdCorreo" placeholder="—" readonly style="background:#f7f5fb;">
             </div>
             <div class="form-group">
               <label class="form-label">N° Contrato</label>
@@ -2932,6 +2936,12 @@
             </label>
           </div>
           <div style="margin-top:10px;font-size:12px;color:#888899;">La factura se generará automáticamente al guardar y podrás imprimirla.</div>
+        </div>
+
+        <!-- Observaciones -->
+        <div class="card">
+          <div class="card-title" style="font-size:13px;margin-bottom:10px;">📝 Observaciones</div>
+          <textarea class="form-control" id="crdObservaciones" rows="2" placeholder="Notas adicionales de la venta a crédito..." style="text-transform:uppercase;"></textarea>
         </div>
 
         <!-- Documentos -->
@@ -3185,22 +3195,23 @@
       <div class="card-title" style="font-size:13px;margin-bottom:12px;">👤 Cliente y Asesor</div>
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Nombre del Cliente *</label>
-          <input type="text" class="form-control" id="vcCliente" placeholder="Nombre completo">
+          <label class="form-label">Cédula / Documento *</label>
+          <input type="text" class="form-control" id="vcCedula" placeholder="Escribe la cédula para buscar cliente..." oninput="buscarClientePorCedula(this.value,'vc')">
+          <div id="vcCedulaInfo" style="font-size:11px;margin-top:3px;display:none;"></div>
         </div>
         <div class="form-group">
-          <label class="form-label">Cédula</label>
-          <input type="text" class="form-control" id="vcCedula" placeholder="No. de cédula">
+          <label class="form-label">Nombre del Cliente *</label>
+          <input type="text" class="form-control" id="vcCliente" placeholder="Se llena al buscar por cédula" readonly style="background:#f7f5fb;">
         </div>
       </div>
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Teléfono</label>
-          <input type="text" class="form-control" id="vcTelefono" placeholder="300 000 0000">
+          <input type="text" class="form-control" id="vcTelefono" placeholder="—" readonly style="background:#f7f5fb;">
         </div>
         <div class="form-group">
           <label class="form-label">Correo Electrónico</label>
-          <input type="email" class="form-control" id="vcCorreo" placeholder="correo@cliente.com">
+          <input type="email" class="form-control" id="vcCorreo" placeholder="—" readonly style="background:#f7f5fb;">
         </div>
         <div class="form-group">
           <label class="form-label">Asesor Comercial</label>
@@ -3255,42 +3266,7 @@
 </div>
 
 <!-- Modal Nueva Garantía -->
-<div class="modal-overlay" id="modalNuevaGarantia">
-  <div class="modal">
-    <div class="modal-header">
-      <div class="modal-title">🛡️ Registrar Garantía</div>
-      <button class="modal-close" onclick="closeModal('modalNuevaGarantia')">✕</button>
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">Referencia</label>
-        <input type="text" class="form-control" id="garRef" placeholder="Modelo del equipo">
-      </div>
-      <div class="form-group">
-        <label class="form-label">IMEI</label>
-        <input type="text" class="form-control" id="garIMEI" placeholder="IMEI">
-      </div>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Detalle del Problema</label>
-      <input type="text" class="form-control" id="garDetalle" placeholder="Describe el problema...">
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">Técnico</label>
-        <input type="text" class="form-control" id="garTecnico" placeholder="Nombre del técnico">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Proveedor</label>
-        <input type="text" class="form-control" id="garProveedor" placeholder="Proveedor responsable">
-      </div>
-    </div>
-    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
-      <button class="btn btn-ghost" onclick="closeModal('modalNuevaGarantia')">Cancelar</button>
-      <button class="btn btn-primary" onclick="guardarGarantia()">Registrar Garantía</button>
-    </div>
-  </div>
-</div>
+<!-- Modal garantía viejo eliminado — usar modalNuevaGarantia más abajo -->
 
 <!-- Modal Nueva Sede -->
 <div class="modal-overlay" id="modalNuevaSede">
@@ -4656,9 +4632,8 @@ function toast(msg, type='success') {
 function openModal(id) {
   const el = $(id);
   if(!el) return;
-  // Si es la factura, ponerla encima de cualquier otro modal abierto
-  if(id === 'modalFactura') {
-    el.style.zIndex = '9000';
+  if(id === 'modalFactura' || id === 'modalNuevoCliente' || id === 'modalEditarCliente') {
+    el.style.zIndex = '9500';
   }
   el.classList.add('open');
 }
@@ -4666,7 +4641,7 @@ function closeModal(id) {
   const el = $(id);
   if(!el) return;
   el.classList.remove('open');
-  if(id === 'modalFactura') el.style.zIndex = '';
+  if(id === 'modalFactura' || id === 'modalNuevoCliente' || id === 'modalEditarCliente') el.style.zIndex = '';
 }
 
 // ============================================================
@@ -6438,6 +6413,48 @@ function buscarClienteVenta(q, prefijo) {
   dd.style.display='block';
 }
 
+// Buscar cliente por cédula al escribir en campo cédula
+function buscarClientePorCedula(val, prefijo) {
+  const infoEl = document.getElementById(prefijo+'CedulaInfo');
+  val = val.trim();
+  if(!val || val.length < 3) {
+    if(infoEl) infoEl.style.display='none';
+    return;
+  }
+  const prefix = prefijo === 'crd' ? 'crd' : 'vc';
+  const cliente = db.clientes.find(c => c.documento === val);
+  if(cliente) {
+    // Llenar campos
+    const setVal = (id, v) => { const e=document.getElementById(id); if(e) e.value=v||''; };
+    setVal(prefix+'Cliente',  cliente.nombre);
+    setVal(prefix+'Cedula',   cliente.documento);
+    setVal(prefix+'Telefono', cliente.telefono||'');
+    setVal(prefix+'Correo',   cliente.correo||'');
+    // Mostrar info de cliente encontrado
+    if(infoEl) {
+      infoEl.innerHTML = `✅ <strong>${cliente.nombre}</strong> · ${cliente.tipo_doc||'CC'}: ${cliente.documento}`;
+      infoEl.style.color = '#16a34a';
+      infoEl.style.display = 'block';
+    }
+    // Actualizar selector de búsqueda si existe
+    const selInfo = document.getElementById(prefijo+'ClienteSelInfo');
+    const selNom  = document.getElementById(prefijo+'ClienteSelNombre');
+    if(selInfo) selInfo.style.display='block';
+    if(selNom)  selNom.textContent = `${cliente.nombre} · ${cliente.tipo_doc||'CC'}: ${cliente.documento}`;
+  } else {
+    // No encontrado
+    const setVal = (id, v) => { const e=document.getElementById(id); if(e) e.value=v||''; };
+    setVal(prefix+'Cliente',  '');
+    setVal(prefix+'Telefono', '');
+    setVal(prefix+'Correo',   '');
+    if(infoEl) {
+      infoEl.innerHTML = `⚠️ No encontrado — <button type="button" onclick="abrirModalNuevoClienteDesdeVenta('${prefijo}')" style="color:#6B2D8B;background:none;border:none;cursor:pointer;font-weight:600;font-size:11px;">+ Crear cliente con esta cédula</button>`;
+      infoEl.style.color = '#d97706';
+      infoEl.style.display = 'block';
+    }
+  }
+}
+
 function seleccionarClientePorId(id, prefijo) {
   const c = db.clientes.find(x => x.id === id);
   if(!c) return;
@@ -6466,9 +6483,11 @@ function seleccionarClienteVenta(c, prefijo) {
 }
 
 function limpiarClienteVenta(prefijo) {
-  const info  = document.getElementById(prefijo+'ClienteSelInfo');
+  const info   = document.getElementById(prefijo+'ClienteSelInfo');
   if(info) info.style.display='none';
-  const prefix= prefijo==='crd' ? 'crd' : 'vc';
+  const infoC  = document.getElementById(prefijo+'CedulaInfo');
+  if(infoC) infoC.style.display='none';
+  const prefix = prefijo==='crd' ? 'crd' : 'vc';
   ['Cliente','Cedula','Telefono','Correo'].forEach(f => {
     const e = document.getElementById(prefix+f); if(e) e.value='';
   });
@@ -6815,7 +6834,7 @@ async function guardarCredito(){
     total: precioFinal, inicial: ini,
     saldo: totalFinanciar, cuotas: quincenas, valorCuota,
     frecuencia: 'Quincenal', sede: sedeActual,
-    obs: prodAdicDesc ? 'Prod. adicional: '+prodAdicDesc+' ('+fmt(prodAdicVal)+')' : '',
+    obs: ($('crdObservaciones')?.value ? $('crdObservaciones').value + (prodAdicDesc?' | Prod. adicional: '+prodAdicDesc+' ('+fmt(prodAdicVal)+')':'') : (prodAdicDesc?'Prod. adicional: '+prodAdicDesc+' ('+fmt(prodAdicVal)+')':'')), 
     docCedFront:  getUrlArchivo('upCedFront'),
     docCedBack:   getUrlArchivo('upCedBack'),
     docFoto:      getUrlArchivo('upFotoEntrega'),
@@ -7030,10 +7049,10 @@ function verDetalleVenta(id) {
       <div style="font-size:12px;color:#888899;">Venta registrada el ${v.fecha || '—'}</div>
     </div>
     <div style="margin-bottom:4px;">
-      ${fila('IMEI / Serial', v.imei && v.imei.length>3 ? v.imei : '—', '#0066cc')}
+      ${fila('IMEI / Serial', (v.imei && v.imei.length>3 ? v.imei : (db.compras.find(c=>c.producto===v.equipo)?.imei1||'—')), '#0066cc')}
       ${fila('Cliente', v.cliente || '—')}
       ${fila('Cédula', v.cedula && v.cedula.length>2 ? v.cedula : '—')}
-      ${fila('Teléfono', v.telefono && v.telefono.length>2 ? v.telefono : '—')}
+      ${fila('Teléfono', v.telefono && v.telefono.length>2 ? v.telefono : (db.clientes.find(c=>c.documento===v.cedula)?.telefono||'—'))}
       ${fila('Asesor', v.asesor || '—')}
       ${fila('Financiera', v.financiera || '—')}
       ${fila('Tipo', v.tipo === 'contado' ? '💵 Contado' : '🤝 Crédito')}
@@ -8562,7 +8581,7 @@ function generarHTMLFactura(d) {
         <div style="font-size:14px;font-weight:600;">${d.asesor}</div>
         <div style="font-size:13px;color:#555;">Modalidad: ${d.tipo === 'credito' ? 'Crédito — '+d.financiera : 'Contado'}${d.esMixto?' (Pago Mixto)':''}</div>
         ${d.esMixto && d.valorFinanciero > 0 ? `<div style="font-size:12px;color:#888;margin-top:2px;">Financiera: ${fmt(d.valorFinanciero)} + Efectivo: ${fmt(d.valorEfectivo)}</div>` : ''}
-        ${d.tipo === 'credito' ? `<div style="font-size:13px;color:#555;">${d.cuotas} quincenas · Cuota: ${fmt(d.valorCuota)}</div>` : ''}
+        ${d.tipo === 'credito' ? `<div style="font-size:13px;color:#555;">${d.cuotas} quincenas</div>` : ''}
       </div>
     </div>
 
@@ -8595,8 +8614,7 @@ function generarHTMLFactura(d) {
           <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:#555;">Inicial:</span><span style="font-weight:600;color:#16a34a;">${fmt(d.inicial)}</span></div>
           <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:#555;">Saldo a financiar:</span><span style="font-weight:600;">${fmt(d.saldoFinanciar)}</span></div>
           ${d.intereses > 0 ? `<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:#555;">Intereses (${d.tasaInteres}% qnal):</span><span style="color:#d97706;">${fmt(d.intereses)}</span></div>` : ''}
-          <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:#555;">Cuota quincenal:</span><span style="font-weight:700;color:#6B2D8B;font-size:15px;">${fmt(d.valorCuota)}</span></div>
-          <div style="display:flex;justify-content:space-between;"><span style="color:#555;">Plazo:</span><span>${d.cuotas} quincenas</span></div>
+          <div style="display:flex;justify-content:space-between;"><span style="color:#555;">Plazo:</span><span style="font-weight:700;color:#6B2D8B;">${d.cuotas} quincenas</span></div>
         </div>` : ''}
       </div>
     </div>
