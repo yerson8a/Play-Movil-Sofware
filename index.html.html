@@ -557,6 +557,10 @@
       <span class="icon">🧮</span> Simulador
     </div>
     <div class="nav-section">Administración</div>
+    <div class="nav-item" onclick="showModule('tareas')" id="navTareas">
+      <span class="icon">📋</span> Tareas
+      <span id="tareasCountBadge" style="display:none;background:#E91E8C;color:#fff;border-radius:10px;font-size:10px;padding:1px 6px;margin-left:auto;font-weight:700;"></span>
+    </div>
     <div class="nav-item" onclick="showModule('contabilidad')">
       <span class="icon">📒</span> Contabilidad
     </div>
@@ -1381,6 +1385,54 @@
       </div>
     </div>
 
+    <!-- ==================== TAREAS ==================== -->
+    <div id="mod-tareas" class="module">
+      <div class="section-header">
+        <div>
+          <div class="section-title">📋 Tareas Pendientes</div>
+          <div class="section-sub">Ventas y gestiones agendadas para seguimiento</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="abrirModalNuevaTareaInit()">+ Nueva Tarea</button>
+      </div>
+
+      <!-- Stats -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px;">
+        <div class="stat-card pink">
+          <div class="stat-label">Pendientes</div>
+          <div class="stat-value pink" id="tareaPendientes">0</div>
+        </div>
+        <div class="stat-card orange">
+          <div class="stat-label">Por Vencer (hoy)</div>
+          <div class="stat-value orange" id="tareaHoy">0</div>
+        </div>
+        <div class="stat-card red" style="background:linear-gradient(135deg,#fee2e2,#fff);">
+          <div class="stat-label">Vencidas</div>
+          <div class="stat-value" style="color:#dc2626;" id="tareaVencidas">0</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-label">Completadas</div>
+          <div class="stat-value green" id="tareaCompletadas">0</div>
+        </div>
+      </div>
+
+      <!-- Filtros y tabs -->
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap;">
+        <div class="tabs" style="flex:1;">
+          <button class="tab active" onclick="switchTareasTab('pendiente',this)">⏳ Pendientes</button>
+          <button class="tab" onclick="switchTareasTab('en_proceso',this)">🔄 En Proceso</button>
+          <button class="tab" onclick="switchTareasTab('completada',this)">✅ Completadas</button>
+          <button class="tab" onclick="switchTareasTab('todas',this)">📋 Todas</button>
+        </div>
+        <div class="search-wrap" style="width:220px;">
+          <span class="search-icon">🔍</span>
+          <input type="text" class="form-control" id="searchTareas" placeholder="Buscar tarea..." oninput="filtrarTareas(this.value)">
+        </div>
+      </div>
+
+      <!-- Grid de tareas -->
+      <div id="tareasGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;"></div>
+    </div>
+
     <!-- ==================== SEDES ==================== -->
     <div id="mod-sedes" class="module">
       <div class="section-header">
@@ -1657,6 +1709,100 @@
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
       <button class="btn btn-ghost" onclick="closeModal('modalNuevoProveedor')">Cancelar</button>
       <button class="btn btn-primary" onclick="guardarProveedor()">💾 Guardar Proveedor</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Nueva Tarea -->
+<div class="modal-overlay" id="modalNuevaTarea">
+  <div class="modal" style="max-width:680px;">
+    <div class="modal-header">
+      <div class="modal-title">📋 Nueva Tarea Pendiente</div>
+      <button class="modal-close" onclick="closeModal('modalNuevaTarea')">✕</button>
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="flex:2;">
+        <label class="form-label">Título / Descripción *</label>
+        <input type="text" class="form-control" id="tareaTitulo" placeholder="Ej: Venta pendiente por confirmar crédito...">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Prioridad</label>
+        <select class="form-control" id="tareaPrioridad">
+          <option value="alta">🔴 Alta</option>
+          <option value="media" selected>🟡 Media</option>
+          <option value="baja">🟢 Baja</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Fecha límite * (mín. 2 días)</label>
+        <input type="date" class="form-control" id="tareaFechaLimite">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Asesor responsable</label>
+        <select class="form-control" id="tareaAsesor"></select>
+      </div>
+    </div>
+    <div style="border-top:1px solid #f0ecf8;margin:12px 0 10px;padding-top:10px;">
+      <div style="font-size:12px;font-weight:600;color:#6B2D8B;margin-bottom:10px;">📦 Datos del Equipo / Venta (opcionales)</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Cliente</label>
+          <input type="text" class="form-control" id="tareaCliente" placeholder="Nombre del cliente">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Cédula / Doc. cliente</label>
+          <input type="text" class="form-control" id="tareaCedula" placeholder="No. documento">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Equipo</label>
+          <input type="text" class="form-control" id="tareaEquipo" placeholder="Modelo del equipo">
+        </div>
+        <div class="form-group">
+          <label class="form-label">IMEI</label>
+          <input type="text" class="form-control" id="tareaIMEI" placeholder="IMEI del equipo" oninput="limpiarIMEI(this)" maxlength="15" inputmode="numeric">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Proveedor</label>
+          <input type="text" class="form-control" id="tareaProveedor" placeholder="Nombre del proveedor">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Valor de Compra</label>
+          <div class="input-money-wrap"><input type="text" class="form-control" id="tareaValor" placeholder="0" oninput="fmtMoneyInput(this)" inputmode="numeric"></div>
+        </div>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Notas adicionales</label>
+      <textarea class="form-control" id="tareaNotas" rows="2" placeholder="Cualquier información relevante para esta tarea..."></textarea>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+      <button class="btn btn-ghost" onclick="closeModal('modalNuevaTarea')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarTarea()">💾 Crear Tarea</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Ver/Editar Tarea -->
+<div class="modal-overlay" id="modalDetalleTarea">
+  <div class="modal" style="max-width:540px;">
+    <div class="modal-header">
+      <div class="modal-title" id="detalleTareaTitulo">📋 Detalle de Tarea</div>
+      <button class="modal-close" onclick="closeModal('modalDetalleTarea')">✕</button>
+    </div>
+    <div id="detalleTareaContenido"></div>
+    <div style="display:flex;gap:8px;justify-content:space-between;margin-top:16px;">
+      <button class="btn btn-ghost btn-sm" style="color:#dc2626;" onclick="eliminarTareaActual()">🗑️ Eliminar</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-ghost" onclick="closeModal('modalDetalleTarea')">Cerrar</button>
+        <button class="btn btn-primary btn-sm" id="btnCompletarTarea" onclick="cambiarEstadoTareaActual('completada')">✅ Completar</button>
+        <button class="btn btn-outline btn-sm" id="btnProcesoTarea" onclick="cambiarEstadoTareaActual('en_proceso')">🔄 En Proceso</button>
+      </div>
     </div>
   </div>
 </div>
@@ -3303,6 +3449,9 @@
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;" class="perm-label"><input type="checkbox" name="permiso" value="usuarios" style="width:15px;height:15px;accent-color:#6B2D8B;"> 👤 Usuarios</label>
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;" class="perm-label"><input type="checkbox" name="permiso" value="financieras" style="width:15px;height:15px;accent-color:#6B2D8B;"> 🏦 Financieras</label>
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;" class="perm-label"><input type="checkbox" name="permiso" value="cajas" style="width:15px;height:15px;accent-color:#6B2D8B;"> 💵 Cajas</label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;" class="perm-label"><input type="checkbox" name="permiso" value="clientes" style="width:15px;height:15px;accent-color:#6B2D8B;"> 👥 Clientes</label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;" class="perm-label"><input type="checkbox" name="permiso" value="proveedores" style="width:15px;height:15px;accent-color:#6B2D8B;"> 🏭 Proveedores</label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;" class="perm-label"><input type="checkbox" name="permiso" value="productos" style="width:15px;height:15px;accent-color:#6B2D8B;"> 📦 Productos</label>
       </div>
       <div style="font-size:11px;color:#888899;margin-top:6px;">Sin selección = acceso completo según su rol.</div>
     </div>
@@ -3941,6 +4090,7 @@ const db = {
   inventario: [],
   ventas: [],
   clientes: [],
+  tareas: [],
   creditos: [],
   gastos: [],
   garantias: [],
@@ -4562,7 +4712,7 @@ function aplicarPermisosNavegacion(user) {
 
 function aplicarPermisosRol(rol) {
   const porRol = {
-    asesor:   ['dashboard','inventario','ventas','creditos','simulador','garantias','servicio'],
+    asesor:   ['dashboard','clientes','inventario','ventas','creditos','simulador','garantias','servicio'],
     bodega:   ['dashboard','inventario','compras','garantias'],
     consulta: ['dashboard','inventario','ventas','creditos'],
   };
@@ -4598,7 +4748,7 @@ function onCambioRolUsuario(rol) {
       cb.disabled = false;
       // Permisos por defecto según rol
       const porRol = {
-        asesor:   ['dashboard','inventario','ventas','creditos','simulador','garantias','servicio'],
+        asesor:   ['dashboard','clientes','inventario','ventas','creditos','simulador','garantias','servicio'],
         bodega:   ['dashboard','inventario','compras','garantias','servicio'],
         consulta: ['dashboard','inventario','ventas','creditos'],
       };
@@ -4667,6 +4817,7 @@ function showModule(name) {
   else if(name==='creditos') renderCreditos();
   else if(name==='contabilidad') renderContabilidad();
   else if(name==='compras') { renderCompras(); renderTablaProveedores(db.proveedores); poblarSelectProveedores(); }
+  else if(name==='tareas') { renderTareas(); }
   else if(name==='clientes') { cargarClientes(); }
   else if(name==='proveedores') { renderProveedoresMod(); }
   else if(name==='productos') { renderProductosMod(); }
@@ -5831,6 +5982,250 @@ async function agregarEquipo(){
 }
 
 // ============================================================
+// MÓDULO TAREAS PENDIENTES (independiente - no afecta datos)
+// ============================================================
+const TAREAS_KEY = 'pm_tareas_v1';
+
+function cargarTareasLocal() {
+  try { return JSON.parse(localStorage.getItem(TAREAS_KEY) || '[]'); } catch(e){ return []; }
+}
+function guardarTareasLocal(tareas) {
+  try { localStorage.setItem(TAREAS_KEY, JSON.stringify(tareas)); } catch(e){}
+}
+
+let tareaSeleccionadaId = null;
+let tabTareasActual = 'pendiente';
+
+function abrirModalNuevaTareaInit() {
+  // Limpiar campos
+  ['tareaTitulo','tareaCliente','tareaCedula','tareaEquipo','tareaIMEI',
+   'tareaProveedor','tareaNotas'].forEach(id=>{ const e=document.getElementById(id); if(e) e.value=''; });
+  const tv = document.getElementById('tareaValor'); if(tv) tv.value='';
+  // Fecha mínima = hoy + 2 días
+  const min = new Date(new Date().getTime() + 2*24*60*60*1000);
+  const fl  = document.getElementById('tareaFechaLimite');
+  if(fl) {
+    const y=min.getFullYear(), m=String(min.getMonth()+1).padStart(2,'0'), d=String(min.getDate()).padStart(2,'0');
+    fl.min = `${y}-${m}-${d}`;
+    fl.value= `${y}-${m}-${d}`;
+  }
+  // Poblar asesores
+  const sel = document.getElementById('tareaAsesor');
+  if(sel) {
+    sel.innerHTML = '<option value="">Sin asignar</option>' +
+      ASESORES_ACTIVOS.filter(a=>a.activo).map(a=>`<option value="${a.nombre}">${a.nombre}</option>`).join('');
+    if(sesionActiva) sel.value = sesionActiva.nombre.toUpperCase();
+  }
+  openModal('modalNuevaTarea');
+}
+
+// Sobrescribir el onclick del botón
+document.addEventListener('DOMContentLoaded', () => {
+  const btn = document.querySelector('[onclick="openModal('modalNuevaTarea')"]');
+  if(btn) btn.setAttribute('onclick','abrirModalNuevaTareaInit()');
+});
+
+function guardarTarea() {
+  const titulo = document.getElementById('tareaTitulo')?.value?.trim();
+  const fecha  = document.getElementById('tareaFechaLimite')?.value;
+  if(!titulo) { toast('El título es obligatorio','error'); return; }
+  if(!fecha)  { toast('La fecha límite es obligatoria','error'); return; }
+
+  // Validar mínimo 2 días
+  const hoy  = new Date(fechaColombia());
+  const lim  = new Date(fecha);
+  const diff = (lim - hoy) / (1000*60*60*24);
+  if(diff < 2) { toast('La fecha límite debe ser mínimo 2 días desde hoy','error'); return; }
+
+  const tareas = cargarTareasLocal();
+  const nueva = {
+    id:         Date.now(),
+    titulo,
+    prioridad:  document.getElementById('tareaPrioridad')?.value||'media',
+    fechaLimite:fecha,
+    fechaCreacion: fechaColombia(),
+    asesor:     document.getElementById('tareaAsesor')?.value||'',
+    cliente:    document.getElementById('tareaCliente')?.value||'',
+    cedula:     document.getElementById('tareaCedula')?.value||'',
+    equipo:     document.getElementById('tareaEquipo')?.value||'',
+    imei:       document.getElementById('tareaIMEI')?.value||'',
+    proveedor:  document.getElementById('tareaProveedor')?.value||'',
+    valor:      getMoneyValue('tareaValor'),
+    notas:      document.getElementById('tareaNotas')?.value||'',
+    estado:     'pendiente',
+    creadoPor:  sesionActiva?.nombre||''
+  };
+  tareas.unshift(nueva);
+  guardarTareasLocal(tareas);
+  db.tareas = tareas;
+  closeModal('modalNuevaTarea');
+  renderTareas();
+  actualizarBadgeTareas();
+  toast('Tarea creada ✅');
+}
+
+function renderTareas(data) {
+  const hoy = fechaColombia();
+  const todas = data || cargarTareasLocal();
+  db.tareas = todas;
+
+  // Stats
+  const pendientes   = todas.filter(t=>t.estado==='pendiente'||t.estado==='en_proceso');
+  const hoyVence     = pendientes.filter(t=>t.fechaLimite===hoy).length;
+  const vencidas     = pendientes.filter(t=>t.fechaLimite<hoy).length;
+  const completadas  = todas.filter(t=>t.estado==='completada').length;
+  const setEl = (id,v) => { const e=document.getElementById(id); if(e) e.textContent=v; };
+  setEl('tareaPendientes', pendientes.length);
+  setEl('tareaHoy',        hoyVence);
+  setEl('tareaVencidas',   vencidas);
+  setEl('tareaCompletadas',completadas);
+
+  // Filtrar por tab
+  let filtradas = todas;
+  if(tabTareasActual==='pendiente')   filtradas=todas.filter(t=>t.estado==='pendiente');
+  else if(tabTareasActual==='en_proceso') filtradas=todas.filter(t=>t.estado==='en_proceso');
+  else if(tabTareasActual==='completada') filtradas=todas.filter(t=>t.estado==='completada');
+
+  // Aplicar búsqueda
+  const q = (document.getElementById('searchTareas')?.value||'').toLowerCase();
+  if(q) filtradas = filtradas.filter(t=>
+    (t.titulo||'').toLowerCase().includes(q)||
+    (t.cliente||'').toLowerCase().includes(q)||
+    (t.equipo||'').toLowerCase().includes(q)||
+    (t.asesor||'').toLowerCase().includes(q)
+  );
+
+  const grid = document.getElementById('tareasGrid');
+  if(!grid) return;
+
+  if(!filtradas.length) {
+    grid.innerHTML=`<div class="card" style="grid-column:1/-1;text-align:center;padding:40px;color:#888899;">
+      <div style="font-size:36px;margin-bottom:12px;">📋</div>
+      <div>Sin tareas en esta categoría</div>
+    </div>`;
+    return;
+  }
+
+  const prioColor = {alta:'#dc2626',media:'#d97706',baja:'#16a34a'};
+  const prioIcon  = {alta:'🔴',media:'🟡',baja:'🟢'};
+  const estadoColor= {pendiente:'badge-pink',en_proceso:'badge-orange',completada:'badge-green'};
+  const estadoLabel= {pendiente:'Pendiente',en_proceso:'En Proceso',completada:'Completada'};
+
+  grid.innerHTML = filtradas.map(t => {
+    const esVencida = t.fechaLimite < hoy && t.estado !== 'completada';
+    const esHoy     = t.fechaLimite === hoy && t.estado !== 'completada';
+    const diasRestantes = Math.ceil((new Date(t.fechaLimite) - new Date(hoy)) / (1000*60*60*24));
+    let diasLabel = '';
+    if(t.estado!=='completada') {
+      if(esVencida)    diasLabel = `<span style="color:#dc2626;font-weight:700;font-size:11px;">⚠️ Vencida hace ${Math.abs(diasRestantes)} día(s)</span>`;
+      else if(esHoy)   diasLabel = `<span style="color:#d97706;font-weight:700;font-size:11px;">⏰ Vence HOY</span>`;
+      else             diasLabel = `<span style="font-size:11px;color:#888899;">${diasRestantes} día(s) restantes</span>`;
+    }
+    return `
+    <div class="card" style="border-left:4px solid ${prioColor[t.prioridad]||'#6B2D8B'};${esVencida?'background:#fff5f5;':''}cursor:pointer;" onclick="verDetalleTarea(${t.id})">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+        <span style="font-size:11px;">${prioIcon[t.prioridad]||''} <span style="color:${prioColor[t.prioridad]};font-weight:600;text-transform:uppercase;">${t.prioridad}</span></span>
+        <span class="badge ${estadoColor[t.estado]||'badge-blue'}" style="font-size:10px;">${estadoLabel[t.estado]||t.estado}</span>
+      </div>
+      <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:14px;margin-bottom:6px;line-height:1.3;">${t.titulo}</div>
+      ${t.cliente?`<div style="font-size:12px;color:#555577;">👤 ${t.cliente}${t.cedula?' · '+t.cedula:''}</div>`:''}
+      ${t.equipo?`<div style="font-size:12px;color:#555577;">📱 ${t.equipo}${t.imei?' · '+t.imei:''}</div>`:''}
+      ${t.valor>0?`<div style="font-size:12px;color:#6B2D8B;font-weight:600;">💰 ${fmt(t.valor)}</div>`:''}
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:8px;border-top:1px solid #f0ecf8;">
+        <div>${diasLabel}</div>
+        <div style="font-size:11px;color:#888899;">📅 ${t.fechaLimite}</div>
+      </div>
+      ${t.asesor?`<div style="font-size:11px;color:#888899;margin-top:4px;">👤 ${t.asesor}</div>`:''}
+    </div>`;
+  }).join('');
+
+  actualizarBadgeTareas();
+}
+
+function switchTareasTab(tab, el) {
+  document.querySelectorAll('#mod-tareas .tab').forEach(t=>t.classList.remove('active'));
+  if(el) el.classList.add('active');
+  tabTareasActual = tab;
+  renderTareas();
+}
+
+function filtrarTareas(q) { renderTareas(); }
+
+function verDetalleTarea(id) {
+  const t = cargarTareasLocal().find(x=>x.id===id);
+  if(!t) return;
+  tareaSeleccionadaId = id;
+  const hoy = fechaColombia();
+  const esVencida = t.fechaLimite < hoy && t.estado !== 'completada';
+  const fila = (label, valor) => valor ? `
+    <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0ecf8;">
+      <span style="font-size:12px;color:#888899;">${label}</span>
+      <strong style="font-size:13px;text-align:right;">${valor}</strong>
+    </div>` : '';
+  const prioColor={alta:'#dc2626',media:'#d97706',baja:'#16a34a'};
+  document.getElementById('detalleTareaTitulo').textContent = '📋 '+t.titulo;
+  document.getElementById('detalleTareaContenido').innerHTML = `
+    <div style="background:${esVencida?'#fee2e2':'#f7f5fb'};border-radius:10px;padding:12px;margin-bottom:12px;display:flex;gap:12px;flex-wrap:wrap;">
+      <div><span style="font-size:11px;color:#888899;">ESTADO</span><br><span class="badge ${t.estado==='completada'?'badge-green':t.estado==='en_proceso'?'badge-orange':'badge-pink'}">${t.estado}</span></div>
+      <div><span style="font-size:11px;color:#888899;">PRIORIDAD</span><br><strong style="color:${prioColor[t.prioridad]};">${t.prioridad.toUpperCase()}</strong></div>
+      <div><span style="font-size:11px;color:#888899;">FECHA LÍMITE</span><br><strong style="color:${esVencida?'#dc2626':'#111'};">${t.fechaLimite}</strong></div>
+      <div><span style="font-size:11px;color:#888899;">CREADA</span><br><strong>${t.fechaCreacion}</strong></div>
+    </div>
+    ${fila('👤 Cliente', t.cliente)}
+    ${fila('🪪 Cédula', t.cedula)}
+    ${fila('📱 Equipo', t.equipo)}
+    ${fila('📡 IMEI', t.imei)}
+    ${fila('🏭 Proveedor', t.proveedor)}
+    ${t.valor>0?fila('💰 Valor compra', fmt(t.valor)):''}
+    ${fila('👤 Asesor responsable', t.asesor)}
+    ${fila('✍️ Creado por', t.creadoPor)}
+    ${t.notas?`<div style="background:#fff7ed;border-radius:8px;padding:10px;margin-top:10px;"><div style="font-size:11px;color:#d97706;font-weight:600;margin-bottom:4px;">📝 NOTAS</div><div style="font-size:13px;">${t.notas}</div></div>`:''}
+  `;
+  const btnC = document.getElementById('btnCompletarTarea');
+  const btnP = document.getElementById('btnProcesoTarea');
+  if(btnC) btnC.style.display = t.estado==='completada' ? 'none' : '';
+  if(btnP) btnP.style.display = t.estado==='en_proceso' ? 'none' : (t.estado==='completada'?'none':'');
+  openModal('modalDetalleTarea');
+}
+
+function cambiarEstadoTareaActual(nuevoEstado) {
+  const tareas = cargarTareasLocal();
+  const t = tareas.find(x=>x.id===tareaSeleccionadaId);
+  if(!t) return;
+  t.estado = nuevoEstado;
+  guardarTareasLocal(tareas);
+  closeModal('modalDetalleTarea');
+  renderTareas();
+  toast(nuevoEstado==='completada'?'Tarea completada ✅':'Tarea en proceso 🔄');
+}
+
+function eliminarTareaActual() {
+  if(!confirm('¿Eliminar esta tarea? Esta acción no se puede deshacer.')) return;
+  const tareas = cargarTareasLocal().filter(t=>t.id!==tareaSeleccionadaId);
+  guardarTareasLocal(tareas);
+  closeModal('modalDetalleTarea');
+  renderTareas();
+  toast('Tarea eliminada');
+}
+
+function actualizarBadgeTareas() {
+  const hoy = fechaColombia();
+  const tareas = cargarTareasLocal();
+  const urgentes = tareas.filter(t =>
+    (t.estado==='pendiente'||t.estado==='en_proceso') &&
+    t.fechaLimite <= hoy
+  ).length;
+  const badge = document.getElementById('tareasCountBadge');
+  if(badge) {
+    badge.textContent = urgentes;
+    badge.style.display = urgentes > 0 ? 'inline' : 'none';
+  }
+}
+
+// Actualizar badge al cargar
+window.addEventListener('load', () => setTimeout(actualizarBadgeTareas, 1500));
+
+// ============================================================
 // MÓDULO CLIENTES
 // ============================================================
 async function cargarClientes() {
@@ -6030,7 +6425,7 @@ function buscarClienteVenta(q, prefijo) {
   }
 
   dd.innerHTML = resultados.map(c => `
-    <div onclick="seleccionarClienteVenta(${JSON.stringify(c).replace(/"/g,"'")}, '${prefijo}')"
+    <div onclick="seleccionarClientePorId(${c.id}, '${prefijo}')"
          style="padding:10px 14px;cursor:pointer;border-bottom:1px solid #f7f5fb;font-size:13px;"
          onmouseover="this.style.background='#f7f5fb'" onmouseout="this.style.background=''">
       <div style="font-weight:600;">${c.nombre}</div>
@@ -6040,6 +6435,12 @@ function buscarClienteVenta(q, prefijo) {
       <button type="button" onclick="abrirModalNuevoClienteDesdeVenta('${prefijo}')" style="color:#6B2D8B;background:none;border:none;cursor:pointer;font-size:12px;font-weight:600;">+ Crear nuevo cliente</button>
     </div>`;
   dd.style.display='block';
+}
+
+function seleccionarClientePorId(id, prefijo) {
+  const c = db.clientes.find(x => x.id === id);
+  if(!c) return;
+  seleccionarClienteVenta(c, prefijo);
 }
 
 function seleccionarClienteVenta(c, prefijo) {
