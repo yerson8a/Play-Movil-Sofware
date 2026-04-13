@@ -2066,7 +2066,7 @@
           <div class="card-title" style="font-size:13px;margin-bottom:10px;">📡 Identificación</div>
           <div class="form-group">
             <label class="form-label">IMEI 1 *</label>
-            <input type="text" class="form-control" id="prodIMEI1" placeholder="IMEI principal (15 dígitos)" maxlength="20" oninput="validarIMEIProd()">
+            <input type="text" class="form-control" id="prodIMEI1" placeholder="IMEI principal (15 dígitos)" maxlength="15" oninput="limpiarIMEI(this);validarIMEIProd()" inputmode="numeric">
             <div id="prodIMEI1Error" style="font-size:11px;color:#dc2626;margin-top:3px;display:none;">⚠️ Este IMEI ya está registrado</div>
           </div>
           <div class="form-row">
@@ -2250,7 +2250,7 @@
       </div>
       <div class="form-group">
         <label class="form-label">IMEI</label>
-        <input type="text" class="form-control" id="invIMEI" placeholder="000000000000000">
+        <input type="text" class="form-control" id="invIMEI" placeholder="000000000000000" oninput="limpiarIMEI(this)" maxlength="15" inputmode="numeric">
       </div>
     </div>
     <div class="form-row">
@@ -2284,7 +2284,7 @@
       <div class="card-title" style="font-size:13px;margin-bottom:10px;">📡 Buscar Producto por IMEI / Serial</div>
       <div class="search-wrap">
         <span class="search-icon">📡</span>
-        <input type="text" class="form-control" id="crdIMEIBusca" placeholder="Escribe o escanea el IMEI para cargar datos automáticamente..." oninput="buscarIMEICredito(this.value)" style="padding-left:40px;">
+        <input type="text" class="form-control" id="crdIMEIBusca" placeholder="Escribe o escanea el IMEI (15 dígitos)..." oninput="limpiarIMEI(this);buscarIMEICredito(this.value)" maxlength="15" style="padding-left:40px;" inputmode="numeric">
       </div>
       <div id="crdIMEIInfo" style="margin-top:10px;display:none;">
         <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px;display:flex;gap:20px;flex-wrap:wrap;font-size:13px;">
@@ -2734,7 +2734,7 @@
       <div class="card-title" style="font-size:13px;margin-bottom:10px;">📡 Buscar Producto por IMEI / Serial</div>
       <div class="search-wrap">
         <span class="search-icon">📡</span>
-        <input type="text" class="form-control" id="vcIMEIBusca" placeholder="Escribe o escanea el IMEI / Serial para cargar datos automáticamente..." oninput="buscarIMEIVenta(this.value)" style="padding-left:40px;">
+        <input type="text" class="form-control" id="vcIMEIBusca" placeholder="Escribe o escanea el IMEI (15 dígitos)..." oninput="limpiarIMEI(this);buscarIMEIVenta(this.value)" maxlength="15" style="padding-left:40px;" inputmode="numeric">
       </div>
       <div id="vcIMEIInfo" style="margin-top:10px;display:none;">
         <div style="background:rgba(0,230,118,0.08);border:1px solid rgba(0,230,118,0.2);border-radius:10px;padding:12px;display:flex;gap:20px;flex-wrap:wrap;font-size:13px;">
@@ -2757,7 +2757,7 @@
         </div>
         <div class="form-group">
           <label class="form-label">IMEI Principal</label>
-          <input type="text" class="form-control" id="vcIMEI" placeholder="IMEI">
+          <input type="text" class="form-control" id="vcIMEI" placeholder="IMEI (15 dígitos)" oninput="limpiarIMEI(this)" maxlength="15" inputmode="numeric">
         </div>
       </div>
       <div class="form-row">
@@ -5903,7 +5903,8 @@ async function guardarVentaContado(){
     productoId:comp?comp.id:null
   };
   // Validar que el equipo esté disponible antes de guardar
-  const imeiVC = $('vcIMEI')?.value||'';
+  const imeiVC = ($('vcIMEI')?.value||'').replace(/[^0-9]/g,'');
+  if(imeiVC && imeiVC.length !== 15) { toast('El IMEI debe tener exactamente 15 dígitos','error'); return; }
   const equipoVC = $('vcEquipo')?.value||'';
   const disponibleVC = await validarDisponibilidadProducto(imeiVC, equipoVC);
   if(!disponibleVC) return;
@@ -5956,7 +5957,8 @@ async function guardarCredito(){
   if(!$('crdEquipo')?.value?.trim()){ toast('El equipo es obligatorio','error'); return; }
 
   // Validar que el equipo esté disponible (no vendido ni duplicado)
-  const imeiCrd = document.getElementById('crdIMEI')?.value||'';
+  const imeiCrd = (document.getElementById('crdIMEIBusca')?.value || document.getElementById('crdIMEI')?.value||'').replace(/[^0-9]/g,'');
+  if(imeiCrd && imeiCrd.length !== 15) { toast('El IMEI debe tener exactamente 15 dígitos','error'); return; }
   const equipoCrd = document.getElementById('crdEquipo')?.value||'';
   const disponibleCrd = await validarDisponibilidadProducto(imeiCrd, equipoCrd);
   if(!disponibleCrd) return;
@@ -7454,20 +7456,8 @@ async function validarDisponibilidadProducto(imei, nombreEquipo) {
     }
   }
 
-  // Verificar también si ya hay una venta activa con ese mismo equipo/nombre
-  if(nombreEquipo && nombreEquipo.length > 3) {
-    const creditoActivo = db.creditos.find(c =>
-      (c.equipo||'').toLowerCase() === nombreEquipo.toLowerCase() &&
-      (c.estado === 'al_dia' || c.estado === 'mora')
-    );
-    if(creditoActivo) {
-      mostrarErrorVenta(
-        '⚠️ Venta duplicada',
-        `Ya existe un crédito activo para el equipo <strong>${nombreEquipo}</strong> a nombre de <strong>${creditoActivo.cliente}</strong>. No se puede vender el mismo equipo dos veces.`
-      );
-      return false;
-    }
-  }
+  // Nota: NO se bloquea por nombre de cliente ni equipo — mismo cliente puede recomprar
+  // Solo se bloquea si el IMEI ya está registrado como VENDIDO en inventario (arriba)
 
   return true; // Todo OK
 }
@@ -7484,6 +7474,32 @@ function mostrarErrorVenta(titulo, mensaje) {
       <button onclick="this.closest('div[style*=fixed]').remove()" style="background:#6B2D8B;color:#fff;border:none;border-radius:10px;padding:12px 32px;font-size:14px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;">Entendido</button>
     </div>`;
   document.body.appendChild(overlay);
+}
+
+// ============================================================
+// VALIDACIÓN Y LIMPIEZA DE IMEI
+// ============================================================
+function limpiarIMEI(el) {
+  // Quitar espacios y caracteres no numéricos
+  el.value = el.value.replace(/[^0-9]/g, '');
+}
+
+function validarCampoIMEI(el, requerido = true) {
+  const val = el.value.replace(/[^0-9]/g, '');
+  el.value = val; // quitar espacios automáticamente
+  if(!val && !requerido) return true;
+  if(!val && requerido) {
+    el.style.borderColor = '#dc2626';
+    return false;
+  }
+  if(val.length !== 15) {
+    el.style.borderColor = '#dc2626';
+    el.title = 'El IMEI debe tener exactamente 15 dígitos';
+    return false;
+  }
+  el.style.borderColor = '#16a34a';
+  el.title = '';
+  return true;
 }
 
 // ============================================================
