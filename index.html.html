@@ -6530,14 +6530,18 @@ function seleccionarClienteVenta(c, prefijo) {
 }
 
 function limpiarClienteVenta(prefijo) {
-  const info   = document.getElementById(prefijo+'ClienteSelInfo');
+  const info    = document.getElementById(prefijo+'ClienteSelInfo');
+  const detalle = document.getElementById(prefijo+'ClienteSelDetalle');
+  const nom     = document.getElementById(prefijo+'ClienteSelNombre');
   if(info) info.style.display='none';
+  if(detalle) detalle.textContent='';
+  if(nom) nom.textContent='';
   const prefix = prefijo==='crd' ? 'crd' : 'vc';
   ['Cliente','Cedula','Telefono','Correo'].forEach(f => {
     const e = document.getElementById(prefix+f); if(e) e.value='';
   });
   const busca = document.getElementById(prefijo+'ClienteBusca');
-  if(busca) { busca.value=''; busca.focus(); }
+  if(busca) busca.value='';
   const dd = document.getElementById(prefijo+'ClienteDropdown');
   if(dd) dd.style.display='none';
 }
@@ -7283,6 +7287,10 @@ function abrirModalCredito() {
     if(elAsesor)  { elAsesor.style.display = ''; elAsesor.value = sesionActiva?.nombre?.toUpperCase()||''; }
     if(selAsesor) selAsesor.style.display = 'none';
   }
+  // Recargar clientes si están vacíos
+  if(!db.clientes || db.clientes.length === 0) cargarClientes();
+  // Limpiar buscador cliente
+  limpiarClienteVenta('crd');
   openModal('modalNuevoCredito');
 }
 
@@ -7320,6 +7328,10 @@ function abrirModalContado() {
     if(elAsesorVC)  { elAsesorVC.style.display = ''; elAsesorVC.value = sesionActiva?.nombre?.toUpperCase()||''; }
     if(selAsesorVC) selAsesorVC.style.display = 'none';
   }
+  // Recargar clientes si están vacíos
+  if(!db.clientes || db.clientes.length === 0) cargarClientes();
+  // Limpiar buscador cliente
+  limpiarClienteVenta('vc');
   openModal('modalVentaContado');
 }
 
@@ -9894,6 +9906,7 @@ async function activarSesion(user) {
   cargarFinancieras().then(() => poblarSelectFinancieras());
   cargarSedes().then(() => poblarSelectSedes());
   cargarAsesoresActivos();
+  cargarClientes(); // Necesario para búsqueda en modales de venta
 
   toast(`Bienvenido, ${user.nombre} 👋`);
 }
