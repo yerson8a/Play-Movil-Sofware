@@ -4022,7 +4022,7 @@ async function guardarCompraDB(datos) {
       garantia_meses: datos.garantiaMeses,
       estado: 'DISPONIBLE',
       observaciones: datos.obs,
-      fecha_compra: datos.fecha || new Date().toISOString().split('T')[0]
+      fecha_compra: datos.fecha || fechaColombia()
     };
     const res = await sbFetch('productos', { method: 'POST', body: row });
     const nuevo = res[0];
@@ -4059,7 +4059,7 @@ async function guardarVentaDB(datos) {
       comision_asesor: datos.comisionAsesor || 0,
       sede_id: sedeId,
       observaciones: datos.obs || null,
-      fecha_venta: new Date().toISOString().split('T')[0]
+      fecha_venta: fechaColombia()
     };
     const res = await sbFetch('ventas', { method: 'POST', body: row });
     const nueva = mapVenta(res[0]);
@@ -4104,7 +4104,7 @@ async function guardarCreditoDB(datos) {
       cuotas_pagadas: 0,
       valor_cuota: datos.valorCuota || null,
       frecuencia: datos.frecuencia || 'Mensual',
-      fecha_inicio: new Date().toISOString().split('T')[0],
+      fecha_inicio: fechaColombia(),
       estado: 'al_dia',
       sede_id: sedeId,
       observaciones: datos.obs || null,
@@ -4140,7 +4140,7 @@ async function registrarAbonoDB(creditoId, valor, metodo = 'Efectivo') {
         credito_id: creditoId,
         valor: valor,
         metodo_pago: metodo,
-        fecha_abono: new Date().toISOString().split('T')[0]
+        fecha_abono: fechaColombia()
       }
     });
 
@@ -4180,7 +4180,7 @@ async function guardarGarantiaDB(datos) {
       falla_reportada: datos.detalle,
       tecnico: datos.tecnico,
       estado: 'recibido',
-      fecha_ingreso: new Date().toISOString().split('T')[0],
+      fecha_ingreso: fechaColombia(),
       sede_id: 1
     };
     const res = await sbFetch('garantias', { method: 'POST', body: row });
@@ -4205,7 +4205,7 @@ async function guardarGastoDB(datos) {
       valor: datos.valor,
       metodo_pago: 'Efectivo',
       sede_id: 1,
-      fecha_gasto: new Date().toISOString().split('T')[0]
+      fecha_gasto: fechaColombia()
     };
     const res = await sbFetch('gastos', { method: 'POST', body: row });
     const nuevo = mapGasto(res[0]);
@@ -4298,7 +4298,7 @@ function setNominasMes(mes, data) {
   try { sessionStorage.setItem('nominas_' + mes, JSON.stringify(data)); } catch(e){}
 }
 // Compatibilidad hacia atrás
-const gastosFijosData = getGastosFijosMes(new Date().toISOString().slice(0,7));
+const gastosFijosData = getGastosFijosMes(mesColombia());
 
 // ============================================================
 // UTILIDADES
@@ -5063,7 +5063,7 @@ function switchContabTab(tab,el){
 }
 
 function renderAsesores(){
-  const mesActual = new Date().toISOString().slice(0,7);
+  const mesActual = mesColombia();
   const ventasValidas = db.ventas.filter(v => !v.anulada);
   const ventasMes     = ventasValidas.filter(v => v.fecha && v.fecha.startsWith(mesActual));
   const emojis = ['🧑‍💼','👨‍💼','👩‍💼','🧑‍💼','👨‍💼','👩‍💼','🧑‍💼','👨‍💼'];
@@ -5596,7 +5596,7 @@ async function guardarCompra(){
   if(!provId){toast('Selecciona un proveedor','error');return;}
   const datos={
     tipo:tipoProductoSeleccionado,
-    fecha:document.getElementById('cmpFecha').value||new Date().toISOString().split('T')[0],
+    fecha:document.getElementById('cmpFecha').value||fechaColombia(),
     producto:document.getElementById('cmpProducto').value||'Sin nombre',
     marca:document.getElementById('cmpMarca').value||'',
     modelo:document.getElementById('cmpModelo').value||'',
@@ -5689,7 +5689,7 @@ function abrirModalProducto() {
 
   // Fecha de hoy por defecto
   const fechaEl = document.getElementById('prodFechaCompra');
-  if(fechaEl) fechaEl.value = new Date().toISOString().split('T')[0];
+  if(fechaEl) fechaEl.value = fechaColombia();
 
   openModal('modalNuevoProducto');
 }
@@ -5734,7 +5734,7 @@ async function guardarProductoNuevo() {
     obs:           document.getElementById('prodObs')?.value||'',
     proveedorId:   provId,
     cantidad:      1,
-    fecha:         document.getElementById('prodFechaCompra')?.value||new Date().toISOString().split('T')[0],
+    fecha:         document.getElementById('prodFechaCompra')?.value||fechaColombia(),
     fotoUrl:       getUrlArchivo('upProductoFoto')||null
   };
 
@@ -6009,7 +6009,7 @@ async function guardarCredito(){
       saldoFinanciar:totalFinanciar, cuotas:quincenas,
       valorCuota, financiera:finSel,
       intereses:totalIntereses, tasaInteres:aplicaInt?tasaInt:0,
-      fecha:new Date().toLocaleDateString('es-CO'),
+      fecha:new Date().toLocaleDateString('es-CO',{timeZone:'America/Bogota'}),
       numero:'PM-'+Date.now().toString().slice(-6)
     };
 
@@ -6076,7 +6076,7 @@ async function confirmarAbono() {
       transf,
       obs,
       nroCuota,
-      fecha:     new Date().toLocaleDateString('es-CO',{year:'numeric',month:'long',day:'numeric'}),
+      fecha:     new Date().toLocaleDateString('es-CO',{timeZone:'America/Bogota',year:'numeric',month:'long',day:'numeric'}),
       saldoAntes: credito.saldo,
       saldoDespues: Math.max(0, credito.saldo - valor),
       numero:    'REC-'+Date.now().toString().slice(-6)
@@ -7080,7 +7080,7 @@ function previsualizarFactura() {
     saldoFinanciar:totalFin, cuotas:quincenas,
     valorCuota, financiera:finSel,
     intereses:totalInt, tasaInteres:aplicaInt?tasaInt:0,
-    fecha:new Date().toLocaleDateString('es-CO'),
+    fecha:new Date().toLocaleDateString('es-CO',{timeZone:'America/Bogota'}),
     numero:'PREVIA-'+Date.now().toString().slice(-4)
   };
   mostrarFactura(datosPreview, false);
@@ -7474,6 +7474,28 @@ function mostrarErrorVenta(titulo, mensaje) {
       <button onclick="this.closest('div[style*=fixed]').remove()" style="background:#6B2D8B;color:#fff;border:none;border-radius:10px;padding:12px 32px;font-size:14px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;">Entendido</button>
     </div>`;
   document.body.appendChild(overlay);
+}
+
+// ============================================================
+// FECHA EN HORA COLOMBIA (UTC-5)
+// ============================================================
+function fechaColombia() {
+  // Devuelve 'YYYY-MM-DD' en la hora local de Colombia sin depender de UTC
+  const ahora = new Date();
+  // Calcular hora en Colombia (UTC-5)
+  const offsetCol = -5 * 60; // minutos
+  const offsetLocal = ahora.getTimezoneOffset(); // minutos (positivo = atrás de UTC)
+  const diffMs = (offsetLocal + offsetCol) * 60 * 1000;
+  const col = new Date(ahora.getTime() - diffMs);
+  const y = col.getUTCFullYear();
+  const m = String(col.getUTCMonth()+1).padStart(2,'0');
+  const d = String(col.getUTCDate()).padStart(2,'0');
+  return `${y}-${m}-${d}`;
+}
+
+function mesColombia() {
+  // Devuelve 'YYYY-MM' en hora Colombia
+  return fechaColombia().slice(0,7);
 }
 
 // ============================================================
@@ -8386,7 +8408,7 @@ async function registrarMovimientoCaja() {
         concepto:      concepto,
         valor:         valor,
         saldo_despues: nuevoSaldo,
-        fecha:         new Date().toISOString().split('T')[0],
+        fecha:         fechaColombia(),
         usuario:       sesionActiva?.nombre || 'Sistema'
       }
     }).catch(() => null); // No bloquear si falla
@@ -8514,7 +8536,7 @@ async function guardarGarantia() {
     fecha_promesa:   document.getElementById('garFechaPromesa')?.value||null,
     observaciones:   document.getElementById('garObservaciones')?.value||null,
     estado:          'recibido',
-    fecha_ingreso:   new Date().toISOString().split('T')[0],
+    fecha_ingreso:   fechaColombia(),
     sede_id:         window.SEDE_ID_ACTIVA || 1
   };
   try {
@@ -8624,7 +8646,7 @@ async function guardarServicio() {
     cobro_cliente:   getMoneyValue('stCobroCliente'),
     observaciones:   document.getElementById('stObservaciones')?.value||null,
     estado:          'recibido',
-    fecha_ingreso:   new Date().toISOString().split('T')[0],
+    fecha_ingreso:   fechaColombia(),
     sede_id:         window.SEDE_ID_ACTIVA || 1
   };
   try {
@@ -8710,7 +8732,7 @@ function renderComisiones() {
     }
   }
 
-  const mesActual = mesSelect?.value || new Date().toISOString().slice(0,7);
+  const mesActual = mesSelect?.value || mesColombia();
   // Solo ventas del mes, no anuladas
   const ventasMes = db.ventas.filter(v => v.fecha && v.fecha.startsWith(mesActual) && !v.anulada);
   const asesores  = ASESORES_ACTIVOS.filter(a => a.activo).map(a => a.nombre.toUpperCase());
@@ -8798,7 +8820,7 @@ function guardarBonoComision() {
   const concepto = document.getElementById('bonoConcepto')?.value?.trim();
   if(!valor||!concepto) { toast('Completa valor y concepto','error'); return; }
   const mesSelect = document.getElementById('comisionesMes');
-  const mes = mesSelect?.value || new Date().toISOString().slice(0,7);
+  const mes = mesSelect?.value || mesColombia();
   dbE3.bonos.push({ asesor, tipo, valor, concepto, mes });
   closeModal('modalNuevoBonoComision');
   renderComisiones();
