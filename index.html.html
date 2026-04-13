@@ -4316,8 +4316,21 @@ function toast(msg, type='success') {
   setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .3s';setTimeout(()=>t.remove(),300);},3500);
 }
 
-function openModal(id) { $(id).classList.add('open'); }
-function closeModal(id) { $(id).classList.remove('open'); }
+function openModal(id) {
+  const el = $(id);
+  if(!el) return;
+  // Si es la factura, ponerla encima de cualquier otro modal abierto
+  if(id === 'modalFactura') {
+    el.style.zIndex = '9000';
+  }
+  el.classList.add('open');
+}
+function closeModal(id) {
+  const el = $(id);
+  if(!el) return;
+  el.classList.remove('open');
+  if(id === 'modalFactura') el.style.zIndex = '';
+}
 
 // ============================================================
 // SISTEMA DE PERMISOS POR MÓDULO
@@ -4859,6 +4872,7 @@ function renderContabilidad(){
       <div style="display:flex;align-items:center;gap:8px;">
         <span style="font-size:13px;font-weight:600;color:#6B2D8B;">${fmt(g.valor)}</span>
         <button class="btn btn-sm btn-ghost" style="padding:2px 7px;font-size:11px;" onclick="editarUnGastoFijo('${mesActual}',${i})">✏️</button>
+        <button class="btn btn-sm btn-ghost" style="padding:2px 7px;font-size:11px;color:#dc2626;" onclick="eliminarGastoFijo('${mesActual}',${i})" title="Eliminar este gasto">🗑️</button>
       </div>
     </div>`).join('') +
     `<div style="display:flex;justify-content:space-between;padding:12px 0;font-weight:700;border-top:2px solid #6B2D8B;margin-top:4px;">
@@ -4989,6 +5003,19 @@ function agregarGastoFijo(mes) {
   setGastosFijosMes(mes, data);
   renderContabilidad();
   toast(`"${label.trim()}" agregado ✅`);
+}
+
+function eliminarGastoFijo(mes, idx) {
+  const data = getGastosFijosMes(mes);
+  const g = data[idx];
+  if(!g) return;
+  if(!confirm(`¿Eliminar el gasto fijo "${g.label}" del mes ${mes}?
+
+Esta acción no se puede deshacer.`)) return;
+  data.splice(idx, 1);
+  setGastosFijosMes(mes, data);
+  renderContabilidad();
+  toast(`"${g.label}" eliminado ✅`);
 }
 
 // ── Editar salario individual ─────────────────────────────────
@@ -6288,20 +6315,72 @@ function imprimirDetalleVenta() {
 // ABRIR MODALES DE VENTA CON ASESOR LOGUEADO
 // ============================================================
 function abrirModalCredito() {
+  // Limpiar todos los campos del formulario
+  const camposCrd = [
+    'crdIMEI','crdEquipo','crdCliente','crdCedula','crdTelefono',
+    'crdCorreo','crdNumContrato','crdInicialManual','crdProdAdicDesc'
+  ];
+  camposCrd.forEach(id => { const e=document.getElementById(id); if(e) e.value=''; });
+  // Limpiar inputs money
+  ['crdCosto','crdVentaBase','crdDescuento','crdProdAdicVal'].forEach(id => {
+    const e=document.getElementById(id); if(e) e.value='';
+  });
+  // Reset selects y checkboxes
+  const ivaCrd = document.getElementById('crdIVA'); if(ivaCrd) ivaCrd.value='0';
+  const comCrd = document.getElementById('crdComFinanciera'); if(comCrd) comCrd.value='';
+  const sinIni = document.getElementById('crdSinInicial'); if(sinIni) sinIni.checked=false;
+  const sinApl = document.getElementById('crdAplicaIntereses'); if(sinApl) sinApl.checked=false;
+  const tipoPagoFin = document.getElementById('tipoPagoFin'); if(tipoPagoFin) tipoPagoFin.checked=true;
+  const mixtoSec = document.getElementById('crdPagoMixtoSection'); if(mixtoSec) mixtoSec.style.display='none';
+  const valFin = document.getElementById('crdValorFinanciero'); if(valFin) valFin.value='';
+  const valEfe = document.getElementById('crdValorEfectivo'); if(valEfe) valEfe.value='';
+  crdInicialSeleccionada = 0;
+  // Limpiar previews de documentos
+  ['cedFrontPreview','cedBackPreview','fotoEntregaPreview','contratoPreview'].forEach(id=>{
+    const e=document.getElementById(id); if(e){ e.textContent=''; e.style.color=''; }
+  });
+  ['upCedFront','upCedBack','upFotoEntrega','upContrato'].forEach(id=>{
+    const e=document.getElementById(id); if(e) e.value='';
+    archivosSubidos[id] = null;
+  });
+  // Limpiar info IMEI
+  const imeiInfo = document.getElementById('crdIMEIInfo');
+  if(imeiInfo) imeiInfo.style.display='none';
+  // Reset resumen
+  ['crdPrecioFinal','crdGananciaNet','crdMargenReal','crdValorFinanciar','crdComFinVal','crdSubtotal'].forEach(id=>{
+    const e=document.getElementById(id); if(e) e.textContent='$0';
+  });
+  const cuotaRes = document.getElementById('crdCuotaResultado');
+  if(cuotaRes) cuotaRes.style.display='none';
+  const iniGrid = document.getElementById('crdInicialesGrid');
+  if(iniGrid) iniGrid.innerHTML='<div style="background:#f7f5fb;border-radius:10px;padding:12px;text-align:center;color:#888899;font-size:12px;">Ingresa precio de venta</div>';
   // Llenar asesor con usuario logueado
   const elAsesor = document.getElementById('crdAsesor');
-  if(elAsesor && sesionActiva) {
-    elAsesor.value = sesionActiva.nombre.toUpperCase();
-  }
+  if(elAsesor && sesionActiva) elAsesor.value = sesionActiva.nombre.toUpperCase();
   openModal('modalNuevoCredito');
 }
 
 function abrirModalContado() {
+  // Limpiar todos los campos
+  const camposVC = [
+    'vcIMEI','vcEquipo','vcCliente','vcCedula','vcTelefono','vcCorreo','vcObservaciones'
+  ];
+  camposVC.forEach(id => { const e=document.getElementById(id); if(e) e.value=''; });
+  ['vcCompra','vcVenta','vcDescuento'].forEach(id => {
+    const e=document.getElementById(id); if(e) e.value='';
+  });
+  const vcIVA = document.getElementById('vcIVA'); if(vcIVA) vcIVA.value='0';
+  const vcCom = document.getElementById('vcComFinanciera'); if(vcCom) vcCom.value='';
+  // Limpiar info IMEI
+  const vcInfo = document.getElementById('vcIMEIInfo');
+  if(vcInfo) vcInfo.style.display='none';
+  // Reset resumen
+  ['vcResumenBase','vcDesgIVA','vcDesgDesc','vcDesgCom','vcPrecioFinalVal','vcGananciaVal','vcComFinVal'].forEach(id=>{
+    const e=document.getElementById(id); if(e) e.textContent='$0';
+  });
   // Llenar asesor con usuario logueado
   const elAsesor = document.getElementById('vcAsesor');
-  if(elAsesor && sesionActiva) {
-    elAsesor.value = sesionActiva.nombre.toUpperCase();
-  }
+  if(elAsesor && sesionActiva) elAsesor.value = sesionActiva.nombre.toUpperCase();
   openModal('modalVentaContado');
 }
 
