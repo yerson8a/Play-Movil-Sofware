@@ -5741,7 +5741,7 @@ async function guardarProveedor(){
 
   const cats=[...document.getElementById('provCategoria').selectedOptions].map(o=>o.value);
   const datos={
-    nombre, tipoDoc, nit, dv:document.getElementById('provDV').value||'',
+    nombre: nombre.toUpperCase(), tipoDoc, nit: nit.toUpperCase(), dv:document.getElementById('provDV').value||'',
     tel1:document.getElementById('provTel1').value||'',
     tel2:document.getElementById('provTel2').value||'',
     correo:document.getElementById('provCorreo').value||'',
@@ -6303,6 +6303,8 @@ async function guardarCliente() {
   const documento= document.getElementById('cliDocumento')?.value?.trim();
   const tipoDoc  = document.getElementById('cliTipoDoc')?.value||'CC';
 
+  nombre    = nombre.toUpperCase();
+  documento = documento.toUpperCase();
   if(!nombre)    { toast('El nombre es obligatorio','error'); return; }
   if(!documento) { toast('El documento es obligatorio','error'); return; }
 
@@ -6752,15 +6754,15 @@ async function guardarVentaContado(){
 
   const datos={
     equipo:$('vcEquipo')?.value||'—',imei,
-    cliente:$('vcCliente')?.value||'—',
-    cedula:$('vcCedula')?.value||'',
-    telefono:$('vcTelefono')?.value||'',
-    correo:$('vcCorreo')?.value||'',
-    asesor:(sesionActiva?.rol==='admin' ? ($('vcAsesorSelect')?.value||$('vcAsesor')?.value||'') : ($('vcAsesor')?.value||'')),
+    cliente:$U('vcCliente')||'—',
+    cedula:$U('vcCedula')||'',
+    telefono:$U('vcTelefono')||'',
+    correo:$U('vcCorreo')||'',
+    asesor:($U('vcAsesorSelect')||$U('vcAsesor')||'').toUpperCase()||sesionActiva?.nombre?.toUpperCase()||'',
     costo,venta:precioFinal,ganancia,
     financiera:finSel,tipo:'contado',
     sede:$('vcSede')?.value||'LOCAL PEREIRA',
-    obs:$('vcObservaciones')?.value||'',
+    obs:$U('vcObservaciones')||'',
     productoId:comp?comp.id:null
   };
   // Validar que el equipo esté disponible antes de guardar
@@ -6826,11 +6828,11 @@ async function guardarCredito(){
 
   const datos = {
     equipo: $('crdEquipo')?.value||'—',
-    cliente: $('crdCliente')?.value||'—',
-    cedula: $('crdCedula')?.value||'',
-    telefono: $('crdTelefono')?.value||'',
-    correo: $('crdCorreo')?.value||'',
-    asesor: (sesionActiva?.rol==='admin' ? ($('crdAsesorSelect')?.value||$('crdAsesor')?.value||'') : ($('crdAsesor')?.value||'')),
+    cliente: $U('crdCliente')||'—',
+    cedula: $U('crdCedula')||'',
+    telefono: $U('crdTelefono')||'',
+    correo: $U('crdCorreo')||'',
+    asesor: ($U('crdAsesorSelect')||$U('crdAsesor')||sesionActiva?.nombre||'').toUpperCase(),
     total: precioFinal, inicial: ini,
     saldo: totalFinanciar, cuotas: quincenas, valorCuota,
     frecuencia: 'Quincenal', sede: sedeActual,
@@ -8427,6 +8429,13 @@ function getMoneyValue(id) {
   return parseFloat((el.value || '0').replace(/[^0-9]/g, '')) || 0;
 }
 
+// Leer valor de campo en MAYÚSCULAS
+function $U(id) {
+  const el = document.getElementById(id);
+  if(!el) return '';
+  return (el.value || '').toUpperCase().trim();
+}
+
 // Establecer valor en un input monetario
 function setMoneyValue(id, num) {
   const el = document.getElementById(id);
@@ -9407,8 +9416,8 @@ function filtrarGarantias(q) {
 }
 
 async function guardarGarantia() {
-  const ref    = document.getElementById('garRef')?.value?.trim();
-  const cliente= document.getElementById('garCliente')?.value?.trim();
+  const ref    = (document.getElementById('garRef')?.value||'').toUpperCase().trim();
+  const cliente= (document.getElementById('garCliente')?.value||'').toUpperCase().trim();
   if(!ref || !cliente) { toast('Equipo y cliente son obligatorios','error'); return; }
   const row = {
     detalle:         ref,
