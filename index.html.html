@@ -1028,6 +1028,18 @@
         <button class="tab" onclick="switchCreditosTab('reportados',this)">Reportados</button>
       </div>
 
+      <!-- Filtros de búsqueda -->
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center;">
+        <div class="search-wrap" style="flex:1;min-width:200px;">
+          <span class="search-icon">🔍</span>
+          <input type="text" class="form-control" id="searchCredCliente" placeholder="Buscar por cliente, cédula o equipo..." oninput="filtrarCreditosTexto()">
+        </div>
+        <select class="form-control" style="width:200px;" id="filtroCredFinanciera" onchange="filtrarCreditosTexto()">
+          <option value="">Todas las financieras</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" onclick="limpiarFiltrosCreditos()">✕ Limpiar</button>
+      </div>
+
       <div id="creditosGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;"></div>
     </div>
 
@@ -4727,6 +4739,28 @@ function renderCreditos(filtro='activos'){
   else if(filtro==='anulados')data=data.filter(c=>c.estado==='anulado');
   else if(filtro==='reportados')data=data.filter(c=>c.reportado);
   else data=data.filter(c=>c.estado==='al_dia'||c.estado==='mora');
+
+  // Poblar select de financieras
+  const selFin = document.getElementById('filtroCredFinanciera');
+  if(selFin && selFin.options.length <= 1) {
+    const fins = [...new Set(db.creditos.map(c=>c.financiera).filter(Boolean))].sort();
+    fins.forEach(f => {
+      const opt = document.createElement('option');
+      opt.value = f; opt.textContent = f;
+      selFin.appendChild(opt);
+    });
+  }
+
+  // Aplicar filtros de texto y financiera
+  const txtBusca = (document.getElementById('searchCredCliente')?.value||'').toLowerCase();
+  const finBusca = document.getElementById('filtroCredFinanciera')?.value||'';
+  if(txtBusca) data = data.filter(c =>
+    (c.cliente||'').toLowerCase().includes(txtBusca) ||
+    (c.cedula||'').includes(txtBusca) ||
+    (c.equipo||'').toLowerCase().includes(txtBusca)
+  );
+  if(finBusca) data = data.filter(c => c.financiera === finBusca);
+
   $('creditosGrid').innerHTML=data.length?data.map(c=>{
     const pct=Math.round((c.pagadas/c.cuotas)*100)||0;
     return `<div class="credito-card">
@@ -4769,7 +4803,22 @@ function renderCreditos(filtro='activos'){
   }).join(''):'<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-text">No hay créditos en esta categoría</div></div>';
 }
 
-function switchCreditosTab(tab,el){document.querySelectorAll('#mod-creditos .tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');renderCreditos(tab);}
+function switchCreditosTab(tab,el){document.querySelectorAll('#mod-creditos .tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');tabCreditosActual=tab;renderCreditos(tab);}
+
+let tabCreditosActual = 'activos';
+const _origSwitchCreditosTab = switchCreditosTab;
+
+function filtrarCreditosTexto() {
+  renderCreditos(tabCreditosActual);
+}
+
+function limpiarFiltrosCreditos() {
+  const s = document.getElementById('searchCredCliente');
+  const f = document.getElementById('filtroCredFinanciera');
+  if(s) s.value = '';
+  if(f) f.value = '';
+  renderCreditos(tabCreditosActual);
+}
 
 function renderContabilidad(){
   const ahora = new Date();
@@ -7568,6 +7617,10 @@ function generarHTMLFactura(d) {
     <div style="margin-top:24px;padding-top:16px;border-top:1px solid #ece8f5;font-size:11px;color:#888;line-height:1.6;">
       Esta factura es un título valor conforme al Art. 772, modificado en la ley 1231 de 2008. 
       La garantía no cubre teléfono apagado, humedad, rayones, golpes, flex y demás elementos de contacto permanente o mala manipulación.
+      Todo teléfono debe ser registrado ante el operador para activar la garantía.
+    </div>
+    <div style="margin-top:10px;padding:10px 14px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;font-size:11px;color:#92400e;line-height:1.6;">
+      ⚠️ <strong>Nota importante:</strong> El valor reflejado en esta factura no incluye gastos de financiación. Los costos asociados al crédito son responsabilidad del cliente según las condiciones pactadas con la financiera.
     </div>
   </div>`;
 }
