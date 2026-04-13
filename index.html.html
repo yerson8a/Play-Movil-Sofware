@@ -534,6 +534,9 @@
     <div class="nav-item" onclick="showModule('compras')">
       <span class="icon">🛒</span> Compras
     </div>
+    <div class="nav-item" onclick="showModule('clientes')">
+      <span class="icon">👥</span> Clientes
+    </div>
     <div class="nav-item" onclick="showModule('proveedores')">
       <span class="icon">🏭</span> Proveedores
     </div>
@@ -658,6 +661,52 @@
     </div>
 
     <!-- ==================== COMPRAS ==================== -->
+    <!-- ==================== CLIENTES ==================== -->
+    <div id="mod-clientes" class="module">
+      <div class="section-header">
+        <div>
+          <div class="section-title">👥 Clientes</div>
+          <div class="section-sub">Gestión de clientes registrados</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="abrirModalNuevoCliente()">+ Nuevo Cliente</button>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px;">
+        <div class="stat-card blue"><div class="stat-label">Total Clientes</div><div class="stat-value blue" id="cliStatTotal">0</div></div>
+        <div class="stat-card green"><div class="stat-label">Con Crédito Activo</div><div class="stat-value green" id="cliStatCredito">0</div></div>
+        <div class="stat-card pink"><div class="stat-label">Con Ventas</div><div class="stat-value pink" id="cliStatVentas">0</div></div>
+        <div class="stat-card orange"><div class="stat-label">Nuevos Mes</div><div class="stat-value orange" id="cliStatNuevos">0</div></div>
+      </div>
+
+      <div class="card">
+        <div class="flex items-center gap-12 mb-16" style="flex-wrap:wrap;">
+          <div class="search-wrap" style="flex:1;min-width:220px;">
+            <span class="search-icon">🔍</span>
+            <input type="text" class="form-control" id="searchClientes" placeholder="Buscar por nombre, cédula, NIT, pasaporte..." oninput="filtrarClientes(this.value)">
+          </div>
+          <select class="form-control" style="width:160px;" onchange="filtrarClientesTipoDoc(this.value)">
+            <option value="">Todos los documentos</option>
+            <option value="CC">Cédula (CC)</option>
+            <option value="CE">Extranjería (CE)</option>
+            <option value="NIT">NIT</option>
+            <option value="PAS">Pasaporte</option>
+          </select>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th><th>Nombre</th><th>Tipo Doc.</th><th>Documento</th>
+                <th>Teléfono</th><th>Correo</th><th>Ciudad</th>
+                <th>Ventas</th><th>Créditos</th><th>Registro</th><th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="tbodyClientes"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <!-- ==================== PROVEEDORES ==================== -->
     <div id="mod-proveedores" class="module">
       <div class="section-header">
@@ -1612,6 +1661,125 @@
   </div>
 </div>
 
+<!-- Modal Nuevo Cliente -->
+<div class="modal-overlay" id="modalNuevoCliente">
+  <div class="modal" style="max-width:600px;">
+    <div class="modal-header">
+      <div class="modal-title">👤 Nuevo Cliente</div>
+      <button class="modal-close" onclick="closeModal('modalNuevoCliente')">✕</button>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Nombre Completo *</label>
+        <input type="text" class="form-control" id="cliNombre" placeholder="Nombre completo">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Tipo Documento *</label>
+        <select class="form-control" id="cliTipoDoc">
+          <option value="CC">Cédula de Ciudadanía (CC)</option>
+          <option value="CE">Cédula de Extranjería (CE)</option>
+          <option value="NIT">NIT</option>
+          <option value="PAS">Pasaporte</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Número de Documento *</label>
+        <input type="text" class="form-control" id="cliDocumento" placeholder="Número de documento" oninput="validarDocumentoCliente()">
+        <div id="cliDocError" style="font-size:11px;color:#dc2626;margin-top:3px;display:none;">⚠️ Este documento ya está registrado</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Teléfono</label>
+        <input type="text" class="form-control" id="cliTelefono" placeholder="300 000 0000">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Correo Electrónico</label>
+        <input type="email" class="form-control" id="cliCorreo" placeholder="correo@cliente.com">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Ciudad</label>
+        <input type="text" class="form-control" id="cliCiudad" placeholder="Ciudad de residencia">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Dirección</label>
+        <input type="text" class="form-control" id="cliDireccion" placeholder="Dirección completa">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Fecha de Nacimiento</label>
+        <input type="date" class="form-control" id="cliFechaNac">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Observaciones</label>
+      <textarea class="form-control" id="cliObs" rows="2" placeholder="Notas internas del cliente..."></textarea>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:space-between;align-items:center;margin-top:16px;">
+      <div style="font-size:11px;color:#888899;">* Obligatorios</div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-ghost" onclick="closeModal('modalNuevoCliente')">Cancelar</button>
+        <button class="btn btn-primary" onclick="guardarCliente()">💾 Guardar Cliente</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Editar Cliente -->
+<div class="modal-overlay" id="modalEditarCliente">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-header">
+      <div class="modal-title">✏️ Editar Cliente</div>
+      <button class="modal-close" onclick="closeModal('modalEditarCliente')">✕</button>
+    </div>
+    <input type="hidden" id="editCliId">
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Nombre *</label>
+        <input type="text" class="form-control" id="editCliNombre">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Tipo Documento</label>
+        <select class="form-control" id="editCliTipoDoc">
+          <option value="CC">CC</option><option value="CE">CE</option>
+          <option value="NIT">NIT</option><option value="PAS">Pasaporte</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Documento *</label>
+        <input type="text" class="form-control" id="editCliDocumento">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Teléfono</label>
+        <input type="text" class="form-control" id="editCliTelefono">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Correo</label>
+        <input type="email" class="form-control" id="editCliCorreo">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Ciudad</label>
+        <input type="text" class="form-control" id="editCliCiudad">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Observaciones</label>
+      <textarea class="form-control" id="editCliObs" rows="2"></textarea>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+      <button class="btn btn-ghost" onclick="closeModal('modalEditarCliente')">Cancelar</button>
+      <button class="btn btn-primary" onclick="actualizarCliente()">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal Editar Proveedor -->
 <div class="modal-overlay" id="modalEditarProveedor">
   <div class="modal" style="max-width:640px;">
@@ -2350,6 +2518,19 @@
         <!-- Cliente -->
         <div class="card">
           <div class="card-title" style="font-size:13px;margin-bottom:10px;">👤 Cliente</div>
+          <!-- Búsqueda de cliente -->
+          <div class="form-group" style="margin-bottom:10px;">
+            <label class="form-label">Buscar cliente</label>
+            <div style="position:relative;">
+              <input type="text" class="form-control" id="crdClienteBusca" placeholder="Escribe nombre, cédula, NIT o pasaporte..." oninput="buscarClienteVenta(this.value,'crd')" autocomplete="off" style="padding-right:40px;">
+              <button type="button" onclick="abrirModalNuevoClienteDesdeVenta('crd')" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:#6B2D8B;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;" title="Crear nuevo cliente">+ Nuevo</button>
+            </div>
+            <div id="crdClienteDropdown" style="display:none;position:absolute;z-index:500;background:#fff;border:1px solid #ece8f5;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.12);max-height:200px;overflow-y:auto;min-width:300px;"></div>
+          </div>
+          <div id="crdClienteSelInfo" style="display:none;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px;margin-bottom:10px;font-size:12px;">
+            <span style="color:#16a34a;font-weight:600;">✅ Cliente seleccionado: </span><span id="crdClienteSelNombre"></span>
+            <button type="button" onclick="limpiarClienteVenta('crd')" style="float:right;background:none;border:none;color:#dc2626;cursor:pointer;font-size:12px;">✕ Cambiar</button>
+          </div>
           <div class="form-row">
             <div class="form-group">
               <label class="form-label">Nombre *</label>
@@ -3759,6 +3940,7 @@ async function sbFetch(tabla, options = {}) {
 const db = {
   inventario: [],
   ventas: [],
+  clientes: [],
   creditos: [],
   gastos: [],
   garantias: [],
@@ -4485,6 +4667,7 @@ function showModule(name) {
   else if(name==='creditos') renderCreditos();
   else if(name==='contabilidad') renderContabilidad();
   else if(name==='compras') { renderCompras(); renderTablaProveedores(db.proveedores); poblarSelectProveedores(); }
+  else if(name==='clientes') { cargarClientes(); }
   else if(name==='proveedores') { renderProveedoresMod(); }
   else if(name==='productos') { renderProductosMod(); }
   else if(name==='asesores') { cargarAsesoresActivos().then(()=>renderAsesores()); }
@@ -5648,6 +5831,263 @@ async function agregarEquipo(){
 }
 
 // ============================================================
+// MÓDULO CLIENTES
+// ============================================================
+async function cargarClientes() {
+  try {
+    const res = await sbFetch('clientes', { order: 'nombre.asc' });
+    db.clientes = res || [];
+  } catch(e) {
+    db.clientes = [];
+  }
+  renderClientes();
+}
+
+function renderClientes(data) {
+  const lista = data || db.clientes;
+  const mes   = mesColombia();
+  const setEl = (id,v) => { const e=document.getElementById(id); if(e) e.textContent=v; };
+  const conCredito = lista.filter(c => db.creditos.some(cr => cr.cedula===c.documento && (cr.estado==='al_dia'||cr.estado==='mora'))).length;
+  const conVentas  = lista.filter(c => db.ventas.some(v => v.cedula===c.documento)).length;
+  const nuevos     = lista.filter(c => (c.fecha_registro||'').startsWith(mes)).length;
+  setEl('cliStatTotal',   lista.length);
+  setEl('cliStatCredito', conCredito);
+  setEl('cliStatVentas',  conVentas);
+  setEl('cliStatNuevos',  nuevos);
+
+  const tbody = document.getElementById('tbodyClientes');
+  if(!tbody) return;
+  tbody.innerHTML = lista.length ? lista.map(c => {
+    const vCount = db.ventas.filter(v => v.cedula===c.documento).length;
+    const crCount= db.creditos.filter(cr => cr.cedula===c.documento).length;
+    return `<tr>
+      <td style="font-weight:700;color:#6B2D8B;">${c.id}</td>
+      <td style="font-weight:600;">${c.nombre}</td>
+      <td><span class="badge badge-blue" style="font-size:10px;">${c.tipo_doc||'CC'}</span></td>
+      <td style="font-family:monospace;font-size:12px;">${c.documento||'—'}</td>
+      <td style="font-size:12px;">${c.telefono||'—'}</td>
+      <td style="font-size:12px;">${c.correo||'—'}</td>
+      <td style="font-size:12px;">${c.ciudad||'—'}</td>
+      <td style="text-align:center;font-weight:700;color:#0066cc;">${vCount}</td>
+      <td style="text-align:center;font-weight:700;color:#6B2D8B;">${crCount}</td>
+      <td style="font-size:11px;color:#888899;">${c.fecha_registro||'—'}</td>
+      <td style="display:flex;gap:4px;">
+        <button class="btn btn-sm btn-ghost" onclick="abrirEditarCliente(${c.id})">✏️</button>
+      </td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="11" style="text-align:center;padding:40px;color:#888899;">Sin clientes registrados</td></tr>';
+}
+
+function filtrarClientes(q) {
+  q = q.toLowerCase();
+  renderClientes(db.clientes.filter(c =>
+    (c.nombre||'').toLowerCase().includes(q) ||
+    (c.documento||'').includes(q) ||
+    (c.correo||'').toLowerCase().includes(q) ||
+    (c.telefono||'').includes(q)
+  ));
+}
+
+function filtrarClientesTipoDoc(tipo) {
+  renderClientes(tipo ? db.clientes.filter(c=>c.tipo_doc===tipo) : db.clientes);
+}
+
+function abrirModalNuevoCliente(prefill) {
+  ['cliNombre','cliDocumento','cliTelefono','cliCorreo','cliCiudad','cliDireccion','cliObs'].forEach(id=>{
+    const e=document.getElementById(id); if(e) e.value='';
+  });
+  const cliFechaNac = document.getElementById('cliFechaNac'); if(cliFechaNac) cliFechaNac.value='';
+  const err = document.getElementById('cliDocError'); if(err) err.style.display='none';
+  if(prefill) {
+    if(prefill.nombre && document.getElementById('cliNombre')) document.getElementById('cliNombre').value = prefill.nombre;
+    if(prefill.documento && document.getElementById('cliDocumento')) document.getElementById('cliDocumento').value = prefill.documento;
+  }
+  openModal('modalNuevoCliente');
+}
+
+// Abrir nuevo cliente desde modal de venta y volver al modal original
+let _ventaModalRetorno = null;
+function abrirModalNuevoClienteDesdeVenta(prefijo) {
+  _ventaModalRetorno = prefijo;
+  const busca = document.getElementById(prefijo+'ClienteBusca')?.value||'';
+  // Pre-llenar si parece nombre
+  const prefill = isNaN(busca.replace(/\s/g,'')) ? {nombre: busca} : {documento: busca};
+  abrirModalNuevoCliente(prefill);
+}
+
+async function validarDocumentoCliente() {
+  const doc  = document.getElementById('cliDocumento')?.value?.trim();
+  const errEl= document.getElementById('cliDocError');
+  if(!doc || doc.length < 4) { if(errEl) errEl.style.display='none'; return; }
+  const existe = db.clientes.find(c => c.documento === doc);
+  if(existe) {
+    if(errEl) { errEl.textContent=`⚠️ Ya registrado: ${existe.nombre}`; errEl.style.display='block'; }
+  } else {
+    if(errEl) errEl.style.display='none';
+  }
+}
+
+async function guardarCliente() {
+  const nombre   = document.getElementById('cliNombre')?.value?.trim();
+  const documento= document.getElementById('cliDocumento')?.value?.trim();
+  const tipoDoc  = document.getElementById('cliTipoDoc')?.value||'CC';
+
+  if(!nombre)    { toast('El nombre es obligatorio','error'); return; }
+  if(!documento) { toast('El documento es obligatorio','error'); return; }
+
+  // Verificar duplicado
+  const existe = db.clientes.find(c => c.documento === documento);
+  if(existe) { toast(`Ya existe: ${existe.nombre}`,'error'); return; }
+
+  const row = {
+    nombre,
+    tipo_doc:        tipoDoc,
+    documento,
+    telefono:        document.getElementById('cliTelefono')?.value||null,
+    correo:          document.getElementById('cliCorreo')?.value||null,
+    ciudad:          document.getElementById('cliCiudad')?.value||null,
+    direccion:       document.getElementById('cliDireccion')?.value||null,
+    fecha_nacimiento:document.getElementById('cliFechaNac')?.value||null,
+    observaciones:   document.getElementById('cliObs')?.value||null,
+    fecha_registro:  fechaColombia()
+  };
+
+  try {
+    showLoader('Guardando cliente...');
+    const res = await sbFetch('clientes', { method:'POST', body:row });
+    const nuevo = res[0];
+    db.clientes.unshift({ id:nuevo.id, ...row });
+    hideLoader();
+    closeModal('modalNuevoCliente');
+    // Si vino desde un modal de venta, auto-seleccionar el cliente
+    if(_ventaModalRetorno) {
+      seleccionarClienteVenta({ id:nuevo.id, nombre, documento, tipo_doc:tipoDoc,
+        telefono:row.telefono, correo:row.correo }, _ventaModalRetorno);
+      _ventaModalRetorno = null;
+    } else {
+      renderClientes();
+    }
+    toast(`${nombre} registrado ✅`);
+  } catch(e) { hideLoader(); toast('Error: '+e.message,'error'); }
+}
+
+function abrirEditarCliente(id) {
+  const c = db.clientes.find(x=>x.id===id);
+  if(!c) return;
+  document.getElementById('editCliId').value        = id;
+  document.getElementById('editCliNombre').value    = c.nombre||'';
+  document.getElementById('editCliTipoDoc').value   = c.tipo_doc||'CC';
+  document.getElementById('editCliDocumento').value = c.documento||'';
+  document.getElementById('editCliTelefono').value  = c.telefono||'';
+  document.getElementById('editCliCorreo').value    = c.correo||'';
+  document.getElementById('editCliCiudad').value    = c.ciudad||'';
+  document.getElementById('editCliObs').value       = c.observaciones||'';
+  openModal('modalEditarCliente');
+}
+
+async function actualizarCliente() {
+  const id     = parseInt(document.getElementById('editCliId').value);
+  const nombre = document.getElementById('editCliNombre')?.value?.trim();
+  const doc    = document.getElementById('editCliDocumento')?.value?.trim();
+  if(!nombre) { toast('El nombre es obligatorio','error'); return; }
+  if(!doc)    { toast('El documento es obligatorio','error'); return; }
+  const row = {
+    nombre, tipo_doc: document.getElementById('editCliTipoDoc')?.value,
+    documento: doc,
+    telefono: document.getElementById('editCliTelefono')?.value||null,
+    correo:   document.getElementById('editCliCorreo')?.value||null,
+    ciudad:   document.getElementById('editCliCiudad')?.value||null,
+    observaciones: document.getElementById('editCliObs')?.value||null
+  };
+  try {
+    showLoader('Actualizando...');
+    await sbFetch(`clientes?id=eq.${id}`, { method:'PATCH', body:row });
+    const c = db.clientes.find(x=>x.id===id);
+    if(c) Object.assign(c, row);
+    hideLoader();
+    closeModal('modalEditarCliente');
+    renderClientes();
+    toast('Cliente actualizado ✅');
+  } catch(e) { hideLoader(); toast('Error: '+e.message,'error'); }
+}
+
+// ── Búsqueda de cliente en formularios de venta ──────────────
+function buscarClienteVenta(q, prefijo) {
+  const dd = document.getElementById(prefijo+'ClienteDropdown');
+  if(!dd) return;
+  if(!q || q.length < 2) { dd.style.display='none'; return; }
+  const ql = q.toLowerCase();
+  const resultados = db.clientes.filter(c =>
+    (c.nombre||'').toLowerCase().includes(ql) ||
+    (c.documento||'').includes(q) ||
+    (c.correo||'').toLowerCase().includes(ql)
+  ).slice(0,8);
+
+  if(!resultados.length) {
+    dd.innerHTML = `<div style="padding:12px 14px;font-size:13px;color:#888899;">Sin resultados — <button type="button" onclick="abrirModalNuevoClienteDesdeVenta('${prefijo}')" style="color:#6B2D8B;background:none;border:none;cursor:pointer;font-weight:600;">+ Crear nuevo cliente</button></div>`;
+    dd.style.display='block';
+    return;
+  }
+
+  dd.innerHTML = resultados.map(c => `
+    <div onclick="seleccionarClienteVenta(${JSON.stringify(c).replace(/"/g,"'")}, '${prefijo}')"
+         style="padding:10px 14px;cursor:pointer;border-bottom:1px solid #f7f5fb;font-size:13px;"
+         onmouseover="this.style.background='#f7f5fb'" onmouseout="this.style.background=''">
+      <div style="font-weight:600;">${c.nombre}</div>
+      <div style="font-size:11px;color:#888899;">${c.tipo_doc||'CC'}: ${c.documento||'—'} ${c.telefono?'· '+c.telefono:''}</div>
+    </div>`).join('') +
+    `<div style="padding:8px 14px;border-top:1px solid #f0ecf8;">
+      <button type="button" onclick="abrirModalNuevoClienteDesdeVenta('${prefijo}')" style="color:#6B2D8B;background:none;border:none;cursor:pointer;font-size:12px;font-weight:600;">+ Crear nuevo cliente</button>
+    </div>`;
+  dd.style.display='block';
+}
+
+function seleccionarClienteVenta(c, prefijo) {
+  // Cerrar dropdown
+  const dd = document.getElementById(prefijo+'ClienteDropdown');
+  if(dd) dd.style.display='none';
+  // Mostrar info seleccionado
+  const info = document.getElementById(prefijo+'ClienteSelInfo');
+  const nom  = document.getElementById(prefijo+'ClienteSelNombre');
+  if(info) info.style.display='block';
+  if(nom)  nom.textContent = `${c.nombre} · ${c.tipo_doc||'CC'}: ${c.documento||'—'}`;
+  // Limpiar búsqueda
+  const busca = document.getElementById(prefijo+'ClienteBusca');
+  if(busca) busca.value='';
+  // Llenar campos del formulario
+  const prefix = prefijo==='crd' ? 'crd' : 'vc';
+  const setVal = (id, v) => { const e=document.getElementById(id); if(e) e.value=v||''; };
+  setVal(prefix+'Cliente',  c.nombre);
+  setVal(prefix+'Cedula',   c.documento);
+  setVal(prefix+'Telefono', c.telefono||'');
+  setVal(prefix+'Correo',   c.correo||'');
+}
+
+function limpiarClienteVenta(prefijo) {
+  const info  = document.getElementById(prefijo+'ClienteSelInfo');
+  if(info) info.style.display='none';
+  const prefix= prefijo==='crd' ? 'crd' : 'vc';
+  ['Cliente','Cedula','Telefono','Correo'].forEach(f => {
+    const e = document.getElementById(prefix+f); if(e) e.value='';
+  });
+  const busca = document.getElementById(prefijo+'ClienteBusca');
+  if(busca) { busca.value=''; busca.focus(); }
+}
+
+// Cerrar dropdown al hacer clic fuera
+document.addEventListener('click', e => {
+  ['crd','vc'].forEach(p => {
+    const dd = document.getElementById(p+'ClienteDropdown');
+    const busca = document.getElementById(p+'ClienteBusca');
+    if(dd && busca && !dd.contains(e.target) && e.target!==busca) {
+      dd.style.display='none';
+    }
+  });
+});
+
+// ============================================================
+// MÓDULO PRODUCTOS
+// ============================================================// ============================================================
 // MÓDULO PRODUCTOS
 // ============================================================
 function actualizarMarcaCustom(sel) {
