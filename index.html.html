@@ -7768,26 +7768,60 @@ function elegirInicial(el,ini,saldo){
   recalcCredito();
 }
 
-function buscarIMEIVenta(val){
-  if(val.length<5){$('vcIMEIInfo').style.display='none';return;}
-  const found=db.compras.find(c=>c.imei1.includes(val)||c.imei2.includes(val)||c.serial.toLowerCase().includes(val.toLowerCase()));
+async function buscarIMEIVenta(val){
+  if(val.length < 5){ const i=$('vcIMEIInfo'); if(i) i.style.display='none'; return; }
+
+  // Buscar primero en memoria
+  let found = db.compras.find(c=>
+    (c.imei1||'').includes(val) ||
+    (c.imei2||'').includes(val) ||
+    (c.serial||'').toLowerCase().includes(val.toLowerCase())
+  );
+
+  // Si no está en memoria, buscar en Supabase
+  if(!found) {
+    try {
+      const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+      const base = SUPABASE_URL + '/rest/v1/productos';
+      const sel  = 'select=id,producto,imei1,imei2,serial,valor_compra,sede_id,proveedor_id,estado';
+      let res = await fetch(`${base}?${sel}&imei1=eq.${val}`, {headers});
+      let rows = await res.json();
+      if(!rows.length){ res = await fetch(`${base}?${sel}&imei2=eq.${val}`, {headers}); rows = await res.json(); }
+      if(!rows.length){ res = await fetch(`${base}?${sel}&serial=ilike.*${val}*`, {headers}); rows = await res.json(); }
+      if(!rows.length){ res = await fetch(`${base}?${sel}&imei1=ilike.*${val}*`, {headers}); rows = await res.json(); }
+      if(rows && rows.length > 0) {
+        const p = rows[0];
+        found = {
+          id: p.id, producto: p.producto, imei1: p.imei1||'', imei2: p.imei2||'',
+          serial: p.serial||'', valorCompra: parseFloat(p.valor_compra)||0,
+          sede_id: p.sede_id, proveedorId: p.proveedor_id, estado: p.estado
+        };
+      }
+    } catch(e){ console.error('Error IMEI venta:', e); }
+  }
+
+  const infoEl = $('vcIMEIInfo');
   if(found){
-    const prov=db.proveedores.find(p=>p.id===found.proveedorId);
-    $('vcIMEIInfo').style.display='block';
-    $('vcInfoProducto').textContent=found.producto;
-    $('vcInfoProveedor').textContent=prov?prov.nombre:'—';
-    $('vcInfoCosto').textContent=fmt(found.valorCompra);
-    $('vcInfoSede').textContent=found.sede;
-    $('vcInfoIMEI').textContent=found.imei1||found.serial||'—';
-    $('vcEquipo').value=found.producto;
-    $('vcIMEI').value=found.imei1||found.serial||'';
+    const prov = db.proveedores.find(p=>p.id===found.proveedorId);
+    const sedeNom = found.sede || (found.sede_id===1?'LOCAL PEREIRA':found.sede_id===2?'LOCAL ARMENIA':'—');
+    if(infoEl) infoEl.style.display='block';
+    const set = (id,v) => { const e=$(id); if(e) e.textContent=v; };
+    set('vcInfoProducto', found.producto);
+    set('vcInfoProveedor', prov?prov.nombre:'—');
+    set('vcInfoCosto',    fmt(found.valorCompra));
+    set('vcInfoSede',     sedeNom);
+    set('vcInfoIMEI',     found.imei1||found.serial||'—');
+    // Llenar campos (algunos son hidden ahora)
+    const setV = (id,v) => { const e=document.getElementById(id); if(e) e.value=v||''; };
+    setV('vcEquipo', found.producto);
+    setV('vcIMEI',   found.imei1||found.serial||'');
     setMoneyValue('vcCompra', found.valorCompra);
-    $('vcSede').value=found.sede;
-    const precio=Math.round(found.valorCompra/0.55);
-    $('vcVenta').value=precio;
+    setMoneyValue('vcVenta',  Math.round(found.valorCompra/0.55));
     calcVContado();
-    toast('✅ Producto encontrado: '+found.producto);
-  } else {$('vcIMEIInfo').style.display='none';}
+    toast('✅ '+found.producto+' — Costo: '+fmt(found.valorCompra));
+  } else {
+    if(infoEl) infoEl.style.display='none';
+  }
 }
 
 async function buscarIMEICredito(val){
@@ -7847,10 +7881,7 @@ async function buscarIMEICredito(val){
       if(elIMEI)      elIMEI.value      = p.imei1 || p.serial || '';
 
       if(elCosto) {
-        elCosto.value            = costo;
-        elCosto.style.background = '#f0fdf4';
-        elCosto.style.borderColor= '#16a34a';
-        // Disparar evento input para que recalcCredito se entere
+        setMoneyValue('crdCosto', costo);
         elCosto.dispatchEvent(new Event('input'));
       }
 
