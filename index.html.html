@@ -2704,6 +2704,8 @@
           <div class="form-row">
             <div class="form-group">
               <label class="form-label">Asesor</label>
+              <!-- Admin: select; Otros: input readonly -->
+              <select class="form-control" id="crdAsesorSelect" style="display:none;font-weight:600;color:#6B2D8B;"></select>
               <input type="text" class="form-control" id="crdAsesor" readonly style="background:#f7f5fb;font-weight:600;color:#6B2D8B;cursor:default;" placeholder="Asesor actual">
             </div>
             <div class="form-group">
@@ -3202,6 +3204,8 @@
         </div>
         <div class="form-group">
           <label class="form-label">Asesor Comercial</label>
+          <!-- Admin: select; Otros: input readonly -->
+          <select class="form-control" id="vcAsesorSelect" style="display:none;font-weight:600;color:#6B2D8B;"></select>
           <input type="text" class="form-control" id="vcAsesor" readonly style="background:#f7f5fb;font-weight:600;color:#6B2D8B;cursor:default;" placeholder="Asesor actual">
         </div>
       </div>
@@ -6733,7 +6737,7 @@ async function guardarVentaContado(){
     cedula:$('vcCedula')?.value||'',
     telefono:$('vcTelefono')?.value||'',
     correo:$('vcCorreo')?.value||'',
-    asesor:$('vcAsesor')?.value||'',
+    asesor:(sesionActiva?.rol==='admin' ? ($('vcAsesorSelect')?.value||$('vcAsesor')?.value||'') : ($('vcAsesor')?.value||'')),
     costo,venta:precioFinal,ganancia,
     financiera:finSel,tipo:'contado',
     sede:$('vcSede')?.value||'LOCAL PEREIRA',
@@ -6807,7 +6811,7 @@ async function guardarCredito(){
     cedula: $('crdCedula')?.value||'',
     telefono: $('crdTelefono')?.value||'',
     correo: $('crdCorreo')?.value||'',
-    asesor: $('crdAsesor')?.value||'',
+    asesor: (sesionActiva?.rol==='admin' ? ($('crdAsesorSelect')?.value||$('crdAsesor')?.value||'') : ($('crdAsesor')?.value||'')),
     total: precioFinal, inicial: ini,
     saldo: totalFinanciar, cuotas: quincenas, valorCuota,
     frecuencia: 'Quincenal', sede: sedeActual,
@@ -7194,9 +7198,25 @@ function abrirModalCredito() {
   if(cuotaRes) cuotaRes.style.display='none';
   const iniGrid = document.getElementById('crdInicialesGrid');
   if(iniGrid) iniGrid.innerHTML='<div style="background:#f7f5fb;border-radius:10px;padding:12px;text-align:center;color:#888899;font-size:12px;">Ingresa precio de venta</div>';
-  // Llenar asesor con usuario logueado
-  const elAsesor = document.getElementById('crdAsesor');
-  if(elAsesor && sesionActiva) elAsesor.value = sesionActiva.nombre.toUpperCase();
+  // Asesor: admin ve select, otros ven su nombre fijo
+  const esAdmin = sesionActiva?.rol === 'admin';
+  const elAsesor   = document.getElementById('crdAsesor');
+  const selAsesor  = document.getElementById('crdAsesorSelect');
+  if(esAdmin) {
+    // Mostrar select con todos los asesores
+    if(elAsesor)  elAsesor.style.display  = 'none';
+    if(selAsesor) {
+      selAsesor.style.display = '';
+      const nombres = ASESORES_ACTIVOS.filter(a=>a.activo).map(a=>a.nombre.toUpperCase());
+      selAsesor.innerHTML = nombres.map(n=>`<option value="${n}">${n}</option>`).join('');
+      // Preseleccionar el admin mismo
+      selAsesor.value = sesionActiva.nombre.toUpperCase();
+    }
+  } else {
+    // Mostrar input readonly con su nombre
+    if(elAsesor)  { elAsesor.style.display = ''; elAsesor.value = sesionActiva?.nombre?.toUpperCase()||''; }
+    if(selAsesor) selAsesor.style.display = 'none';
+  }
   openModal('modalNuevoCredito');
 }
 
@@ -7218,9 +7238,22 @@ function abrirModalContado() {
   ['vcResumenBase','vcDesgIVA','vcDesgDesc','vcDesgCom','vcPrecioFinalVal','vcGananciaVal','vcComFinVal'].forEach(id=>{
     const e=document.getElementById(id); if(e) e.textContent='$0';
   });
-  // Llenar asesor con usuario logueado
-  const elAsesor = document.getElementById('vcAsesor');
-  if(elAsesor && sesionActiva) elAsesor.value = sesionActiva.nombre.toUpperCase();
+  // Asesor: admin ve select, otros ven su nombre fijo
+  const esAdminVC  = sesionActiva?.rol === 'admin';
+  const elAsesorVC = document.getElementById('vcAsesor');
+  const selAsesorVC= document.getElementById('vcAsesorSelect');
+  if(esAdminVC) {
+    if(elAsesorVC)  elAsesorVC.style.display  = 'none';
+    if(selAsesorVC) {
+      selAsesorVC.style.display = '';
+      const nombresVC = ASESORES_ACTIVOS.filter(a=>a.activo).map(a=>a.nombre.toUpperCase());
+      selAsesorVC.innerHTML = nombresVC.map(n=>`<option value="${n}">${n}</option>`).join('');
+      selAsesorVC.value = sesionActiva.nombre.toUpperCase();
+    }
+  } else {
+    if(elAsesorVC)  { elAsesorVC.style.display = ''; elAsesorVC.value = sesionActiva?.nombre?.toUpperCase()||''; }
+    if(selAsesorVC) selAsesorVC.style.display = 'none';
+  }
   openModal('modalVentaContado');
 }
 
@@ -7909,7 +7942,7 @@ function previsualizarFactura() {
     correo:  $('crdCorreo')?.value||'',
     equipo:  $('crdEquipo')?.value||'Equipo',
     imei:    $('crdIMEI')?.value||'',
-    asesor:  $('crdAsesor')?.value||'',
+    asesor:  (sesionActiva?.rol==='admin' ? ($('crdAsesorSelect')?.value||$('crdAsesor')?.value||'') : ($('crdAsesor')?.value||'')),
     numContrato: $('crdNumContrato')?.value||'',
     sede: sedeActual,
     precioBase:base, iva:ivaVal, descuento:desc,
