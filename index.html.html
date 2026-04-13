@@ -4598,23 +4598,93 @@ function poblarSelectsAsesores() {
 
 const NOMINA_ASESORES = []; // Se llena dinámicamente
 
+// Cache local para gastos/nóminas (se sincroniza con Supabase)
+const _cacheGastos = {};
+const _cacheNominas = {};
+
 function getGastosFijosMes(mes) {
-  const key = 'gastosFijos_' + mes;
-  try { const v = sessionStorage.getItem(key); if(v) return JSON.parse(v); } catch(e){}
+  if(_cacheGastos[mes]) return _cacheGastos[mes];
   return GASTOS_FIJOS_LABELS.map(label => ({ label, valor: 0 }));
 }
-function setGastosFijosMes(mes, data) {
-  try { sessionStorage.setItem('gastosFijos_' + mes, JSON.stringify(data)); } catch(e){}
+
+async function setGastosFijosMes(mes, data) {
+  _cacheGastos[mes] = data;
+  // Guardar en Supabase tabla configuracion_contabilidad
+  try {
+    const headers = {
+      'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'Content-Type': 'application/json', 'Prefer': 'return=representation'
+    };
+    // Buscar si ya existe registro para este mes
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/configuracion_contabilidad?tipo=eq.gastos_fijos&mes=eq.${mes}`, {headers});
+    const rows = await res.json();
+    if(rows && rows.length > 0) {
+      // Actualizar
+      await fetch(`${SUPABASE_URL}/rest/v1/configuracion_contabilidad?tipo=eq.gastos_fijos&mes=eq.${mes}`, {
+        method:'PATCH', headers, body: JSON.stringify({ datos: JSON.stringify(data) })
+      });
+    } else {
+      // Insertar
+      await fetch(`${SUPABASE_URL}/rest/v1/configuracion_contabilidad`, {
+        method:'POST', headers, body: JSON.stringify({ tipo:'gastos_fijos', mes, datos: JSON.stringify(data) })
+      });
+    }
+  } catch(e) { console.error('Error guardando gastos fijos:', e); }
 }
+
+async function cargarGastosFijosMes(mes) {
+  try {
+    const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/configuracion_contabilidad?tipo=eq.gastos_fijos&mes=eq.${mes}`, {headers});
+    const rows = await res.json();
+    if(rows && rows.length > 0) {
+      _cacheGastos[mes] = JSON.parse(rows[0].datos);
+      return _cacheGastos[mes];
+    }
+  } catch(e) { console.error('Error cargando gastos fijos:', e); }
+  return GASTOS_FIJOS_LABELS.map(label => ({ label, valor: 0 }));
+}
+
 function getNominasMes(mes) {
-  const key = 'nominas_' + mes;
-  try { const v = sessionStorage.getItem(key); if(v) return JSON.parse(v); } catch(e){}
+  if(_cacheNominas[mes]) return _cacheNominas[mes];
   return NOMINA_ASESORES.map(nombre => ({ nombre, salario: 0 }));
 }
-function setNominasMes(mes, data) {
-  try { sessionStorage.setItem('nominas_' + mes, JSON.stringify(data)); } catch(e){}
+
+async function setNominasMes(mes, data) {
+  _cacheNominas[mes] = data;
+  try {
+    const headers = {
+      'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'Content-Type': 'application/json', 'Prefer': 'return=representation'
+    };
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/configuracion_contabilidad?tipo=eq.nominas&mes=eq.${mes}`, {headers});
+    const rows = await res.json();
+    if(rows && rows.length > 0) {
+      await fetch(`${SUPABASE_URL}/rest/v1/configuracion_contabilidad?tipo=eq.nominas&mes=eq.${mes}`, {
+        method:'PATCH', headers, body: JSON.stringify({ datos: JSON.stringify(data) })
+      });
+    } else {
+      await fetch(`${SUPABASE_URL}/rest/v1/configuracion_contabilidad`, {
+        method:'POST', headers, body: JSON.stringify({ tipo:'nominas', mes, datos: JSON.stringify(data) })
+      });
+    }
+  } catch(e) { console.error('Error guardando nóminas:', e); }
 }
-// Compatibilidad hacia atrás
+
+async function cargarNominasMes(mes) {
+  try {
+    const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/configuracion_contabilidad?tipo=eq.nominas&mes=eq.${mes}`, {headers});
+    const rows = await res.json();
+    if(rows && rows.length > 0) {
+      _cacheNominas[mes] = JSON.parse(rows[0].datos);
+      return _cacheNominas[mes];
+    }
+  } catch(e) { console.error('Error cargando nóminas:', e); }
+  return NOMINA_ASESORES.map(nombre => ({ nombre, salario: 0 }));
+}
+
+// Compatibilidad
 const gastosFijosData = getGastosFijosMes(mesColombia());
 
 // ============================================================
@@ -4799,7 +4869,7 @@ function showModule(name) {
   else if(name==='inventario') renderInventario();
   else if(name==='ventas') renderVentas();
   else if(name==='creditos') renderCreditos();
-  else if(name==='contabilidad') renderContabilidad();
+  else if(name==='contabilidad') { renderContabilidad(); }
   else if(name==='compras') { renderCompras(); renderTablaProveedores(db.proveedores); poblarSelectProveedores(); }
   else if(name==='tareas') { renderTareas(); }
   else if(name==='clientes') { cargarClientes(); }
@@ -5155,7 +5225,7 @@ function limpiarFiltrosCreditos() {
   renderCreditos(tabCreditosActual);
 }
 
-function renderContabilidad(){
+async function renderContabilidad(){
   const ahora = new Date();
   const mesActual = ahora.getFullYear()+'-'+String(ahora.getMonth()+1).padStart(2,'0');
   const ventasMes = db.ventas.filter(v=>v.fecha&&v.fecha.startsWith(mesActual)&&!v.anulada);
@@ -5173,7 +5243,7 @@ function renderContabilidad(){
   setEl('contGananciaDelta', 'Ganancia '+mesActual);
 
   // ── Gastos fijos editables por mes ──
-  const gastosMesData = getGastosFijosMes(mesActual);
+  const gastosMesData = await cargarGastosFijosMes(mesActual);
   const totalFijos = gastosMesData.reduce((a,g)=>a+g.valor,0);
   const gfEl = $('gastosFijos');
   if(gfEl) gfEl.innerHTML = `
@@ -5220,7 +5290,7 @@ function renderContabilidad(){
     </tr>`).join('');
 
   // ── Nómina editable por mes ──
-  const nominasMes = getNominasMes(mesActual);
+  const nominasMes = await cargarNominasMes(mesActual);
   // Comisión = suma real de comision_asesor registrada en cada venta del mes
   const comisionesMes = {};
   ventasMes.forEach(v=>{
@@ -5289,9 +5359,9 @@ function mostrarModalEdicion(titulo, campos, onGuardar) {
 function editarUnGastoFijo(mes, idx) {
   const data = getGastosFijosMes(mes);
   const g = data[idx];
-  mostrarModalEdicion(`✏️ Editar: ${g.label}`, [{label: g.label + ' ($)', valor: g.valor}], (vals) => {
+  mostrarModalEdicion(`✏️ Editar: ${g.label}`, [{label: g.label + ' ($)', valor: g.valor}], async (vals) => {
     data[idx].valor = vals[0];
-    setGastosFijosMes(mes, data);
+    await setGastosFijosMes(mes, data);
     renderContabilidad();
     toast(`"${g.label}" actualizado ✅`);
   });
@@ -5301,9 +5371,9 @@ function editarTodosGastosFijos(mes) {
   const data = getGastosFijosMes(mes);
   mostrarModalEdicion(`✏️ Gastos Fijos — ${mes}`,
     data.map(g => ({label: g.label+' ($)', valor: g.valor})),
-    (vals) => {
+    async (vals) => {
       vals.forEach((v,i) => { data[i].valor = v; });
-      setGastosFijosMes(mes, data);
+      await setGastosFijosMes(mes, data);
       renderContabilidad();
       toast('Gastos fijos actualizados ✅');
     }
@@ -5318,8 +5388,7 @@ function agregarGastoFijo(mes) {
   const valor = parseFloat(valorStr)||0;
   const data = getGastosFijosMes(mes);
   data.push({ label: label.trim(), valor });
-  setGastosFijosMes(mes, data);
-  renderContabilidad();
+  setGastosFijosMes(mes, data).then(() => renderContabilidad());
   toast(`"${label.trim()}" agregado ✅`);
 }
 
@@ -5331,8 +5400,7 @@ function eliminarGastoFijo(mes, idx) {
 
 Esta acción no se puede deshacer.`)) return;
   data.splice(idx, 1);
-  setGastosFijosMes(mes, data);
-  renderContabilidad();
+  setGastosFijosMes(mes, data).then(() => renderContabilidad());
   toast(`"${g.label}" eliminado ✅`);
 }
 
@@ -5344,8 +5412,7 @@ function editarUnaSalario(mes, idx) {
     [{label: 'Salario base ($)', valor: n.salario}],
     (vals) => {
       data[idx].salario = vals[0];
-      setNominasMes(mes, data);
-      renderContabilidad();
+      setNominasMes(mes, data).then(() => renderContabilidad());
       toast(`Salario de ${n.nombre} actualizado ✅`);
     }
   );
