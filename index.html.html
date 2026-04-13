@@ -6019,11 +6019,7 @@ function abrirModalNuevaTareaInit() {
   openModal('modalNuevaTarea');
 }
 
-// Sobrescribir el onclick del botón
-document.addEventListener('DOMContentLoaded', () => {
-  const btn = document.querySelector('[onclick="openModal('modalNuevaTarea')"]');
-  if(btn) btn.setAttribute('onclick','abrirModalNuevaTareaInit()');
-});
+// Botón de nueva tarea usa abrirModalNuevaTareaInit() directamente en HTML
 
 function guardarTarea() {
   const titulo = document.getElementById('tareaTitulo')?.value?.trim();
