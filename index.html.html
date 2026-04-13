@@ -5885,7 +5885,7 @@ async function guardarVentaContado(){
   const precioFinal=base-desc;                     // IVA NO suma al precio
   const comVal=Math.round(precioFinal*comPct/100);
   const ganancia=precioFinal-costo-comVal;
-  const finSel=($('vcFinanciera')?.value||'CONTADO').split(':')[0];
+  const finSel=(($('vcFinanciera')?.value||'CONTADO:0').split(':')[0]).substring(0,50);
   const imei=$('vcIMEI')?.value||'';
   const comp=db.compras.find(c=>c.imei1===imei||c.imei2===imei||c.serial===imei);
 
@@ -5933,7 +5933,7 @@ async function guardarCredito(){
   const aplicaInt    = $('crdAplicaIntereses')?.checked||false;
   const tasaInt      = parseFloat($('crdTasaInteres')?.value)||2.5;
   const enviarFact   = $('crdEnviarFactura')?.checked||false;
-  const finSel       = ($('crdFinanciera')?.value||'CONTADO:0').split(':')[0];
+  const finSel       = ((($('crdFinanciera')?.value||'CONTADO:0').split(':')[0]).substring(0,50)).substring(0,50);
 
   const ivaVal         = Math.round(base * ivaPct/100);   // Solo informativo
   const precioFinal    = base - desc + prodAdicVal;        // IVA NO suma
@@ -5978,7 +5978,7 @@ async function guardarCredito(){
     docCedBack:   getUrlArchivo('upCedBack'),
     docFoto:      getUrlArchivo('upFotoEntrega'),
     docContrato:  getUrlArchivo('upContrato'),
-    financiera:   ($('crdFinanciera')?.value||'CONTADO:0').split(':')[0]
+    financiera:   ((($('crdFinanciera')?.value||'CONTADO:0').split(':')[0]).substring(0,50)).substring(0,50)
   };
 
   try {
@@ -7046,7 +7046,7 @@ function previsualizarFactura() {
   const quincenas    = parseInt($('crdPlazoQuincenas')?.value)||12;
   const aplicaInt    = $('crdAplicaIntereses')?.checked||false;
   const tasaInt      = parseFloat($('crdTasaInteres')?.value)||2.5;
-  const finSel       = ($('crdFinanciera')?.value||'CONTADO:0').split(':')[0];
+  const finSel       = ((($('crdFinanciera')?.value||'CONTADO:0').split(':')[0]).substring(0,50)).substring(0,50);
   const sedeActual   = window.SEDE_ACTIVA || 'LOCAL PEREIRA';
 
   const ivaVal      = Math.round(base * ivaPct/100);
@@ -8288,12 +8288,11 @@ async function eliminarFinanciera(id) {
 
 function poblarSelectFinancieras() {
   const activas = dbAdmin.financieras.filter(f => f.estado === 'activa');
-  // Actualizar todos los selects de financiera en el sistema
   ['vcFinanciera', 'crdFinanciera'].forEach(id => {
     const sel = document.getElementById(id);
     if (!sel) return;
-    sel.innerHTML = '<option value="">Seleccionar financiera...</option>' +
-      activas.map(f => `<option value="${f.nombre}:${f.comision}">${f.nombre} (${f.comision}% comisión)</option>`).join('');
+    sel.innerHTML = '<option value=":0">Seleccionar financiera...</option>' +
+      activas.map(f => `<option value="${f.nombre}:${f.comision}">${f.nombre} (${f.comision}%)</option>`).join('');
   });
 }
 
