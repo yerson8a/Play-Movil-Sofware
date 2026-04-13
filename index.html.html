@@ -2679,8 +2679,8 @@
                 style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:#6B2D8B;color:#fff;border:none;border-radius:8px;padding:5px 12px;font-size:12px;cursor:pointer;font-weight:600;">
                 + Nuevo
               </button>
+              <div id="crdClienteDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:9999;background:#fff;border:1px solid #ece8f5;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.2);max-height:220px;overflow-y:auto;margin-top:4px;"></div>
             </div>
-            <div id="crdClienteDropdown" style="display:none;position:absolute;z-index:600;background:#fff;border:1px solid #ece8f5;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.15);max-height:220px;overflow-y:auto;min-width:320px;"></div>
           </div>
           <!-- Info cliente seleccionado -->
           <div id="crdClienteSelInfo" style="display:none;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px;margin-bottom:10px;">
@@ -3201,8 +3201,8 @@
             style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:#6B2D8B;color:#fff;border:none;border-radius:8px;padding:5px 12px;font-size:12px;cursor:pointer;font-weight:600;">
             + Nuevo
           </button>
+          <div id="vcClienteDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:9999;background:#fff;border:1px solid #ece8f5;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.2);max-height:220px;overflow-y:auto;margin-top:4px;"></div>
         </div>
-        <div id="vcClienteDropdown" style="display:none;position:absolute;z-index:600;background:#fff;border:1px solid #ece8f5;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.15);max-height:220px;overflow-y:auto;min-width:320px;"></div>
       </div>
       <!-- Cliente seleccionado -->
       <div id="vcClienteSelInfo" style="display:none;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px;margin-bottom:12px;">
@@ -6215,7 +6215,10 @@ async function cargarClientes() {
   } catch(e) {
     db.clientes = [];
   }
-  renderClientes();
+  // Solo renderizar si estamos en el módulo clientes
+  if(document.getElementById('mod-clientes')?.classList.contains('active')) {
+    renderClientes();
+  }
 }
 
 function renderClientes(data) {
@@ -6420,15 +6423,39 @@ function buscarClienteVenta(q, prefijo) {
 }
 
 // Buscar cliente por cédula al escribir en campo cédula
-function buscarClienteUnificado(q, prefijo) {
+async function buscarClienteUnificado(q, prefijo) {
   const dd = document.getElementById(prefijo+'ClienteDropdown');
   if(!dd) return;
+  q = q.trim();
   if(!q || q.length < 2) { dd.style.display='none'; return; }
+
+  // Si db.clientes está vacío, cargar primero
+  if(!db.clientes || db.clientes.length === 0) {
+    dd.innerHTML = '<div style="padding:12px 14px;font-size:13px;color:#888899;">⏳ Cargando...</div>';
+    dd.style.display='block';
+    await cargarClientes();
+  }
+
   const ql = q.toLowerCase();
-  const resultados = db.clientes.filter(c =>
+  // Buscar en memoria local
+  let resultados = db.clientes.filter(c =>
     (c.nombre||'').toLowerCase().includes(ql) ||
-    (c.documento||'').includes(q)
+    (c.documento||'').toLowerCase().includes(ql)
   ).slice(0, 10);
+
+  // Si no hay resultados locales, buscar en Supabase directamente
+  if(!resultados.length && q.length >= 3) {
+    try {
+      const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+      const r1 = await fetch(`${SUPABASE_URL}/rest/v1/clientes?select=id,nombre,tipo_doc,documento,telefono,correo&nombre=ilike.*${encodeURIComponent(q)}*&limit=10`, {headers});
+      const r2 = await fetch(`${SUPABASE_URL}/rest/v1/clientes?select=id,nombre,tipo_doc,documento,telefono,correo&documento=ilike.*${encodeURIComponent(q)}*&limit=10`, {headers});
+      const d1 = await r1.json(); const d2 = await r2.json();
+      resultados = [...(Array.isArray(d1)?d1:[]), ...(Array.isArray(d2)?d2:[])];
+      // Deduplicar y guardar en memoria
+      resultados = resultados.filter((c,i,a) => a.findIndex(x=>x.id===c.id)===i);
+      resultados.forEach(c => { if(!db.clientes.find(x=>x.id===c.id)) db.clientes.push(c); });
+    } catch(e) { console.error('Error buscando clientes:', e); }
+  }
 
   if(!resultados.length) {
     dd.innerHTML = `
@@ -6443,13 +6470,16 @@ function buscarClienteUnificado(q, prefijo) {
     return;
   }
 
-  dd.innerHTML = resultados.map(c => `
-    <div onclick="seleccionarClienteVenta(${c.id}, '${prefijo}')"
+  dd.innerHTML = resultados.map(c => {
+    const cId = c.id;
+    const pref = prefijo;
+    return `<div onclick="seleccionarClientePorId(${cId}, '${pref}')"
       style="padding:10px 14px;cursor:pointer;border-bottom:1px solid #f7f5fb;font-size:13px;"
       onmouseover="this.style.background='#f7f5fb'" onmouseout="this.style.background=''">
       <div style="font-weight:700;">${c.nombre}</div>
       <div style="font-size:11px;color:#888899;">${c.tipo_doc||'CC'}: ${c.documento||'—'}${c.telefono?' · '+c.telefono:''}</div>
-    </div>`).join('') +
+    </div>`;
+  }).join('') +
     `<div style="padding:8px 14px;border-top:1px solid #f0ecf8;">
       <button type="button" onclick="abrirModalNuevoClienteDesdeVenta('${prefijo}')"
         style="color:#6B2D8B;background:none;border:none;cursor:pointer;font-size:12px;font-weight:600;">
