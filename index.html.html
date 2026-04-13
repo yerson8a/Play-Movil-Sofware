@@ -7480,22 +7480,17 @@ function mostrarErrorVenta(titulo, mensaje) {
 // FECHA EN HORA COLOMBIA (UTC-5)
 // ============================================================
 function fechaColombia() {
-  // Usa la API Intl para obtener la fecha exacta en Bogotá
-  const ahora = new Date();
-  const partes = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Bogota',
-    year:  'numeric',
-    month: '2-digit',
-    day:   '2-digit'
-  }).formatToParts(ahora);
-  const y = partes.find(p=>p.type==='year').value;
-  const m = partes.find(p=>p.type==='month').value;
-  const d = partes.find(p=>p.type==='day').value;
+  // UTC-5 fijo Colombia — resta 5 horas al UTC actual
+  const utc = new Date();
+  const col = new Date(utc.getTime() - (5 * 60 * 60 * 1000));
+  const y = col.getUTCFullYear();
+  const m = String(col.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(col.getUTCDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
 }
 
 function mesColombia() {
-  return fechaColombia().slice(0,7);
+  return fechaColombia().slice(0, 7);
 }
 
 // ============================================================
