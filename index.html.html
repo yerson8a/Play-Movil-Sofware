@@ -3923,7 +3923,7 @@ function mapCredito(c) {
     telefono: c.telefono_cliente || '',
     equipo: c.producto_desc || '—',
     asesor: c.asesor || '',
-    financiera: '—',
+    financiera: c.financiera || '—',
     total: parseFloat(c.monto_total) || 0,
     inicial: parseFloat(c.inicial) || 0,
     saldo: parseFloat(c.saldo_pendiente) || 0,
@@ -4111,7 +4111,8 @@ async function guardarCreditoDB(datos) {
       doc_cedula_frente:  datos.docCedFront  || null,
       doc_cedula_reverso: datos.docCedBack   || null,
       doc_foto_entrega:   datos.docFoto      || null,
-      doc_contrato:       datos.docContrato  || null
+      doc_contrato:       datos.docContrato  || null,
+      financiera:         datos.financiera   || null
     };
     const res = await sbFetch('creditos', { method: 'POST', body: row });
     const nuevo = mapCredito(res[0]);
@@ -4740,15 +4741,18 @@ function renderCreditos(filtro='activos'){
   else if(filtro==='reportados')data=data.filter(c=>c.reportado);
   else data=data.filter(c=>c.estado==='al_dia'||c.estado==='mora');
 
-  // Poblar select de financieras
+  // Poblar select de financieras (siempre actualizar)
   const selFin = document.getElementById('filtroCredFinanciera');
-  if(selFin && selFin.options.length <= 1) {
-    const fins = [...new Set(db.creditos.map(c=>c.financiera).filter(Boolean))].sort();
+  if(selFin) {
+    const valActual = selFin.value;
+    selFin.innerHTML = '<option value="">Todas las financieras</option>';
+    const fins = [...new Set(db.creditos.map(c=>c.financiera).filter(f => f && f !== '—'))].sort();
     fins.forEach(f => {
       const opt = document.createElement('option');
       opt.value = f; opt.textContent = f;
       selFin.appendChild(opt);
     });
+    if(valActual) selFin.value = valActual;
   }
 
   // Aplicar filtros de texto y financiera
@@ -5944,7 +5948,8 @@ async function guardarCredito(){
     docCedFront:  getUrlArchivo('upCedFront'),
     docCedBack:   getUrlArchivo('upCedBack'),
     docFoto:      getUrlArchivo('upFotoEntrega'),
-    docContrato:  getUrlArchivo('upContrato')
+    docContrato:  getUrlArchivo('upContrato'),
+    financiera:   ($('crdFinanciera')?.value||'CONTADO:0').split(':')[0]
   };
 
   try {
