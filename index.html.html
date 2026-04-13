@@ -2667,39 +2667,35 @@
         <div class="card">
           <div class="card-title" style="font-size:13px;margin-bottom:10px;">👤 Cliente</div>
           <!-- Búsqueda de cliente -->
-          <div class="form-group" style="margin-bottom:10px;">
-            <label class="form-label">Buscar cliente</label>
+          <!-- Buscador único de cliente -->
+          <div class="form-group" style="margin-bottom:12px;">
+            <label class="form-label">Buscar cliente por nombre o cédula *</label>
             <div style="position:relative;">
-              <input type="text" class="form-control" id="crdClienteBusca" placeholder="Escribe nombre, cédula, NIT o pasaporte..." oninput="buscarClienteVenta(this.value,'crd')" autocomplete="off" style="padding-right:40px;">
-              <button type="button" onclick="abrirModalNuevoClienteDesdeVenta('crd')" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:#6B2D8B;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;" title="Crear nuevo cliente">+ Nuevo</button>
+              <input type="text" class="form-control" id="crdClienteBusca"
+                placeholder="Escribe nombre o cédula del cliente..."
+                oninput="buscarClienteUnificado(this.value,'crd')"
+                autocomplete="off">
+              <button type="button" onclick="abrirModalNuevoClienteDesdeVenta('crd')"
+                style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:#6B2D8B;color:#fff;border:none;border-radius:8px;padding:5px 12px;font-size:12px;cursor:pointer;font-weight:600;">
+                + Nuevo
+              </button>
             </div>
-            <div id="crdClienteDropdown" style="display:none;position:absolute;z-index:500;background:#fff;border:1px solid #ece8f5;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.12);max-height:200px;overflow-y:auto;min-width:300px;"></div>
+            <div id="crdClienteDropdown" style="display:none;position:absolute;z-index:600;background:#fff;border:1px solid #ece8f5;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.15);max-height:220px;overflow-y:auto;min-width:320px;"></div>
           </div>
-          <div id="crdClienteSelInfo" style="display:none;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px;margin-bottom:10px;font-size:12px;">
-            <span style="color:#16a34a;font-weight:600;">✅ Cliente seleccionado: </span><span id="crdClienteSelNombre"></span>
-            <button type="button" onclick="limpiarClienteVenta('crd')" style="float:right;background:none;border:none;color:#dc2626;cursor:pointer;font-size:12px;">✕ Cambiar</button>
+          <!-- Info cliente seleccionado -->
+          <div id="crdClienteSelInfo" style="display:none;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px;margin-bottom:10px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="color:#16a34a;font-weight:700;font-size:13px;">✅ <span id="crdClienteSelNombre"></span></span>
+              <button type="button" onclick="limpiarClienteVenta('crd')" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:12px;font-weight:600;">✕ Cambiar</button>
+            </div>
+            <div id="crdClienteSelDetalle" style="font-size:11px;color:#555577;margin-top:3px;"></div>
           </div>
-          <!-- Búsqueda por cédula — auto-llena los demás campos -->
+          <!-- Campos ocultos que se llenan automáticamente -->
+          <input type="hidden" id="crdCedula">
+          <input type="hidden" id="crdCliente">
+          <input type="hidden" id="crdTelefono">
+          <input type="hidden" id="crdCorreo">
           <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">Cédula / Documento *</label>
-              <input type="text" class="form-control" id="crdCedula" placeholder="Escribe la cédula para buscar cliente..." oninput="buscarClientePorCedula(this.value,'crd')">
-              <div id="crdCedulaInfo" style="font-size:11px;margin-top:3px;display:none;"></div>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Nombre completo *</label>
-              <input type="text" class="form-control" id="crdCliente" placeholder="Se llena al buscar por cédula" readonly style="background:#f7f5fb;">
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">Teléfono</label>
-              <input type="text" class="form-control" id="crdTelefono" placeholder="—" readonly style="background:#f7f5fb;">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Correo</label>
-              <input type="email" class="form-control" id="crdCorreo" placeholder="—" readonly style="background:#f7f5fb;">
-            </div>
             <div class="form-group">
               <label class="form-label">N° Contrato</label>
               <input type="text" class="form-control" id="crdNumContrato" placeholder="Ej: C-2024-001">
@@ -3193,29 +3189,37 @@
     <!-- Cliente y asesor -->
     <div class="card" style="margin-bottom:16px;">
       <div class="card-title" style="font-size:13px;margin-bottom:12px;">👤 Cliente y Asesor</div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Cédula / Documento *</label>
-          <input type="text" class="form-control" id="vcCedula" placeholder="Escribe la cédula para buscar cliente..." oninput="buscarClientePorCedula(this.value,'vc')">
-          <div id="vcCedulaInfo" style="font-size:11px;margin-top:3px;display:none;"></div>
+      <!-- Buscador único -->
+      <div class="form-group" style="margin-bottom:12px;">
+        <label class="form-label">Buscar cliente por nombre o cédula *</label>
+        <div style="position:relative;">
+          <input type="text" class="form-control" id="vcClienteBusca"
+            placeholder="Escribe nombre o cédula..."
+            oninput="buscarClienteUnificado(this.value,'vc')"
+            autocomplete="off">
+          <button type="button" onclick="abrirModalNuevoClienteDesdeVenta('vc')"
+            style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:#6B2D8B;color:#fff;border:none;border-radius:8px;padding:5px 12px;font-size:12px;cursor:pointer;font-weight:600;">
+            + Nuevo
+          </button>
         </div>
-        <div class="form-group">
-          <label class="form-label">Nombre del Cliente *</label>
-          <input type="text" class="form-control" id="vcCliente" placeholder="Se llena al buscar por cédula" readonly style="background:#f7f5fb;">
-        </div>
+        <div id="vcClienteDropdown" style="display:none;position:absolute;z-index:600;background:#fff;border:1px solid #ece8f5;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.15);max-height:220px;overflow-y:auto;min-width:320px;"></div>
       </div>
+      <!-- Cliente seleccionado -->
+      <div id="vcClienteSelInfo" style="display:none;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px;margin-bottom:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="color:#16a34a;font-weight:700;font-size:13px;">✅ <span id="vcClienteSelNombre"></span></span>
+          <button type="button" onclick="limpiarClienteVenta('vc')" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:12px;font-weight:600;">✕ Cambiar</button>
+        </div>
+        <div id="vcClienteSelDetalle" style="font-size:11px;color:#555577;margin-top:3px;"></div>
+      </div>
+      <!-- Campos ocultos -->
+      <input type="hidden" id="vcCedula">
+      <input type="hidden" id="vcCliente">
+      <input type="hidden" id="vcTelefono">
+      <input type="hidden" id="vcCorreo">
       <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Teléfono</label>
-          <input type="text" class="form-control" id="vcTelefono" placeholder="—" readonly style="background:#f7f5fb;">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Correo Electrónico</label>
-          <input type="email" class="form-control" id="vcCorreo" placeholder="—" readonly style="background:#f7f5fb;">
-        </div>
         <div class="form-group">
           <label class="form-label">Asesor Comercial</label>
-          <!-- Admin: select; Otros: input readonly -->
           <select class="form-control" id="vcAsesorSelect" style="display:none;font-weight:600;color:#6B2D8B;"></select>
           <input type="text" class="form-control" id="vcAsesor" readonly style="background:#f7f5fb;font-weight:600;color:#6B2D8B;cursor:default;" placeholder="Asesor actual">
         </div>
@@ -6416,6 +6420,45 @@ function buscarClienteVenta(q, prefijo) {
 }
 
 // Buscar cliente por cédula al escribir en campo cédula
+function buscarClienteUnificado(q, prefijo) {
+  const dd = document.getElementById(prefijo+'ClienteDropdown');
+  if(!dd) return;
+  if(!q || q.length < 2) { dd.style.display='none'; return; }
+  const ql = q.toLowerCase();
+  const resultados = db.clientes.filter(c =>
+    (c.nombre||'').toLowerCase().includes(ql) ||
+    (c.documento||'').includes(q)
+  ).slice(0, 10);
+
+  if(!resultados.length) {
+    dd.innerHTML = `
+      <div style="padding:12px 14px;font-size:13px;color:#888899;">
+        Sin resultados —
+        <button type="button" onclick="abrirModalNuevoClienteDesdeVenta('${prefijo}')"
+          style="color:#6B2D8B;background:none;border:none;cursor:pointer;font-weight:600;">
+          + Crear nuevo cliente
+        </button>
+      </div>`;
+    dd.style.display = 'block';
+    return;
+  }
+
+  dd.innerHTML = resultados.map(c => `
+    <div onclick="seleccionarClienteVenta(${c.id}, '${prefijo}')"
+      style="padding:10px 14px;cursor:pointer;border-bottom:1px solid #f7f5fb;font-size:13px;"
+      onmouseover="this.style.background='#f7f5fb'" onmouseout="this.style.background=''">
+      <div style="font-weight:700;">${c.nombre}</div>
+      <div style="font-size:11px;color:#888899;">${c.tipo_doc||'CC'}: ${c.documento||'—'}${c.telefono?' · '+c.telefono:''}</div>
+    </div>`).join('') +
+    `<div style="padding:8px 14px;border-top:1px solid #f0ecf8;">
+      <button type="button" onclick="abrirModalNuevoClienteDesdeVenta('${prefijo}')"
+        style="color:#6B2D8B;background:none;border:none;cursor:pointer;font-size:12px;font-weight:600;">
+        + Crear nuevo cliente
+      </button>
+    </div>`;
+  dd.style.display = 'block';
+}
+
 function buscarClientePorCedula(val, prefijo) {
   const infoEl = document.getElementById(prefijo+'CedulaInfo');
   val = val.trim();
@@ -6464,20 +6507,22 @@ function seleccionarClientePorId(id, prefijo) {
 }
 
 function seleccionarClienteVenta(c, prefijo) {
-  // Cerrar dropdown
+  if(typeof c === 'number') { seleccionarClientePorId(c, prefijo); return; }
+  // Cerrar dropdown y limpiar búsqueda
   const dd = document.getElementById(prefijo+'ClienteDropdown');
   if(dd) dd.style.display='none';
-  // Mostrar info seleccionado
-  const info = document.getElementById(prefijo+'ClienteSelInfo');
-  const nom  = document.getElementById(prefijo+'ClienteSelNombre');
-  if(info) info.style.display='block';
-  if(nom)  nom.textContent = `${c.nombre} · ${c.tipo_doc||'CC'}: ${c.documento||'—'}`;
-  // Limpiar búsqueda
   const busca = document.getElementById(prefijo+'ClienteBusca');
   if(busca) busca.value='';
-  // Llenar campos del formulario
+  // Mostrar tarjeta de cliente seleccionado
+  const info   = document.getElementById(prefijo+'ClienteSelInfo');
+  const nom    = document.getElementById(prefijo+'ClienteSelNombre');
+  const detalle= document.getElementById(prefijo+'ClienteSelDetalle');
+  if(info) info.style.display='block';
+  if(nom)  nom.textContent = c.nombre?.toUpperCase()||'—';
+  if(detalle) detalle.textContent = `${c.tipo_doc||'CC'}: ${c.documento||'—'}${c.telefono?' · '+c.telefono:''}${c.correo?' · '+c.correo:''}`;
+  // Llenar campos ocultos
   const prefix = prefijo==='crd' ? 'crd' : 'vc';
-  const setVal = (id, v) => { const e=document.getElementById(id); if(e) e.value=v||''; };
+  const setVal = (id, v) => { const e=document.getElementById(id); if(e) e.value=(v||'').toUpperCase(); };
   setVal(prefix+'Cliente',  c.nombre);
   setVal(prefix+'Cedula',   c.documento);
   setVal(prefix+'Telefono', c.telefono||'');
@@ -6487,14 +6532,14 @@ function seleccionarClienteVenta(c, prefijo) {
 function limpiarClienteVenta(prefijo) {
   const info   = document.getElementById(prefijo+'ClienteSelInfo');
   if(info) info.style.display='none';
-  const infoC  = document.getElementById(prefijo+'CedulaInfo');
-  if(infoC) infoC.style.display='none';
   const prefix = prefijo==='crd' ? 'crd' : 'vc';
   ['Cliente','Cedula','Telefono','Correo'].forEach(f => {
     const e = document.getElementById(prefix+f); if(e) e.value='';
   });
   const busca = document.getElementById(prefijo+'ClienteBusca');
   if(busca) { busca.value=''; busca.focus(); }
+  const dd = document.getElementById(prefijo+'ClienteDropdown');
+  if(dd) dd.style.display='none';
 }
 
 // Cerrar dropdown al hacer clic fuera
