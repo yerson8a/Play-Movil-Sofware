@@ -3452,6 +3452,7 @@
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;" class="perm-label"><input type="checkbox" name="permiso" value="clientes" style="width:15px;height:15px;accent-color:#6B2D8B;"> 👥 Clientes</label>
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;" class="perm-label"><input type="checkbox" name="permiso" value="proveedores" style="width:15px;height:15px;accent-color:#6B2D8B;"> 🏭 Proveedores</label>
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;" class="perm-label"><input type="checkbox" name="permiso" value="productos" style="width:15px;height:15px;accent-color:#6B2D8B;"> 📦 Productos</label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;" class="perm-label"><input type="checkbox" name="permiso" value="tareas" style="width:15px;height:15px;accent-color:#6B2D8B;"> 📋 Tareas</label>
       </div>
       <div style="font-size:11px;color:#888899;margin-top:6px;">Sin selección = acceso completo según su rol.</div>
     </div>
@@ -4712,9 +4713,9 @@ function aplicarPermisosNavegacion(user) {
 
 function aplicarPermisosRol(rol) {
   const porRol = {
-    asesor:   ['dashboard','clientes','inventario','ventas','creditos','simulador','garantias','servicio'],
-    bodega:   ['dashboard','inventario','compras','garantias'],
-    consulta: ['dashboard','inventario','ventas','creditos'],
+    asesor:   ['dashboard','tareas','clientes','inventario','ventas','creditos','simulador','garantias','servicio'],
+    bodega:   ['dashboard','tareas','inventario','compras','garantias'],
+    consulta: ['dashboard','tareas','inventario','ventas','creditos'],
   };
   const permitidos = porRol[rol] || ['dashboard'];
   document.querySelectorAll('.nav-item').forEach(nav => {
@@ -4748,9 +4749,9 @@ function onCambioRolUsuario(rol) {
       cb.disabled = false;
       // Permisos por defecto según rol
       const porRol = {
-        asesor:   ['dashboard','clientes','inventario','ventas','creditos','simulador','garantias','servicio'],
-        bodega:   ['dashboard','inventario','compras','garantias','servicio'],
-        consulta: ['dashboard','inventario','ventas','creditos'],
+        asesor:   ['dashboard','tareas','clientes','inventario','ventas','creditos','simulador','garantias','servicio'],
+        bodega:   ['dashboard','tareas','inventario','compras','garantias','servicio'],
+        consulta: ['dashboard','tareas','inventario','ventas','creditos'],
       };
       const defaults = porRol[rol] || [];
       cb.checked = defaults.includes(cb.value);
