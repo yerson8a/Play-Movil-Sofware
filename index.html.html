@@ -6933,6 +6933,13 @@ async function guardarVentaContado(){
   }
   // Validar cliente
   if(!$U('vcCliente')) { toast('Selecciona un cliente','error'); return; }
+  // Validar asesor — admin debe escoger un asesor habilitado
+  const asesorSelVC = ($U('vcAsesorSelect')||$U('vcAsesor')||'').trim();
+  if(!asesorSelVC) { toast('Selecciona un asesor para la venta','error'); return; }
+  const asesorActivoVC = ASESORES_ACTIVOS.find(a => a.activo && a.nombre.toUpperCase() === asesorSelVC.toUpperCase());
+  if(!asesorActivoVC && sesionActiva?.rol === 'admin') {
+    toast('El asesor seleccionado no está habilitado. Escoge un asesor activo.','error'); return;
+  }
 
   const ivaPct    = parseFloat($('vcIVA')?.value)||0;
   const desc      = getMoneyValue('vcDescuento');
@@ -7057,6 +7064,13 @@ async function guardarCredito(){
     toast('Agrega al menos un producto antes de guardar','error'); return;
   }
   if(!$U('crdCliente')) { toast('Selecciona un cliente','error'); return; }
+  // Validar asesor — admin debe escoger un asesor habilitado
+  const asesorSelCrd = ($U('crdAsesorSelect')||$U('crdAsesor')||'').trim();
+  if(!asesorSelCrd) { toast('Selecciona un asesor para la venta','error'); return; }
+  const asesorActivoCrd = ASESORES_ACTIVOS.find(a => a.activo && a.nombre.toUpperCase() === asesorSelCrd.toUpperCase());
+  if(!asesorActivoCrd && sesionActiva?.rol === 'admin') {
+    toast('El asesor seleccionado no está habilitado. Escoge un asesor activo del módulo Asesores.','error'); return;
+  }
 
   // Validar disponibilidad de cada IMEI
   for(const p of productosVentaCrd) {
@@ -8603,24 +8617,59 @@ async function ejecutarAnulacion() {
         });
       }
 
-      // 3. Devolver equipo al inventario (estado DISPONIBLE)
-      if(credito.equipo) {
-        // Buscar por nombre exacto en estado VENDIDO
-        const resProd = await fetch(
-          `${baseUrl}/productos?select=id,producto,imei1&producto=eq.${encodeURIComponent(credito.equipo)}&estado=eq.VENDIDO&limit=1`,
+      // 3. Devolver TODOS los equipos al inventario
+      // credito.equipo puede ser "PROD A | PROD B | PROD C" para multi-producto
+      const equiposAnular = (credito.equipo||'').split('|').map(e=>e.trim()).filter(Boolean);
+      let devueltos = [];
+      for(const eqNombre of equiposAnular) {
+        if(!eqNombre) continue;
+        // Buscar por nombre en estado VENDIDO
+        let resProd = await fetch(
+          `${baseUrl}/productos?select=id,producto,imei1&producto=eq.${encodeURIComponent(eqNombre)}&estado=eq.VENDIDO&limit=1`,
           {headers}
         );
-        const prods = await resProd.json();
+        let prods = await resProd.json();
+        // Si no encuentra por nombre exacto, buscar por ilike
+        if(!prods.length) {
+          resProd = await fetch(
+            `${baseUrl}/productos?select=id,producto,imei1&producto=ilike.*${encodeURIComponent(eqNombre)}*&estado=eq.VENDIDO&limit=1`,
+            {headers}
+          );
+          prods = await resProd.json();
+        }
         if(prods.length > 0) {
           await fetch(`${baseUrl}/productos?id=eq.${prods[0].id}`, {
             method: 'PATCH',
             headers: {...headers, 'Content-Type':'application/json'},
             body: JSON.stringify({ estado: 'DISPONIBLE' })
           });
-          toast('✅ Venta anulada · Crédito anulado · ' + prods[0].producto + ' devuelto al inventario');
-        } else {
-          toast('✅ Venta anulada · Crédito anulado (equipo no encontrado en inventario)');
+          // Actualizar memoria local
+          const inv = db.inventario.find(i=>i.id===prods[0].id);
+          if(inv) inv.estado='DISPONIBLE';
+          const comp = db.compras.find(c=>c.id===prods[0].id);
+          if(comp) comp.estado='DISPONIBLE';
+          devueltos.push(prods[0].producto);
         }
+      }
+      // También buscar por IMEI si el crédito tiene IMEI
+      if(credito.imei && !devueltos.length) {
+        const resI = await fetch(
+          `${baseUrl}/productos?select=id,producto,imei1&imei1=eq.${credito.imei}&estado=eq.VENDIDO&limit=1`,
+          {headers}
+        );
+        const prI = await resI.json();
+        if(prI.length) {
+          await fetch(`${baseUrl}/productos?id=eq.${prI[0].id}`, {
+            method:'PATCH', headers:{...headers,'Content-Type':'application/json'},
+            body: JSON.stringify({estado:'DISPONIBLE'})
+          });
+          devueltos.push(prI[0].producto);
+        }
+      }
+      if(devueltos.length > 0) {
+        toast('✅ Anulado · Devuelto al inventario: ' + devueltos.join(', '));
+      } else {
+        toast('✅ Venta anulada · Crédito anulado (productos no encontrados en inventario)');
       }
 
       credito.estado = 'anulado';
