@@ -6373,12 +6373,9 @@ async function validarDocumentoCliente() {
 }
 
 async function guardarCliente() {
-  const nombre   = document.getElementById('cliNombre')?.value?.trim();
-  const documento= document.getElementById('cliDocumento')?.value?.trim();
-  const tipoDoc  = document.getElementById('cliTipoDoc')?.value||'CC';
-
-  nombre    = nombre.toUpperCase();
-  documento = documento.toUpperCase();
+  let nombre    = (document.getElementById('cliNombre')?.value||'').trim().toUpperCase();
+  let documento = (document.getElementById('cliDocumento')?.value||'').trim().toUpperCase();
+  const tipoDoc = document.getElementById('cliTipoDoc')?.value||'CC';
   if(!nombre)    { toast('El nombre es obligatorio','error'); return; }
   if(!documento) { toast('El documento es obligatorio','error'); return; }
 
@@ -6434,8 +6431,8 @@ function abrirEditarCliente(id) {
 
 async function actualizarCliente() {
   const id     = parseInt(document.getElementById('editCliId').value);
-  const nombre = document.getElementById('editCliNombre')?.value?.trim();
-  const doc    = document.getElementById('editCliDocumento')?.value?.trim();
+  const nombre = (document.getElementById('editCliNombre')?.value||'').trim().toUpperCase();
+  const doc    = (document.getElementById('editCliDocumento')?.value||'').trim().toUpperCase();
   if(!nombre) { toast('El nombre es obligatorio','error'); return; }
   if(!doc)    { toast('El documento es obligatorio','error'); return; }
   const row = {
@@ -9764,7 +9761,7 @@ function abrirModalComision(ventaId, asesor, equipo, ganancia) {
 
 async function guardarComisionVenta() {
   const ventaId = parseInt(document.getElementById('comisionVentaId').value);
-  const valor   = parseFloat(document.getElementById('comisionValorInput').value) || 0;
+  const valor   = getMoneyValue('comisionValorInput');
   try {
     // Actualizar comision_asesor en la tabla ventas
     await sbFetch(`ventas?id=eq.${ventaId}`, {
@@ -9786,7 +9783,7 @@ async function editarComisionVenta(ventaId) {
   if(!v) return;
   abrirModalComision(ventaId, v.asesor, v.equipo, v.ganancia);
   // Pre-llenar con valor actual
-  setTimeout(()=>{ document.getElementById('comisionValorInput').value = v.comisionAsesor || 0; }, 50);
+  setTimeout(()=>{ setMoneyValue('comisionValorInput', v.comisionAsesor || 0); }, 50);
 }
 
 function cerrarModalComision() {
