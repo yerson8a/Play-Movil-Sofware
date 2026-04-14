@@ -1809,6 +1809,57 @@
   </div>
 </div>
 
+<!-- Modal Agregar Producto a Venta -->
+<div class="modal-overlay" id="modalAgregarProductoVenta" style="z-index:9600;">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-header">
+      <div class="modal-title" id="mpModalTitulo">📱 Agregar Producto</div>
+      <button class="modal-close" onclick="closeModal('modalAgregarProductoVenta')">✕</button>
+    </div>
+    <!-- Buscar por IMEI -->
+    <div class="form-group" style="margin-bottom:12px;">
+      <label class="form-label">Buscar por IMEI / Serial</label>
+      <div class="search-wrap">
+        <span class="search-icon">📡</span>
+        <input type="text" class="form-control" id="mpIMEIBusca"
+          placeholder="Escanea o escribe el IMEI..."
+          oninput="limpiarIMEI(this);buscarIMEIModalProd(this.value)"
+          maxlength="15" style="padding-left:40px;" inputmode="numeric">
+      </div>
+      <div id="mpIMEIInfo" style="margin-top:6px;display:none;"></div>
+    </div>
+    <input type="hidden" id="mpProdId">
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Nombre / Modelo *</label>
+        <input type="text" class="form-control" id="mpEquipo" placeholder="Ej: SAMSUNG A54 128GB">
+      </div>
+      <div class="form-group">
+        <label class="form-label">IMEI / Serial</label>
+        <input type="text" class="form-control" id="mpIMEI" placeholder="15 dígitos" oninput="limpiarIMEI(this)" maxlength="15" inputmode="numeric">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Costo (P.L) *</label>
+        <div class="input-money-wrap">
+          <input type="text" class="form-control" id="mpCosto" placeholder="0" oninput="fmtMoneyInput(this)" inputmode="numeric">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Precio de Venta *</label>
+        <div class="input-money-wrap">
+          <input type="text" class="form-control" id="mpPrecio" placeholder="0" oninput="fmtMoneyInput(this)" inputmode="numeric">
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+      <button class="btn btn-ghost" onclick="closeModal('modalAgregarProductoVenta')">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmarAgregarProducto()">➕ Agregar a la Venta</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal Nuevo Cliente -->
 <div class="modal-overlay" id="modalNuevoCliente">
   <div class="modal" style="max-width:600px;">
@@ -2595,43 +2646,45 @@
       <button class="modal-close" onclick="closeModal('modalNuevoCredito')">✕</button>
     </div>
 
-    <!-- Buscar IMEI -->
+    <!-- Lista de productos -->
     <div class="card" style="margin-bottom:14px;border:2px solid #ece8f5;">
-      <div class="card-title" style="font-size:13px;margin-bottom:10px;">📡 Buscar Producto por IMEI / Serial</div>
-      <div class="search-wrap">
-        <span class="search-icon">📡</span>
-        <input type="text" class="form-control" id="crdIMEIBusca" placeholder="Escribe o escanea el IMEI (15 dígitos)..." oninput="limpiarIMEI(this);buscarIMEICredito(this.value)" maxlength="15" style="padding-left:40px;" inputmode="numeric">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <div class="card-title" style="font-size:13px;margin:0;">📱 Productos a Vender</div>
+        <button type="button" class="btn btn-sm btn-primary" onclick="agregarProductoCrd()">+ Agregar Producto</button>
       </div>
-      <div id="crdIMEIInfo" style="margin-top:10px;display:none;">
-        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px;display:flex;gap:20px;flex-wrap:wrap;font-size:13px;">
-          <div>📱 <strong id="crdInfoProducto">—</strong></div>
-          <div>🏭 Proveedor: <strong id="crdInfoProveedor">—</strong></div>
-          <div>💲 Costo: <strong style="color:#6B2D8B;" id="crdInfoCosto">—</strong></div>
-          <div>🏠 Sede: <strong id="crdInfoSede">—</strong></div>
-          <div>📡 IMEI: <strong style="color:#0066cc;font-family:monospace;" id="crdInfoIMEI">—</strong></div>
-        </div>
+      <div id="crdProductosList"></div>
+      <!-- Totales consolidados -->
+      <div id="crdTotalesMulti" style="display:none;background:#f7f5fb;border-radius:8px;padding:10px;margin-top:8px;font-size:13px;">
+        <div style="display:flex;justify-content:space-between;"><span style="color:#888899;">Total Costo:</span><strong id="crdTotalCosto">$0</strong></div>
+        <div style="display:flex;justify-content:space-between;"><span style="color:#888899;">Total Venta:</span><strong style="color:#6B2D8B;" id="crdTotalVenta">$0</strong></div>
       </div>
     </div>
+    <!-- Campos ocultos compatibilidad -->
+    <input type="hidden" id="crdEquipo">
+    <input type="hidden" id="crdIMEI">
+    <input type="hidden" id="crdIMEIBusca">
+    <div id="crdIMEIInfo" style="display:none;"></div>
+    <div id="crdInfoProducto" style="display:none;"></div>
+    <div id="crdInfoProveedor" style="display:none;"></div>
+    <div id="crdInfoCosto" style="display:none;"></div>
+    <div id="crdInfoSede" style="display:none;"></div>
+    <div id="crdInfoIMEI" style="display:none;"></div>
 
     <div class="form-row" style="gap:14px;">
 
       <!-- COLUMNA IZQUIERDA -->
       <div style="flex:1;display:flex;flex-direction:column;gap:14px;">
 
-        <!-- Equipo -->
+        <!-- Inputs de precio consolidado (se llenan desde la lista de productos) -->
         <div class="card">
-          <div class="card-title" style="font-size:13px;margin-bottom:10px;">📱 Equipo</div>
-          <div class="form-group">
-            <label class="form-label">Modelo *</label>
-            <input type="text" class="form-control" id="crdEquipo" placeholder="Se llena con el IMEI" oninput="recalcCredito()">
-          </div>
+          <div class="card-title" style="font-size:13px;margin-bottom:10px;">💰 Precio y Condiciones</div>
           <div class="form-row">
             <div class="form-group">
-              <label class="form-label">Costo (P.L) *</label>
+              <label class="form-label">Costo Total *</label>
               <div class="input-money-wrap"><input type="text" class="form-control" id="crdCosto" placeholder="0" oninput="fmtMoneyInput(this);recalcCredito()" inputmode="numeric"></div>
             </div>
             <div class="form-group">
-              <label class="form-label">Precio Venta *</label>
+              <label class="form-label">Precio Total Venta *</label>
               <div class="input-money-wrap"><input type="text" class="form-control" id="crdVentaBase" placeholder="0" oninput="fmtMoneyInput(this);recalcCredito()" inputmode="numeric"></div>
             </div>
           </div>
@@ -3064,45 +3117,37 @@
       <button class="modal-close" onclick="closeModal('modalVentaContado')">✕</button>
     </div>
 
-    <!-- Buscar por IMEI/Serial -->
+    <!-- Lista de productos contado -->
     <div class="card" style="margin-bottom:16px;border:2px solid var(--border);">
-      <div class="card-title" style="font-size:13px;margin-bottom:10px;">📡 Buscar Producto por IMEI / Serial</div>
-      <div class="search-wrap">
-        <span class="search-icon">📡</span>
-        <input type="text" class="form-control" id="vcIMEIBusca" placeholder="Escribe o escanea el IMEI (15 dígitos)..." oninput="limpiarIMEI(this);buscarIMEIVenta(this.value)" maxlength="15" style="padding-left:40px;" inputmode="numeric">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <div class="card-title" style="font-size:13px;margin:0;">📱 Productos a Vender</div>
+        <button type="button" class="btn btn-sm btn-primary" onclick="agregarProductoVC()">+ Agregar Producto</button>
       </div>
-      <div id="vcIMEIInfo" style="margin-top:10px;display:none;">
-        <div style="background:rgba(0,230,118,0.08);border:1px solid rgba(0,230,118,0.2);border-radius:10px;padding:12px;display:flex;gap:20px;flex-wrap:wrap;font-size:13px;">
-          <div>📱 <strong id="vcInfoProducto">—</strong></div>
-          <div>🏭 Proveedor: <strong id="vcInfoProveedor">—</strong></div>
-          <div>💲 Costo: <strong style="color:var(--pink);" id="vcInfoCosto">—</strong></div>
-          <div>🏠 Sede: <strong id="vcInfoSede">—</strong></div>
-          <div>📡 IMEI: <strong style="color:var(--blue);font-family:monospace;" id="vcInfoIMEI">—</strong></div>
-        </div>
+      <div id="vcProductosList"></div>
+      <div id="vcTotalesMulti" style="display:none;background:#f7f5fb;border-radius:8px;padding:10px;margin-top:8px;font-size:13px;">
+        <div style="display:flex;justify-content:space-between;"><span style="color:#888899;">Total Costo:</span><strong id="vcTotalCosto">$0</strong></div>
+        <div style="display:flex;justify-content:space-between;"><span style="color:#888899;">Total Venta:</span><strong style="color:#6B2D8B;" id="vcTotalVenta">$0</strong></div>
       </div>
     </div>
+    <!-- Campos ocultos compatibilidad -->
+    <input type="hidden" id="vcEquipo">
+    <input type="hidden" id="vcIMEI">
+    <input type="hidden" id="vcIMEIBusca">
+    <input type="hidden" id="vcSede">
+    <div id="vcIMEIInfo" style="display:none;"></div>
+    <div id="vcInfoProducto" style="display:none;"></div>
+    <div id="vcInfoProveedor" style="display:none;"></div>
+    <div id="vcInfoCosto" style="display:none;"></div>
+    <div id="vcInfoSede" style="display:none;"></div>
+    <div id="vcInfoIMEI" style="display:none;"></div>
 
-    <!-- Datos equipo -->
+    <!-- Precio consolidado -->
     <div class="card" style="margin-bottom:16px;">
-      <div class="card-title" style="font-size:13px;margin-bottom:12px;">📱 Datos del Equipo</div>
+      <div class="card-title" style="font-size:13px;margin-bottom:12px;">💰 Costo Total</div>
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Producto / Modelo *</label>
-          <input type="text" class="form-control" id="vcEquipo" placeholder="Se llena automáticamente con el IMEI">
-        </div>
-        <div class="form-group">
-          <label class="form-label">IMEI Principal</label>
-          <input type="text" class="form-control" id="vcIMEI" placeholder="IMEI (15 dígitos)" oninput="limpiarIMEI(this)" maxlength="15" inputmode="numeric">
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Costo del Equipo (P.L) *</label>
+          <label class="form-label">Costo Total (P.L) *</label>
           <div class="input-money-wrap"><input type="text" class="form-control" id="vcCompra" placeholder="0" oninput="fmtMoneyInput(this);calcVContado()" inputmode="numeric"></div>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Sede</label>
-          <input type="text" class="form-control" id="vcSede" placeholder="Se llena automáticamente">
         </div>
       </div>
     </div>
@@ -6882,49 +6927,97 @@ async function actualizarProducto() {
 }
 
 async function guardarVentaContado(){
-  const costo=getMoneyValue('vcCompra');
-  const base=getMoneyValue('vcVenta');
-  const ivaPct=parseFloat($('vcIVA')?.value)||0;
-  const desc=getMoneyValue('vcDescuento');
-  const comPct=parseFloat($('vcComFinanciera')?.value)||0;
-  const ivaVal=Math.round(base*ivaPct/100);        // Solo informativo
-  const precioFinal=base-desc;                     // IVA NO suma al precio
-  const comVal=Math.round(precioFinal*comPct/100);
-  const ganancia=precioFinal-costo-comVal;
-  const finSel=(($('vcFinanciera')?.value||'CONTADO:0').split(':')[0]).substring(0,50);
-  const imei=$('vcIMEI')?.value||'';
-  const comp=db.compras.find(c=>c.imei1===imei||c.imei2===imei||c.serial===imei);
+  // Validar productos
+  if(!productosVentaVC || productosVentaVC.length === 0) {
+    toast('Agrega al menos un producto antes de guardar','error'); return;
+  }
+  // Validar cliente
+  if(!$U('vcCliente')) { toast('Selecciona un cliente','error'); return; }
 
-  const datos={
-    equipo:$('vcEquipo')?.value||'—',imei,
-    cliente:$U('vcCliente')||'—',
-    cedula:$U('vcCedula')||'',
-    telefono:$U('vcTelefono')||'',
-    correo:$U('vcCorreo')||'',
-    asesor:($U('vcAsesorSelect')||$U('vcAsesor')||'').toUpperCase()||sesionActiva?.nombre?.toUpperCase()||'',
-    costo,venta:precioFinal,ganancia,
-    financiera:finSel,tipo:'contado',
-    sede:$('vcSede')?.value||'LOCAL PEREIRA',
-    obs:$U('vcObservaciones')||'',
-    productoId:comp?comp.id:null
-  };
-  // Validar que el equipo esté disponible antes de guardar
-  const imeiVC = ($('vcIMEI')?.value||'').replace(/[^0-9]/g,'');
-  if(imeiVC && imeiVC.length !== 15) { toast('El IMEI debe tener exactamente 15 dígitos','error'); return; }
-  const equipoVC = $('vcEquipo')?.value||'';
-  const disponibleVC = await validarDisponibilidadProducto(imeiVC, equipoVC);
-  if(!disponibleVC) return;
+  const ivaPct    = parseFloat($('vcIVA')?.value)||0;
+  const desc      = getMoneyValue('vcDescuento');
+  const comPct    = parseFloat($('vcComFinanciera')?.value)||0;
+  const finSel    = (($('vcFinanciera')?.value||'CONTADO:0').split(':')[0]).substring(0,50);
+  const asesor    = ($U('vcAsesorSelect')||$U('vcAsesor')||sesionActiva?.nombre||'').toUpperCase();
+  const sedeActual= window.SEDE_ACTIVA||'LOCAL PEREIRA';
+  const obs       = $U('vcObservaciones')||'';
+  const cliente   = $U('vcCliente')||'—';
+  const cedula    = $U('vcCedula')||'';
+  const telefono  = $U('vcTelefono')||'';
+  const correo    = $U('vcCorreo')||'';
 
-  try{
-    await guardarVentaDB(datos);
-    // Marcar producto como VENDIDO
-    const imeiVC2 = document.getElementById('vcIMEI')?.value||'';
-    const equipoVC2 = document.getElementById('vcEquipo')?.value||'';
-    await marcarProductoVendido(imeiVC2, equipoVC2);
+  // Validar disponibilidad de cada IMEI
+  for(const p of productosVentaVC) {
+    const imeiCheck = (p.imei||'').replace(/[^0-9]/g,'');
+    if(imeiCheck && imeiCheck.length === 15) {
+      const disp = await validarDisponibilidadProducto(imeiCheck, p.producto);
+      if(!disp) return;
+    }
+  }
+
+  // Calcular totales
+  const totalCosto  = productosVentaVC.reduce((s,p)=>s+(p.costo||0),0);
+  const totalBase   = productosVentaVC.reduce((s,p)=>s+(p.precio||0),0);
+  const precioFinal = totalBase - desc;
+  const comVal      = Math.round(precioFinal * comPct/100);
+  const ganancia    = precioFinal - totalCosto - comVal;
+
+  showLoader('Registrando venta...');
+  try {
+    // Guardar una venta por producto, la primera es la "principal" para la factura
+    let ventaPrincipal = null;
+    for(let i=0; i<productosVentaVC.length; i++) {
+      const p = productosVentaVC[i];
+      const esPrincipal = i === 0;
+      const precioProd  = p.precio||0;
+      const costoProd   = p.costo||0;
+      // Prorratear descuento y comisión proporcional
+      const pct         = totalBase > 0 ? precioProd/totalBase : 1/productosVentaVC.length;
+      const descProd    = Math.round(desc * pct);
+      const pFinal      = precioProd - descProd;
+      const comProd     = Math.round(pFinal * comPct/100);
+      const ganProd     = pFinal - costoProd - comProd;
+
+      const row = {
+        equipo: p.producto||'—', imei: p.imei||'',
+        cliente, cedula_cliente: cedula, telefono_cliente: telefono,
+        asesor, valor_venta: pFinal, valor_compra: costoProd,
+        ganancia: ganProd, financiera: finSel, forma_pago: 'Contado',
+        comision_asesor: 0, sede_id: sedeActual.includes('ARMENIA')?2:1,
+        observaciones: obs + (productosVentaVC.length>1 ? ` | Factura agrupada (${productosVentaVC.length} productos)` : ''),
+        fecha_venta: fechaColombia()
+      };
+      const res = await sbFetch('ventas', { method:'POST', body:row });
+      const nueva = mapVenta(res[0]);
+      db.ventas.unshift(nueva);
+      if(esPrincipal) ventaPrincipal = nueva;
+      // Marcar como vendido
+      await marcarProductoVendido(p.imei||'', p.producto||'');
+    }
+
+    hideLoader();
     closeModal('modalVentaContado');
+
+    // Mostrar modal comisión y factura
+    if(ventaPrincipal) abrirModalComision(ventaPrincipal.id, asesor, productosVentaVC.map(p=>p.producto).join(', '), ganancia);
+
+    // Factura con todos los productos
+    const datosFactura = {
+      tipo:'contado',
+      cliente, cedula, telefono, correo, asesor,
+      fecha: new Date().toLocaleDateString('es-CO',{timeZone:'America/Bogota'}),
+      equipo: productosVentaVC[0].producto,
+      imei:   productosVentaVC[0].imei||'',
+      productosList: productosVentaVC,
+      precioBase:  totalBase,
+      precioFinal, descuento: desc,
+      financiera:  finSel, ivaPct, ganancia
+    };
+    mostrarFactura(datosFactura, !!correo);
+
     renderVentas(); renderInventario();
     toast('Venta registrada ✅');
-  }catch(e){ toast('Error: '+e.message,'error'); }
+  } catch(e) { hideLoader(); toast('Error: '+e.message,'error'); }
 }
 
 async function guardarCredito(){
@@ -6959,18 +7052,34 @@ async function guardarCredito(){
   const valorCuota   = quincenas > 0 ? Math.round(totalFinanciar / quincenas) : 0;
   const sedeActual   = window.SEDE_ACTIVA || 'LOCAL PEREIRA';
 
-  if(!$('crdCliente')?.value?.trim()){ toast('El nombre del cliente es obligatorio','error'); return; }
-  if(!$('crdEquipo')?.value?.trim()){ toast('El equipo es obligatorio','error'); return; }
+  // Validar productos y cliente
+  if(!productosVentaCrd || productosVentaCrd.length === 0) {
+    toast('Agrega al menos un producto antes de guardar','error'); return;
+  }
+  if(!$U('crdCliente')) { toast('Selecciona un cliente','error'); return; }
 
-  // Validar que el equipo esté disponible (no vendido ni duplicado)
-  const imeiCrd = (document.getElementById('crdIMEIBusca')?.value || document.getElementById('crdIMEI')?.value||'').replace(/[^0-9]/g,'');
-  if(imeiCrd && imeiCrd.length !== 15) { toast('El IMEI debe tener exactamente 15 dígitos','error'); return; }
-  const equipoCrd = document.getElementById('crdEquipo')?.value||'';
-  const disponibleCrd = await validarDisponibilidadProducto(imeiCrd, equipoCrd);
-  if(!disponibleCrd) return;
+  // Validar disponibilidad de cada IMEI
+  for(const p of productosVentaCrd) {
+    const imeiCheck = (p.imei||'').replace(/[^0-9]/g,'');
+    if(imeiCheck && imeiCheck.length === 15) {
+      const disp = await validarDisponibilidadProducto(imeiCheck, p.producto);
+      if(!disp) return;
+    }
+  }
+
+  // Calcular totales desde la lista de productos
+  const totalCostoCrd  = productosVentaCrd.reduce((s,p)=>s+(p.costo||0),0);
+  const totalPrecioCrd = productosVentaCrd.reduce((s,p)=>s+(p.precio||0),0);
+  // Sobreescribir costo y base con los totales reales
+  if(totalCostoCrd > 0) setMoneyValue('crdCosto', totalCostoCrd);
+  if(totalPrecioCrd > 0) setMoneyValue('crdVentaBase', totalPrecioCrd);
+
+  // Nombre consolidado de equipos
+  const equipoConsolidado = productosVentaCrd.map(p=>p.producto).join(' | ');
+  const imeiPrincipal     = productosVentaCrd[0].imei||'';
 
   const datos = {
-    equipo: $('crdEquipo')?.value||'—',
+    equipo: equipoConsolidado||productosVentaCrd[0]?.producto||'—',
     cliente: $U('crdCliente')||'—',
     cedula: $U('crdCedula')||'',
     telefono: $U('crdTelefono')||'',
@@ -6990,7 +7099,7 @@ async function guardarCredito(){
   try {
     await guardarCreditoDB(datos);
 
-    const imeiVenta = document.getElementById('crdIMEI')?.value||'';
+    const imeiVenta = imeiPrincipal;
     await guardarVentaDB({
       equipo:datos.equipo, imei:imeiVenta,
       cliente:datos.cliente, cedula:datos.cedula,
@@ -6999,7 +7108,10 @@ async function guardarCredito(){
     });
 
     // Marcar producto como VENDIDO en Supabase usando IMEI o nombre
-    await marcarProductoVendido(imeiVenta, datos.equipo);
+    // Marcar TODOS los productos como vendidos
+    for(const p of productosVentaCrd) {
+      await marcarProductoVendido(p.imei||'', p.producto||'');
+    }
 
     const datosFactura = {
       tipo:'credito', cliente:datos.cliente, cedula:datos.cedula,
@@ -7385,6 +7497,9 @@ function abrirModalCredito() {
   if(!db.clientes || db.clientes.length === 0) cargarClientes();
   // Limpiar buscador cliente
   limpiarClienteVenta('crd');
+  // Limpiar lista de productos
+  productosVentaCrd = []; _idxProdCrd = 0;
+  renderListaProductos('crd');
   openModal('modalNuevoCredito');
 }
 
@@ -7426,6 +7541,9 @@ function abrirModalContado() {
   if(!db.clientes || db.clientes.length === 0) cargarClientes();
   // Limpiar buscador cliente
   limpiarClienteVenta('vc');
+  // Limpiar lista de productos
+  productosVentaVC = []; _idxProdVC = 0;
+  renderListaProductos('vc');
   openModal('modalVentaContado');
 }
 
@@ -7832,6 +7950,160 @@ function elegirInicial(el,ini,saldo){
   recalcCredito();
 }
 
+// ============================================================
+// VENTA MULTI-PRODUCTO
+// ============================================================
+// Listas en memoria de productos por modal
+let productosVentaCrd = []; // [{idx, imei, producto, costo, precio, productoId}]
+let productosVentaVC  = []; // [{idx, imei, producto, costo, precio, productoId}]
+let _idxProdCrd = 0;
+let _idxProdVC  = 0;
+
+function renderFilaProducto(p, tipo) {
+  const prefijo = tipo === 'crd' ? 'crd' : 'vc';
+  return `
+  <div id="prod-fila-${tipo}-${p.idx}" style="background:#f7f5fb;border-radius:10px;padding:12px;margin-bottom:8px;border:1px solid #ece8f5;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <span style="font-weight:700;font-size:13px;color:#6B2D8B;">#${p.idx+1} ${p.producto||'Sin nombre'}</span>
+      <button type="button" onclick="eliminarProductoVenta('${tipo}',${p.idx})" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:16px;" title="Eliminar">✕</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:12px;">
+      <div>
+        <div style="color:#888899;margin-bottom:2px;">IMEI / Serial</div>
+        <div style="font-family:monospace;color:#0066cc;">${p.imei||'—'}</div>
+      </div>
+      <div>
+        <div style="color:#888899;margin-bottom:2px;">Costo</div>
+        <div style="font-weight:600;color:#6B2D8B;">${fmt(p.costo||0)}</div>
+      </div>
+      <div>
+        <div style="color:#888899;margin-bottom:2px;">Precio Venta</div>
+        <div style="font-weight:600;color:#16a34a;">${fmt(p.precio||0)}</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function actualizarTotalesMulti(tipo) {
+  const lista = tipo === 'crd' ? productosVentaCrd : productosVentaVC;
+  const totalCosto  = lista.reduce((s,p)=>s+(p.costo||0),0);
+  const totalPrecio = lista.reduce((s,p)=>s+(p.precio||0),0);
+
+  const totDiv = document.getElementById(tipo+'TotalesMulti');
+  if(totDiv) totDiv.style.display = lista.length > 1 ? 'block' : 'none';
+  const tcEl = document.getElementById(tipo+'TotalCosto');
+  const tvEl = document.getElementById(tipo+'TotalVenta');
+  if(tcEl) tcEl.textContent = fmt(totalCosto);
+  if(tvEl) tvEl.textContent = fmt(totalPrecio);
+
+  // Actualizar campos consolidados
+  if(tipo === 'crd') {
+    setMoneyValue('crdCosto',     totalCosto);
+    setMoneyValue('crdVentaBase', totalPrecio);
+    recalcCredito();
+  } else {
+    setMoneyValue('vcCompra', totalCosto);
+    setMoneyValue('vcVenta',  totalPrecio);
+    calcVContado();
+  }
+}
+
+function renderListaProductos(tipo) {
+  const lista = tipo === 'crd' ? productosVentaCrd : productosVentaVC;
+  const el    = document.getElementById(tipo+'ProductosList');
+  if(!el) return;
+  if(!lista.length) {
+    el.innerHTML = '<div style="text-align:center;padding:20px;color:#888899;font-size:13px;">📱 Sin productos — usa "+ Agregar Producto"</div>';
+    return;
+  }
+  el.innerHTML = lista.map(p => renderFilaProducto(p, tipo)).join('');
+  actualizarTotalesMulti(tipo);
+}
+
+function eliminarProductoVenta(tipo, idx) {
+  if(tipo==='crd') productosVentaCrd = productosVentaCrd.filter(p=>p.idx!==idx);
+  else             productosVentaVC  = productosVentaVC.filter(p=>p.idx!==idx);
+  renderListaProductos(tipo);
+  actualizarTotalesMulti(tipo);
+}
+
+// ── Modal para agregar un producto ───────────────────────────
+function agregarProductoCrd() { abrirModalAgregarProducto('crd'); }
+function agregarProductoVC()  { abrirModalAgregarProducto('vc'); }
+
+let _tipoModalProd = 'crd';
+function abrirModalAgregarProducto(tipo) {
+  _tipoModalProd = tipo;
+  // Limpiar campos del modal
+  ['mpIMEIBusca','mpEquipo','mpIMEI'].forEach(id=>{
+    const e=document.getElementById(id); if(e) e.value='';
+  });
+  ['mpCosto','mpPrecio'].forEach(id=>{ const e=document.getElementById(id); if(e) e.value=''; });
+  const info = document.getElementById('mpIMEIInfo');
+  if(info) info.style.display='none';
+  document.getElementById('mpModalTitulo').textContent = tipo==='crd'?'📱 Agregar a Venta Crédito':'📱 Agregar a Venta Contado';
+  openModal('modalAgregarProductoVenta');
+}
+
+async function buscarIMEIModalProd(val) {
+  if(val.length < 5) { document.getElementById('mpIMEIInfo').style.display='none'; return; }
+  try {
+    const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+    const base = SUPABASE_URL + '/rest/v1/productos';
+    const sel  = 'select=id,producto,imei1,imei2,serial,valor_compra,sede_id,proveedor_id';
+    let res = await fetch(`${base}?${sel}&imei1=eq.${val}`, {headers});
+    let rows = await res.json();
+    if(!rows.length){ res=await fetch(`${base}?${sel}&imei2=eq.${val}`,{headers}); rows=await res.json(); }
+    if(!rows.length){ res=await fetch(`${base}?${sel}&serial=ilike.*${val}*`,{headers}); rows=await res.json(); }
+    if(!rows.length){ res=await fetch(`${base}?${sel}&imei1=ilike.*${val}*`,{headers}); rows=await res.json(); }
+    if(rows && rows.length > 0) {
+      const p = rows[0];
+      const costo = parseFloat(p.valor_compra)||0;
+      document.getElementById('mpEquipo').value = p.producto||'';
+      document.getElementById('mpIMEI').value   = p.imei1||p.serial||'';
+      setMoneyValue('mpCosto',  costo);
+      setMoneyValue('mpPrecio', Math.round(costo/0.55));
+      document.getElementById('mpProdId').value = p.id;
+      const sedeNom = p.sede_id===1?'PEREIRA':p.sede_id===2?'ARMENIA':'—';
+      const prov    = db.proveedores.find(x=>x.id===p.proveedor_id);
+      const infoEl  = document.getElementById('mpIMEIInfo');
+      if(infoEl) {
+        infoEl.innerHTML = `<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:8px;font-size:12px;">
+          ✅ <strong>${p.producto}</strong> — IMEI: ${p.imei1||'—'} — Sede: ${sedeNom} — Costo: ${fmt(costo)}
+          ${prov?'— Proveedor: '+prov.nombre:''}
+        </div>`;
+        infoEl.style.display='block';
+      }
+      toast('✅ '+p.producto);
+    } else {
+      document.getElementById('mpIMEIInfo').style.display='none';
+    }
+  } catch(e){ console.error(e); }
+}
+
+function confirmarAgregarProducto() {
+  const equipo = (document.getElementById('mpEquipo')?.value||'').trim().toUpperCase();
+  const imei   = document.getElementById('mpIMEI')?.value||'';
+  const costo  = getMoneyValue('mpCosto');
+  const precio = getMoneyValue('mpPrecio');
+  const prodId = parseInt(document.getElementById('mpProdId')?.value)||null;
+
+  if(!equipo) { toast('El nombre del producto es obligatorio','error'); return; }
+  if(!precio) { toast('El precio de venta es obligatorio','error'); return; }
+
+  const tipo  = _tipoModalProd;
+  const idx   = tipo==='crd' ? _idxProdCrd++ : _idxProdVC++;
+  const prod  = { idx, imei, producto: equipo, costo, precio, productoId: prodId };
+
+  if(tipo==='crd') productosVentaCrd.push(prod);
+  else             productosVentaVC.push(prod);
+
+  renderListaProductos(tipo);
+  closeModal('modalAgregarProductoVenta');
+  toast(`${equipo} agregado ✅`);
+}
+
+// ============================================================
 async function buscarIMEIVenta(val){
   if(val.length < 5){ const i=$('vcIMEIInfo'); if(i) i.style.display='none'; return; }
 
@@ -8728,13 +9000,22 @@ function mostrarFactura(datos, enviarCorreo) {
 }
 
 function generarHTMLFactura(d) {
-  const lineaProducto = `
+  // Si tiene lista de productos, generar una fila por cada uno
+  const lineasProductos = (d.productosList && d.productosList.length > 0)
+    ? d.productosList.map(p => `
     <tr>
-      <td style="padding:10px 8px;border-bottom:1px solid #f0f0f5;">${d.equipo}${d.imei ? '<br><span style="font-size:11px;color:#888;font-family:monospace;">IMEI: '+d.imei+'</span>' : ''}</td>
+      <td style="padding:10px 8px;border-bottom:1px solid #f0f0f5;">${p.producto||p.equipo||'—'}${p.imei?'<br><span style="font-size:11px;color:#888;font-family:monospace;">IMEI: '+p.imei+'</span>':''}</td>
+      <td style="padding:10px 8px;border-bottom:1px solid #f0f0f5;text-align:center;">1</td>
+      <td style="padding:10px 8px;border-bottom:1px solid #f0f0f5;text-align:right;">${fmt(p.precio||0)}</td>
+      <td style="padding:10px 8px;border-bottom:1px solid #f0f0f5;text-align:right;">${fmt(p.precio||0)}</td>
+    </tr>`).join('')
+    : `<tr>
+      <td style="padding:10px 8px;border-bottom:1px solid #f0f0f5;">${d.equipo||'—'}${d.imei?'<br><span style="font-size:11px;color:#888;font-family:monospace;">IMEI: '+d.imei+'</span>':''}</td>
       <td style="padding:10px 8px;border-bottom:1px solid #f0f0f5;text-align:center;">1</td>
       <td style="padding:10px 8px;border-bottom:1px solid #f0f0f5;text-align:right;">${fmt(d.precioBase)}</td>
       <td style="padding:10px 8px;border-bottom:1px solid #f0f0f5;text-align:right;">${fmt(d.precioBase)}</td>
     </tr>`;
+  const lineaProducto = lineasProductos;
   const lineaAdic = d.prodAdicVal > 0 ? `
     <tr>
       <td style="padding:10px 8px;border-bottom:1px solid #f0f0f5;">${d.prodAdicDesc || 'Producto adicional'}</td>
