@@ -1028,6 +1028,10 @@
             <span class="search-icon">🔍</span>
             <input type="text" class="form-control" placeholder="Buscar cliente, equipo, asesor..." oninput="filtrarVentas(this.value)" id="searchVentas">
           </div>
+          <div class="search-wrap" style="width:200px;">
+            <span class="search-icon">📡</span>
+            <input type="text" class="form-control" placeholder="Buscar por IMEI / Serial..." oninput="filtrarVentasPorIMEI(this.value)" id="searchVentasIMEI" style="padding-left:36px;" inputmode="numeric">
+          </div>
           <select class="form-control" style="width:160px;" onchange="filtrarVentasPorAsesor(this.value)" id="filtroAsesorVentas">
             <option value="">Todos los asesores</option>
           </select>
@@ -1036,7 +1040,7 @@
           <table>
             <thead>
               <tr>
-                <th>Fecha</th><th>Equipo</th><th>Cliente</th><th>Asesor</th>
+                <th>Fecha</th><th>Equipo</th><th>IMEI</th><th>Cliente</th><th>Asesor</th>
                 <th>V.Compra</th><th>V.Venta</th><th>Ganancia</th><th>Comisión</th><th>Financiera</th><th>Estado</th><th></th>
               </tr>
             </thead>
@@ -5157,9 +5161,25 @@ function renderVentas(filtro){
 }
 
 function switchVentasTab(tab,el){document.querySelectorAll('#mod-ventas .tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');renderVentas(tab);}
-function filtrarVentas(q){q=q.toLowerCase();const f=db.ventas.filter(v=>(v.equipo||'').toLowerCase().includes(q)||(v.cliente||'').toLowerCase().includes(q)||(v.asesor||'').toLowerCase().includes(q));renderVentas_data(f);}
+function filtrarVentas(q){
+  // Limpiar filtro IMEI al usar búsqueda general
+  const imeiSearch = document.getElementById('searchVentasIMEI');
+  if(imeiSearch) imeiSearch.value='';
+  q=q.toLowerCase();
+  const f=db.ventas.filter(v=>(v.equipo||'').toLowerCase().includes(q)||(v.cliente||'').toLowerCase().includes(q)||(v.asesor||'').toLowerCase().includes(q)||(v.imei||'').includes(q)||(v.cedula||'').includes(q));
+  renderVentas_data(f);
+}
+function filtrarVentasPorIMEI(q){
+  // Limpiar búsqueda general al buscar por IMEI
+  const search = document.getElementById('searchVentas');
+  if(search) search.value='';
+  q=q.trim();
+  if(!q){ renderVentas_data(db.ventas); return; }
+  const f=db.ventas.filter(v=>(v.imei||'').includes(q));
+  renderVentas_data(f);
+}
 function filtrarVentasPorAsesor(a){renderVentas_data(a?db.ventas.filter(v=>v.asesor===a):db.ventas);}
-function renderVentas_data(data){$('tbodyVentas').innerHTML=data.map(v=>`<tr style="${v.anulada?'opacity:0.5;background:#fff5f5;':''}"><td>${v.fecha}</td><td>${(v.equipo||'').substring(0,20)}</td><td>${v.cliente}</td><td>${v.asesor}</td><td>${fmt(v.costo)}</td><td>${v.anulada?'<span style="color:#dc2626;font-size:11px;">ANULADA</span>':fmt(v.venta)}</td><td style="color:${v.anulada?'#dc2626':'var(--green)'};">${v.anulada?'$0':fmt(v.ganancia)}</td><td style="color:#6B2D8B;">${v.anulada?'$0':v.comisionAsesor>0?fmt(v.comisionAsesor):'—'}</td><td>${v.financiera}</td><td><span class="badge ${v.anulada?'badge-red':v.tipo==='contado'?'badge-green':'badge-pink'}">${v.anulada?'ANULADA':v.tipo}</span></td></tr>`).join('');}
+function renderVentas_data(data){$('tbodyVentas').innerHTML=data.map(v=>`<tr style="${v.anulada?'opacity:0.5;background:#fff5f5;':''}"><td>${v.fecha}</td><td>${(v.equipo||'').substring(0,20)}</td><td style="font-family:monospace;font-size:11px;color:#0066cc;">${v.imei&&v.imei.length>3?v.imei:'—'}</td><td>${v.cliente}</td><td>${v.asesor}</td><td>${fmt(v.costo)}</td><td>${v.anulada?'<span style="color:#dc2626;font-size:11px;">ANULADA</span>':fmt(v.venta)}</td><td style="color:${v.anulada?'#dc2626':'var(--green)'};">${v.anulada?'$0':fmt(v.ganancia)}</td><td style="color:#6B2D8B;">${v.anulada?'$0':v.comisionAsesor>0?fmt(v.comisionAsesor):'—'}</td><td>${v.financiera}</td><td><span class="badge ${v.anulada?'badge-red':v.tipo==='contado'?'badge-green':'badge-pink'}">${v.anulada?'ANULADA':v.tipo}</span></td><td><button class="btn btn-sm btn-ghost" onclick="verDetalleVenta(${v.id})">🔍</button></td></tr>`).join('');}
 
 function renderCreditos(filtro='activos'){
   // Actualizar badge del menu con creditos en mora
