@@ -5131,33 +5131,39 @@ function filtrarInventarioPorSede(s) {
   renderTablaInventario(s ? db.inventario.filter(e=>e.sede.includes(s)) : db.inventario);
 }
 
+function filaVenta(v) {
+  const comisionHtml = v.anulada ? '$0' : v.comisionAsesor > 0
+    ? (sesionActiva?.rol==='admin'
+        ? `<span style="cursor:pointer;" onclick="editarComisionVenta(${v.id})" title="Editar">${fmt(v.comisionAsesor)} ✏️</span>`
+        : fmt(v.comisionAsesor))
+    : (sesionActiva?.rol==='admin'
+        ? `<button class="btn btn-sm btn-ghost" style="font-size:10px;padding:2px 7px;" onclick="editarComisionVenta(${v.id})">+ Agregar</button>`
+        : '—');
+  return `<tr style="${v.anulada?'opacity:0.55;background:#fff5f5;':''}">
+    <td style="font-size:12px;">${v.fecha}</td>
+    <td style="font-weight:500;">${(v.equipo||'').substring(0,22)}</td>
+    <td style="font-family:monospace;font-size:11px;color:#0066cc;">${v.imei&&v.imei.length>3?v.imei:'—'}</td>
+    <td>${v.cliente}</td>
+    <td>${v.asesor}</td>
+    <td style="color:var(--text2);">${fmt(v.costo)}</td>
+    <td style="font-weight:600;color:${v.anulada?'#dc2626':'inherit'};">${v.anulada?'ANULADA':fmt(v.venta)}</td>
+    <td style="color:${v.anulada?'#dc2626':'var(--green)'};font-weight:600;">${v.anulada?'$0':fmt(v.ganancia)}</td>
+    <td style="color:#6B2D8B;font-weight:600;">${comisionHtml}</td>
+    <td><span class="badge badge-blue" style="font-size:10px;">${v.financiera}</span></td>
+    <td><span class="badge ${v.anulada?'badge-red':v.tipo==='contado'?'badge-green':'badge-pink'}">${v.anulada?'❌ ANULADA':v.tipo}</span></td>
+    <td><button class="btn btn-sm btn-ghost" style="font-size:11px;padding:3px 8px;" onclick="verDetalleVenta(${v.id})">🔍</button></td>
+  </tr>`;
+}
+
 function renderVentas(filtro){
   let data=db.ventas;
   if(filtro==='contado')data=data.filter(v=>v.tipo==='contado');
   else if(filtro==='credito')data=data.filter(v=>v.tipo==='credito');
   else if(filtro==='marzo')data=data.filter(v=>v.fecha&&v.fecha.startsWith('2026-03'));
   else if(filtro==='febrero')data=data.filter(v=>v.fecha&&v.fecha.startsWith('2026-02'));
-  $('tbodyVentas').innerHTML=data.length?data.map(v=>`
-    <tr style="${v.anulada?'opacity:0.55;background:#fff5f5;':''}">
-      <td style="font-size:12px;">${v.fecha}</td>
-      <td style="font-weight:500;">${(v.equipo||'').substring(0,22)}...</td>
-      <td>${v.cliente}</td><td>${v.asesor}</td>
-      <td style="color:var(--text2);">${fmt(v.costo)}</td>
-      <td style="font-weight:600;color:${v.anulada?'#dc2626':'inherit'};">${v.anulada?'ANULADA':fmt(v.venta)}</td>
-      <td style="color:${v.anulada?'#dc2626':'var(--green)'};font-weight:600;">${v.anulada?'$0':fmt(v.ganancia)}</td>
-      <td style="color:#6B2D8B;font-weight:600;">
-        ${v.anulada?'$0':v.comisionAsesor>0?
-          (sesionActiva&&sesionActiva.rol==='admin'?
-            `<span style="cursor:pointer;" onclick="editarComisionVenta(${v.id})" title="Editar comisión">${fmt(v.comisionAsesor)} ✏️</span>`:
-            fmt(v.comisionAsesor))
-          :(sesionActiva&&sesionActiva.rol==='admin'?
-            `<button class="btn btn-sm btn-ghost" style="font-size:10px;padding:2px 7px;" onclick="editarComisionVenta(${v.id})">+ Agregar</button>`:
-            '—')}
-      </td>
-      <td><span class="badge badge-blue">${v.financiera}</span></td>
-      <td><span class="badge ${v.anulada?'badge-red':v.tipo==='contado'?'badge-green':'badge-pink'}">${v.anulada?'❌ ANULADA':v.tipo}</span></td>
-      <td><button class="btn btn-sm btn-ghost" style="font-size:11px;padding:3px 8px;" onclick="verDetalleVenta(${v.id})">🔍</button></td>
-    </tr>`).join(''):'<tr><td colspan="11" style="text-align:center;padding:40px;color:var(--text2);">Sin ventas registradas</td></tr>';
+  $('tbodyVentas').innerHTML = data.length
+    ? data.map(filaVenta).join('')
+    : '<tr><td colspan="12" style="text-align:center;padding:40px;color:var(--text2);">Sin ventas registradas</td></tr>';
 }
 
 function switchVentasTab(tab,el){document.querySelectorAll('#mod-ventas .tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');renderVentas(tab);}
@@ -5169,17 +5175,32 @@ function filtrarVentas(q){
   const f=db.ventas.filter(v=>(v.equipo||'').toLowerCase().includes(q)||(v.cliente||'').toLowerCase().includes(q)||(v.asesor||'').toLowerCase().includes(q)||(v.imei||'').includes(q)||(v.cedula||'').includes(q));
   renderVentas_data(f);
 }
-function filtrarVentasPorIMEI(q){
-  // Limpiar búsqueda general al buscar por IMEI
+async function filtrarVentasPorIMEI(q){
   const search = document.getElementById('searchVentas');
   if(search) search.value='';
   q=q.trim();
   if(!q){ renderVentas_data(db.ventas); return; }
-  const f=db.ventas.filter(v=>(v.imei||'').includes(q));
+  // Buscar en memoria primero
+  let f = db.ventas.filter(v=>(v.imei||'').toLowerCase().includes(q.toLowerCase()));
+  // Si no hay resultados locales, buscar en Supabase
+  if(!f.length && q.length >= 4) {
+    try {
+      const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/ventas?select=*&imei=ilike.*${encodeURIComponent(q)}*&limit=20`, {headers});
+      const rows = await res.json();
+      if(Array.isArray(rows) && rows.length) {
+        f = rows.map(mapVenta);
+      }
+    } catch(e){ console.error(e); }
+  }
   renderVentas_data(f);
 }
 function filtrarVentasPorAsesor(a){renderVentas_data(a?db.ventas.filter(v=>v.asesor===a):db.ventas);}
-function renderVentas_data(data){$('tbodyVentas').innerHTML=data.map(v=>`<tr style="${v.anulada?'opacity:0.5;background:#fff5f5;':''}"><td>${v.fecha}</td><td>${(v.equipo||'').substring(0,20)}</td><td style="font-family:monospace;font-size:11px;color:#0066cc;">${v.imei&&v.imei.length>3?v.imei:'—'}</td><td>${v.cliente}</td><td>${v.asesor}</td><td>${fmt(v.costo)}</td><td>${v.anulada?'<span style="color:#dc2626;font-size:11px;">ANULADA</span>':fmt(v.venta)}</td><td style="color:${v.anulada?'#dc2626':'var(--green)'};">${v.anulada?'$0':fmt(v.ganancia)}</td><td style="color:#6B2D8B;">${v.anulada?'$0':v.comisionAsesor>0?fmt(v.comisionAsesor):'—'}</td><td>${v.financiera}</td><td><span class="badge ${v.anulada?'badge-red':v.tipo==='contado'?'badge-green':'badge-pink'}">${v.anulada?'ANULADA':v.tipo}</span></td><td><button class="btn btn-sm btn-ghost" onclick="verDetalleVenta(${v.id})">🔍</button></td></tr>`).join('');}
+function renderVentas_data(data){
+  $('tbodyVentas').innerHTML = data.length
+    ? data.map(filaVenta).join('')
+    : '<tr><td colspan="12" style="text-align:center;padding:40px;color:var(--text2);">Sin resultados</td></tr>';
+}
 
 function renderCreditos(filtro='activos'){
   // Actualizar badge del menu con creditos en mora
