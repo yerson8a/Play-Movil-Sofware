@@ -5104,8 +5104,8 @@ function renderTablaInventario(data) {
       <td><span class="badge ${e.estado==='DISPONIBLE'?'badge-green':e.estado==='VENDIDO'?'badge-pink':e.estado==='GARANTIA'?'badge-orange':'badge-red'}">${e.estado}</span></td>
       <td style="display:flex;gap:4px;">
         <button class="btn btn-sm btn-ghost" onclick="verDetalleProducto(${e.id})" title="Ver detalle">🔍</button>
-        ${sesionActiva && sesionActiva.rol==='admin' ? `<button class="btn btn-sm btn-ghost" style="color:#6B2D8B;" onclick="abrirTrasladoEquipo(${e.id},'${e.producto?.replace(/'/g,"\'")}')" title="Trasladar">🔄</button>` : ''}
-        <button class="btn btn-sm btn-ghost" onclick="eliminarEquipo(${e.id})" title="Eliminar">🗑️</button>
+        ${esUsuarioAdmin() ? `<button class="btn btn-sm btn-ghost" style="color:#6B2D8B;" onclick="abrirTrasladoEquipo(${e.id},'${e.producto?.replace(/'/g,"\'")}')" title="Trasladar">🔄</button>` : ''}
+        ${esUsuarioAdmin() ? `<button class="btn btn-sm btn-ghost" onclick="eliminarEquipo(${e.id})" title="Eliminar">🗑️</button>` : ''}
       </td>
     </tr>`).join(''):'<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text2);">Sin equipos en este filtro</td></tr>';
 }
@@ -7284,13 +7284,20 @@ function verDetalleProducto(id) {
     </div>` : ''}
   `;
 
-  // Botón editar apunta al producto
+  // Botón editar: solo visible para usuario admin
   const btnEditar = document.getElementById('btnEditarDesdeDetalle');
-  if(btnEditar) btnEditar.onclick = () => {
-    closeModal('modalDetalleProducto');
-    showModule('productos');
-    setTimeout(()=>abrirEditarProducto(id), 300);
-  };
+  if(btnEditar) {
+    if(esUsuarioAdmin()) {
+      btnEditar.style.display = '';
+      btnEditar.onclick = () => {
+        closeModal('modalDetalleProducto');
+        showModule('productos');
+        setTimeout(()=>abrirEditarProducto(id), 300);
+      };
+    } else {
+      btnEditar.style.display = 'none';
+    }
+  }
 
   openModal('modalDetalleProducto');
 }
