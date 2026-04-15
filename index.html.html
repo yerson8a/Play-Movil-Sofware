@@ -5053,7 +5053,7 @@ function renderInventario() {
 
   // Botón traslado: solo visible para admin
   const btnTraslado = document.getElementById('btnTrasladoEquipo');
-  if(btnTraslado) btnTraslado.style.display = (sesionActiva && sesionActiva.rol === 'admin') ? '' : 'none';
+  if(btnTraslado) btnTraslado.style.display = (esUsuarioAdmin()) ? '' : 'none';
 
   // Stats
   const dataVisible = getInvDataFiltrada();
@@ -5246,7 +5246,7 @@ function renderCreditos(filtro='activos'){
         </div>`:''}
         <div style="display:flex;gap:6px;border-top:1px solid #f0ecf8;padding-top:8px;">
           <button class="btn btn-sm btn-ghost" style="flex:1;font-size:11px;" onclick="abrirCambioEquipo(${c.id})" title="Cambiar equipo">🔄 Cambio equipo</button>
-          ${sesionActiva&&sesionActiva.rol==='admin'?`<button class="btn btn-sm btn-ghost" style="flex:1;font-size:11px;color:#dc2626;" onclick="confirmarAnularCredito(${c.id})" title="Anular venta">❌ Anular</button>`:''}
+          ${esUsuarioAdmin()?`<button class="btn btn-sm btn-ghost" style="flex:1;font-size:11px;color:#dc2626;" onclick="confirmarAnularCredito(${c.id})" title="Anular venta">❌ Anular</button>`:``}
         </div>
       </div>
     </div>`;
@@ -6056,6 +6056,7 @@ async function guardarCompra(){
 }
 
 async function agregarEquipo(){
+  if(!esUsuarioAdmin()) { toast('Solo el usuario administrador puede agregar productos','error'); return; }
   // Modal rápido desde inventario
   const datos={
     tipo:'Celular',
@@ -6746,6 +6747,7 @@ function abrirModalProducto() {
 }
 
 async function guardarProductoNuevo() {
+  if(!esUsuarioAdmin()) { toast('Solo el usuario administrador puede realizar esta acción','error'); return; }
   const nombre   = document.getElementById('prodNombre')?.value?.trim();
   const imei1    = document.getElementById('prodIMEI1')?.value?.trim();
   const valor    = getMoneyValue('prodValorCompra');
@@ -6845,7 +6847,7 @@ function renderProductosMod(data) {
       <td><span style="font-size:11px;padding:2px 8px;border-radius:8px;background:rgba(107,45,139,0.1);color:#6B2D8B;">${sedeObj?sedeObj.nombre:p.sede||'—'}</span></td>
       <td><span class="badge ${estadoColor[p.estado]||'badge-blue'}">${p.estado}</span></td>
       <td style="display:flex;gap:4px;">
-        <button class="btn btn-sm btn-ghost" onclick="abrirEditarProducto(${p.id})" title="Editar">✏️</button>
+        ${esUsuarioAdmin() ? `<button class="btn btn-sm btn-ghost" onclick="abrirEditarProducto(${p.id})" title="Editar">✏️</button>` : ''}
       </td>
     </tr>`;
   }).join('') : '<tr><td colspan="12" style="text-align:center;padding:40px;color:#888899;">Sin productos registrados</td></tr>';
@@ -6890,6 +6892,7 @@ function abrirEditarProducto(id) {
 }
 
 async function actualizarProducto() {
+  if(!esUsuarioAdmin()) { toast('Solo el usuario administrador puede editar productos','error'); return; }
   const id     = parseInt(document.getElementById('editProdId').value);
   const nombre = document.getElementById('editProdNombre')?.value?.trim();
   if(!nombre) { toast('El nombre es obligatorio','error'); return; }
@@ -8564,7 +8567,7 @@ async function buscarParaSalida(val) {
 }
 
 async function ejecutarAnulacion() {
-  if(sesionActiva?.rol !== 'admin') { toast('Solo el administrador puede anular ventas','error'); closeModal('modalAnularVenta'); return; }
+  if(!esUsuarioAdmin()) { toast('Solo el usuario administrador puede anular ventas','error'); closeModal('modalAnularVenta'); return; }
   const id = parseInt(document.getElementById('anularCreditoId').value);
   const tipo = document.getElementById('anularTipo').value;
 
@@ -8930,6 +8933,11 @@ function getMoneyValue(id) {
   const el = document.getElementById(id);
   if(!el) return 0;
   return parseFloat((el.value || '0').replace(/[^0-9]/g, '')) || 0;
+}
+
+// Solo el usuario "admin" puede cambiar estados en inventario/ventas
+function esUsuarioAdmin() {
+  return sesionActiva?.usuario?.toLowerCase() === 'admin';
 }
 
 // Leer valor de campo en MAYÚSCULAS
