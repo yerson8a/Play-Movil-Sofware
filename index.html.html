@@ -7698,94 +7698,132 @@ async function verFacturaVenta() {
 }
 
 async function confirmarAnularVentaContado() {
-  if(sesionActiva?.rol !== 'admin') { toast('Solo el administrador puede anular ventas','error'); return; }
+  if(!esUsuarioAdmin()) { toast('Solo el usuario administrador puede anular ventas','error'); return; }
   if(!ventaDetalleActualId) return;
   const v = db.ventas.find(x => x.id === ventaDetalleActualId);
   if(!v) return;
+  if(v.anulada) { toast('Esta venta ya esta anulada','error'); return; }
 
-  if(!confirm(`¿Anular la venta de "${v.equipo || 'este equipo'}" a ${v.cliente}?
+  const msgConfirm = 'Anular la venta de ' + (v.equipo||'este equipo') + ' - ' + v.cliente + '?' +
+    ' Se anulara la venta, el credito vinculado (si existe),' +
+    ' el equipo volvera al inventario como DISPONIBLE' +
+    ' y se actualizaran todos los modulos.';
+  if(!confirm(msgConfirm)) return;
 
-Esta acción marcará la venta como ANULADA y devolverá el equipo al inventario.`)) return;
+  showLoader('Anulando venta...');
+  const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' };
+  const base = SUPABASE_URL + '/rest/v1';
+  const resumen = { ventasAnuladas:0, creditosAnulados:0, equiposDevueltos:[] };
 
   try {
-    showLoader('Anulando venta...');
-    const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' };
-    const baseUrl = SUPABASE_URL + '/rest/v1';
+    // ── PASO 1: Anular TODAS las ventas del mismo grupo (cliente+fecha+asesor) ──
+    const todasVentasGrupo = db.ventas.filter(x =>
+      x.cliente === v.cliente &&
+      x.fecha   === v.fecha   &&
+      x.asesor  === v.asesor  &&
+      !x.anulada
+    );
+    // Incluir la venta actual si no estaba en el filtro
+    if(!todasVentasGrupo.find(x=>x.id===v.id)) todasVentasGrupo.push(v);
 
-    // 1. Marcar venta como ANULADA en Supabase (valor y ganancia a 0)
-    await fetch(`${baseUrl}/ventas?id=eq.${v.id}`, {
-      method: 'PATCH',
-      headers,
-      body: JSON.stringify({ observaciones: 'ANULADA: Anulación manual desde módulo ventas', valor_venta: 0, ganancia: 0 })
-    });
+    for(const vx of todasVentasGrupo) {
+      await fetch(`${base}/ventas?id=eq.${vx.id}`, {
+        method:'PATCH', headers,
+        body: JSON.stringify({
+          observaciones: 'ANULADA: Anulación manual desde módulo ventas',
+          valor_venta: 0, ganancia: 0, comision_asesor: 0
+        })
+      });
+      // Actualizar memoria
+      const vMem = db.ventas.find(x=>x.id===vx.id);
+      if(vMem){ vMem.anulada=true; vMem.venta=0; vMem.ganancia=0; }
+      resumen.ventasAnuladas++;
 
-    // 2. Devolver equipo al inventario si tiene IMEI
-    if(v.imei && v.imei.length > 5) {
-      const resProd = await fetch(`${baseUrl}/productos?select=id&imei1=eq.${v.imei}&estado=eq.VENDIDO&limit=1`, {headers});
-      const prods = await resProd.json();
-      if(prods.length > 0) {
-        await fetch(`${baseUrl}/productos?id=eq.${prods[0].id}`, {
-          method: 'PATCH', headers,
-          body: JSON.stringify({ estado: 'DISPONIBLE' })
-        });
+      // ── PASO 2: Devolver cada equipo al inventario ──────────
+      const imeiVx = (vx.imei||'').replace(/[^0-9]/g,'');
+      let devuelto = false;
+
+      // 2a. Buscar por IMEI exacto
+      if(imeiVx.length >= 5) {
+        let rP = await fetch(`${base}/productos?select=id,producto&imei1=eq.${imeiVx}&estado=eq.VENDIDO&limit=1`,{headers});
+        let pRows = await rP.json();
+        if(!pRows.length){ rP=await fetch(`${base}/productos?select=id,producto&imei2=eq.${imeiVx}&estado=eq.VENDIDO&limit=1`,{headers}); pRows=await rP.json(); }
+        if(pRows.length){ 
+          await fetch(`${base}/productos?id=eq.${pRows[0].id}`,{method:'PATCH',headers,body:JSON.stringify({estado:'DISPONIBLE'})});
+          const inv=db.inventario.find(i=>i.id===pRows[0].id); if(inv) inv.estado='DISPONIBLE';
+          const comp=db.compras.find(c=>c.id===pRows[0].id); if(comp) comp.estado='DISPONIBLE';
+          resumen.equiposDevueltos.push(pRows[0].producto||vx.equipo);
+          devuelto=true;
+        }
       }
-    } else if(v.equipo) {
-      // Buscar por nombre del equipo
-      const resProd = await fetch(`${baseUrl}/productos?select=id&producto=eq.${encodeURIComponent(v.equipo)}&estado=eq.VENDIDO&limit=1`, {headers});
-      const prods = await resProd.json();
-      if(prods.length > 0) {
-        await fetch(`${baseUrl}/productos?id=eq.${prods[0].id}`, {
-          method: 'PATCH', headers,
-          body: JSON.stringify({ estado: 'DISPONIBLE' })
-        });
+      // 2b. Si no encontró por IMEI, buscar por nombre exacto
+      if(!devuelto && vx.equipo) {
+        const equipoNombre = vx.equipo.split('|')[0].trim();
+        let rP = await fetch(`${base}/productos?select=id,producto&producto=eq.${encodeURIComponent(equipoNombre)}&estado=eq.VENDIDO&limit=1`,{headers});
+        let pRows = await rP.json();
+        // 2c. Si no hay exacto, buscar por ilike
+        if(!pRows.length){ rP=await fetch(`${base}/productos?select=id,producto&producto=ilike.*${encodeURIComponent(equipoNombre.substring(0,15))}*&estado=eq.VENDIDO&limit=1`,{headers}); pRows=await rP.json(); }
+        if(pRows.length){
+          await fetch(`${base}/productos?id=eq.${pRows[0].id}`,{method:'PATCH',headers,body:JSON.stringify({estado:'DISPONIBLE'})});
+          const inv=db.inventario.find(i=>i.id===pRows[0].id); if(inv) inv.estado='DISPONIBLE';
+          const comp=db.compras.find(c=>c.id===pRows[0].id); if(comp) comp.estado='DISPONIBLE';
+          resumen.equiposDevueltos.push(pRows[0].producto||equipoNombre);
+        }
       }
     }
 
-    // 3. Anular crédito vinculado (si existe) buscando por equipo + cliente
-    const equiposAnularV = (v.equipo||'').split('|').map(e=>e.trim()).filter(Boolean);
-    for(const eqNombre of equiposAnularV) {
-      // Buscar crédito activo con ese equipo y cliente
-      let resC = await fetch(
-        `${baseUrl}/creditos?select=id,estado&producto_desc=ilike.*${encodeURIComponent(eqNombre)}*&cliente=eq.${encodeURIComponent(v.cliente)}&estado=neq.anulado&limit=3`,
+    // ── PASO 3: Anular crédito vinculado ────────────────────────
+    // Buscar por cédula del cliente (más confiable)
+    let credRows = [];
+    if(v.cedula) {
+      const rC = await fetch(
+        `${base}/creditos?select=id,estado,producto_desc&cedula_cliente=eq.${encodeURIComponent(v.cedula)}&estado=neq.anulado&limit=10`,
         {headers}
       );
-      let credRows = await resC.json();
-      // Si no hay por nombre, buscar por cedula
-      if(!credRows.length && v.cedula) {
-        resC = await fetch(
-          `${baseUrl}/creditos?select=id,estado&cedula_cliente=eq.${encodeURIComponent(v.cedula)}&estado=neq.anulado&limit=3`,
-          {headers}
-        );
-        credRows = await resC.json();
-      }
-      for(const cr of (Array.isArray(credRows)?credRows:[])) {
-        await fetch(`${baseUrl}/creditos?id=eq.${cr.id}`, {
-          method:'PATCH', headers,
-          body: JSON.stringify({ estado:'anulado', observaciones:'ANULADO: Anulación desde módulo ventas' })
-        });
-        // Actualizar memoria
-        const cMem = db.creditos.find(x=>x.id===cr.id);
-        if(cMem) cMem.estado = 'anulado';
-      }
+      credRows = await rC.json() || [];
     }
-
-    // 4. Actualizar en memoria
-    v.anulada   = true;
-    v.venta     = 0;
-    v.ganancia  = 0;
-    v.observaciones = 'ANULADA: Anulación manual desde módulo ventas';
+    // Si no hay por cédula, buscar por nombre cliente
+    if(!credRows.length) {
+      const rC = await fetch(
+        `${base}/creditos?select=id,estado,producto_desc&cliente=eq.${encodeURIComponent(v.cliente)}&estado=neq.anulado&limit=10`,
+        {headers}
+      );
+      credRows = await rC.json() || [];
+    }
+    for(const cr of credRows) {
+      await fetch(`${base}/creditos?id=eq.${cr.id}`, {
+        method:'PATCH', headers,
+        body: JSON.stringify({
+          estado: 'anulado',
+          observaciones: 'ANULADO: Desde módulo ventas — ' + fechaColombia()
+        })
+      });
+      const cMem = db.creditos.find(x=>x.id===cr.id);
+      if(cMem) cMem.estado = 'anulado';
+      resumen.creditosAnulados++;
+    }
 
     hideLoader();
     closeModal('modalDetalleVenta');
+
+    // Recargar datos frescos
+    await cargarDatosPorSede(sesionActiva);
     renderVentas();
     renderCreditos();
     renderInventario();
     renderContabilidad();
     renderComisiones();
-    toast('Venta anulada. Equipo devuelto al inventario ✅');
+
+    // Resumen de la anulacion
+    const linea1 = resumen.ventasAnuladas + ' venta(s) anulada(s)';
+    const linea2 = resumen.creditosAnulados > 0 ? resumen.creditosAnulados + ' credito(s) anulado(s)' : 'Sin credito vinculado encontrado';
+    const linea3 = resumen.equiposDevueltos.length > 0 ? 'Devuelto al inventario: ' + resumen.equiposDevueltos.join(', ') : 'Equipo no encontrado en inventario';
+    toast(linea1 + ' | ' + linea2 + ' | ' + linea3);
+
   } catch(e) {
     hideLoader();
-    toast('Error: ' + e.message, 'error');
+    toast('Error en anulacion: ' + e.message, 'error');
+    console.error(e);
   }
 }
 
