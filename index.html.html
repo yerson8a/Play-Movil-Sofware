@@ -4978,7 +4978,7 @@ function showModule(name) {
   else if(name==='creditos') renderCreditos();
   else if(name==='contabilidad') { renderContabilidad(); }
   else if(name==='compras') { renderCompras(); renderTablaProveedores(db.proveedores); poblarSelectProveedores(); }
-  else if(name==='tareas') { renderTareas(); }
+  else if(name==='tareas') { cargarTareasSupabase().then(()=>renderTareas()); }
   else if(name==='clientes') { cargarClientes(); }
   else if(name==='proveedores') { renderProveedoresMod(); }
   else if(name==='productos') { renderProductosMod(); }
@@ -6276,13 +6276,34 @@ async function agregarEquipo(){
 // ============================================================
 // MÓDULO TAREAS PENDIENTES (independiente - no afecta datos)
 // ============================================================
-const TAREAS_KEY = 'pm_tareas_v1';
-
-function cargarTareasLocal() {
-  try { return JSON.parse(localStorage.getItem(TAREAS_KEY) || '[]'); } catch(e){ return []; }
+// ── Tareas en Supabase (compartidas entre usuarios) ──────────
+async function cargarTareasSupabase() {
+  try {
+    const res = await sbFetch('tareas_pendientes', { order: 'fecha_limite.asc' });
+    db.tareas = (res || []).map(mapTarea);
+  } catch(e) {
+    db.tareas = [];
+  }
 }
-function guardarTareasLocal(tareas) {
-  try { localStorage.setItem(TAREAS_KEY, JSON.stringify(tareas)); } catch(e){}
+
+function mapTarea(t) {
+  return {
+    id:            t.id,
+    titulo:        t.titulo || '',
+    prioridad:     t.prioridad || 'media',
+    fechaLimite:   t.fecha_limite || '',
+    fechaCreacion: t.fecha_creacion || '',
+    asesor:        t.asesor || '',
+    cliente:       t.cliente || '',
+    cedula:        t.cedula || '',
+    equipo:        t.equipo || '',
+    imei:          t.imei || '',
+    proveedor:     t.proveedor || '',
+    valor:         parseFloat(t.valor) || 0,
+    notas:         t.notas || '',
+    estado:        t.estado || 'pendiente',
+    creadoPor:     t.creado_por || ''
+  };
 }
 
 let tareaSeleccionadaId = null;
@@ -6313,7 +6334,7 @@ function abrirModalNuevaTareaInit() {
 
 // Botón de nueva tarea usa abrirModalNuevaTareaInit() directamente en HTML
 
-function guardarTarea() {
+async function guardarTarea() {
   const titulo = document.getElementById('tareaTitulo')?.value?.trim();
   const fecha  = document.getElementById('tareaFechaLimite')?.value;
   if(!titulo) { toast('El título es obligatorio','error'); return; }
@@ -6325,37 +6346,42 @@ function guardarTarea() {
   const diff = (lim - hoy) / (1000*60*60*24);
   if(diff < 2) { toast('La fecha límite debe ser mínimo 2 días desde hoy','error'); return; }
 
-  const tareas = cargarTareasLocal();
-  const nueva = {
-    id:         Date.now(),
+  const row = {
     titulo,
-    prioridad:  document.getElementById('tareaPrioridad')?.value||'media',
-    fechaLimite:fecha,
-    fechaCreacion: fechaColombia(),
-    asesor:     document.getElementById('tareaAsesor')?.value||'',
-    cliente:    document.getElementById('tareaCliente')?.value||'',
-    cedula:     document.getElementById('tareaCedula')?.value||'',
-    equipo:     document.getElementById('tareaEquipo')?.value||'',
-    imei:       document.getElementById('tareaIMEI')?.value||'',
-    proveedor:  document.getElementById('tareaProveedor')?.value||'',
-    valor:      getMoneyValue('tareaValor'),
-    notas:      document.getElementById('tareaNotas')?.value||'',
-    estado:     'pendiente',
-    creadoPor:  sesionActiva?.nombre||''
+    prioridad:     document.getElementById('tareaPrioridad')?.value||'media',
+    fecha_limite:  fecha,
+    fecha_creacion:fechaColombia(),
+    asesor:        (document.getElementById('tareaAsesor')?.value||'').toUpperCase()||null,
+    cliente:       (document.getElementById('tareaCliente')?.value||'').toUpperCase()||null,
+    cedula:        document.getElementById('tareaCedula')?.value||null,
+    equipo:        (document.getElementById('tareaEquipo')?.value||'').toUpperCase()||null,
+    imei:          document.getElementById('tareaIMEI')?.value||null,
+    proveedor:     (document.getElementById('tareaProveedor')?.value||'').toUpperCase()||null,
+    valor:         getMoneyValue('tareaValor')||0,
+    notas:         document.getElementById('tareaNotas')?.value||null,
+    estado:        'pendiente',
+    creado_por:    sesionActiva?.nombre?.toUpperCase()||''
   };
-  tareas.unshift(nueva);
-  guardarTareasLocal(tareas);
-  db.tareas = tareas;
-  closeModal('modalNuevaTarea');
-  renderTareas();
-  actualizarBadgeTareas();
-  toast('Tarea creada ✅');
+  try {
+    showLoader('Guardando tarea...');
+    const res = await sbFetch('tareas_pendientes', { method:'POST', body:row });
+    const nueva = mapTarea(res[0]);
+    db.tareas.unshift(nueva);
+    hideLoader();
+    closeModal('modalNuevaTarea');
+    renderTareas();
+    actualizarBadgeTareas();
+    toast('Tarea creada y compartida con todos los usuarios ✅');
+  } catch(e) { hideLoader(); toast('Error: '+e.message,'error'); }
 }
 
-function renderTareas(data) {
+async function renderTareas(data) {
   const hoy = fechaColombia();
-  const todas = data || cargarTareasLocal();
-  db.tareas = todas;
+  // Si no hay datos en memoria, cargar desde Supabase
+  if(!data && (!db.tareas || db.tareas.length === 0)) {
+    await cargarTareasSupabase();
+  }
+  const todas = data || db.tareas || [];
 
   // Stats
   const pendientes   = todas.filter(t=>t.estado==='pendiente'||t.estado==='en_proceso');
@@ -6440,7 +6466,7 @@ function switchTareasTab(tab, el) {
 function filtrarTareas(q) { renderTareas(); }
 
 function verDetalleTarea(id) {
-  const t = cargarTareasLocal().find(x=>x.id===id);
+  const t = db.tareas.find(x=>x.id===id);
   if(!t) return;
   tareaSeleccionadaId = id;
   const hoy = fechaColombia();
@@ -6476,29 +6502,36 @@ function verDetalleTarea(id) {
   openModal('modalDetalleTarea');
 }
 
-function cambiarEstadoTareaActual(nuevoEstado) {
-  const tareas = cargarTareasLocal();
-  const t = tareas.find(x=>x.id===tareaSeleccionadaId);
-  if(!t) return;
-  t.estado = nuevoEstado;
-  guardarTareasLocal(tareas);
-  closeModal('modalDetalleTarea');
-  renderTareas();
-  toast(nuevoEstado==='completada'?'Tarea completada ✅':'Tarea en proceso 🔄');
+async function cambiarEstadoTareaActual(nuevoEstado) {
+  if(!tareaSeleccionadaId) return;
+  try {
+    await sbFetch(`tareas_pendientes?id=eq.${tareaSeleccionadaId}`, {
+      method:'PATCH', body:{ estado: nuevoEstado }
+    });
+    const t = db.tareas.find(x=>x.id===tareaSeleccionadaId);
+    if(t) t.estado = nuevoEstado;
+    closeModal('modalDetalleTarea');
+    renderTareas();
+    actualizarBadgeTareas();
+    toast(nuevoEstado==='completada'?'Tarea completada ✅':'Tarea en proceso 🔄');
+  } catch(e) { toast('Error: '+e.message,'error'); }
 }
 
-function eliminarTareaActual() {
-  if(!confirm('¿Eliminar esta tarea? Esta acción no se puede deshacer.')) return;
-  const tareas = cargarTareasLocal().filter(t=>t.id!==tareaSeleccionadaId);
-  guardarTareasLocal(tareas);
-  closeModal('modalDetalleTarea');
-  renderTareas();
-  toast('Tarea eliminada');
+async function eliminarTareaActual() {
+  if(!confirm('¿Eliminar esta tarea? Esta accion no se puede deshacer.')) return;
+  try {
+    await sbFetch(`tareas_pendientes?id=eq.${tareaSeleccionadaId}`, { method:'DELETE' });
+    db.tareas = db.tareas.filter(t=>t.id!==tareaSeleccionadaId);
+    closeModal('modalDetalleTarea');
+    renderTareas();
+    actualizarBadgeTareas();
+    toast('Tarea eliminada');
+  } catch(e) { toast('Error: '+e.message,'error'); }
 }
 
 function actualizarBadgeTareas() {
   const hoy = fechaColombia();
-  const tareas = cargarTareasLocal();
+  const tareas = db.tareas || [];
   const urgentes = tareas.filter(t =>
     (t.estado==='pendiente'||t.estado==='en_proceso') &&
     t.fechaLimite <= hoy
@@ -10898,6 +10931,7 @@ async function activarSesion(user) {
   cargarSedes().then(() => poblarSelectSedes());
   cargarAsesoresActivos();
   cargarClientes(); // Necesario para búsqueda en modales de venta
+  cargarTareasSupabase().then(() => actualizarBadgeTareas()); // Tareas compartidas
 
   toast(`Bienvenido, ${user.nombre} 👋`);
 }
