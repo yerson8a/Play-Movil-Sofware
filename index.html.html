@@ -7591,35 +7591,110 @@ function verDetalleVenta(id) {
   openModal('modalDetalleVenta');
 }
 
-function verFacturaVenta() {
+async function verFacturaVenta() {
   const v = db.ventas.find(x => x.id === ventaDetalleActualId);
   if(!v) { toast('Venta no encontrada','error'); return; }
-  const datosF = {
-    tipo: v.tipo === 'contado' ? 'contado' : 'credito',
-    cliente: v.cliente||'—', cedula: v.cedula||'',
-    telefono: v.telefono||'', correo: v.correo||'',
-    equipo: v.equipo||'—', imei: v.imei||'',
-    asesor: v.asesor||'', sede: v.sede||'',
-    precioBase: v.venta||0, iva: 0, descuento: 0,
-    prodAdicDesc:'', prodAdicVal:0, comision: 0,
-    precioFinal: v.venta||0, ganancia: v.ganancia||0,
-    inicial: 0, saldoFinanciar: 0, cuotas: 0,
-    valorCuota: 0, financiera: v.financiera||'',
-    intereses: 0, tasaInteres: 0,
-    fecha: v.fecha||new Date().toLocaleDateString('es-CO'),
-    numero: 'PM-'+v.id
-  };
-  // Buscar datos de crédito si aplica
-  const cred = db.creditos.find(c =>
-    c.cliente === v.cliente && c.equipo === v.equipo
+
+  // Buscar datos ampliados desde Supabase para tener todos los campos
+  let ventaCompleta = v;
+  try {
+    const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/ventas?id=eq.${v.id}&select=*`, {headers});
+    const rows = await res.json();
+    if(rows && rows.length) ventaCompleta = { ...v, ...rows[0] };
+  } catch(e) { console.error(e); }
+
+  // Buscar crédito vinculado (mismo cliente + equipo o cedula)
+  let cred = db.creditos.find(c =>
+    (c.cliente === v.cliente || c.cedula === v.cedula) &&
+    (c.equipo === v.equipo || (v.equipo||'').includes(c.equipo||'') || (c.equipo||'').includes(v.equipo||''))
   );
-  if(cred) {
-    datosF.inicial       = cred.inicial||0;
-    datosF.saldoFinanciar = cred.saldo||0;
-    datosF.cuotas        = cred.cuotas||0;
-    datosF.valorCuota    = cred.valorCuota||0;
+  // Si no está en memoria, buscar en Supabase
+  if(!cred && v.tipo === 'credito') {
+    try {
+      const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/creditos?cedula_cliente=eq.${encodeURIComponent(v.cedula||'')}&select=*&limit=1`,
+        {headers}
+      );
+      const rows = await res.json();
+      if(rows && rows.length) cred = mapCredito(rows[0]);
+    } catch(e) { console.error(e); }
   }
-  mostrarFactura(datosF, false);
+
+  // Reconstruir los valores financieros
+  // valor_venta = precio final (después de descuentos)
+  const precioFinal   = parseFloat(ventaCompleta.valor_venta) || v.venta || 0;
+  const costo         = parseFloat(ventaCompleta.valor_compra) || v.costo || 0;
+  const ganancia      = parseFloat(ventaCompleta.ganancia) || v.ganancia || 0;
+  const financiera    = ventaCompleta.financiera || v.financiera || 'CONTADO';
+  const comisionAsesor= parseFloat(ventaCompleta.comision_asesor) || v.comisionAsesor || 0;
+
+  // Estimar comisión financiera desde la diferencia (precio - costo - ganancia)
+  const comisionFinanciera = Math.max(0, precioFinal - costo - ganancia - comisionAsesor);
+
+  // Buscar otros productos de la misma factura (mismo cliente, misma fecha)
+  const otraVentas = db.ventas.filter(x =>
+    x.id !== v.id &&
+    x.cliente === v.cliente &&
+    x.fecha === v.fecha &&
+    x.asesor === v.asesor &&
+    !x.anulada
+  );
+
+  // Construir lista de productos
+  let productosList = null;
+  if(otraVentas.length > 0) {
+    // Venta multi-producto: incluir la actual y las demás del mismo grupo
+    productosList = [v, ...otraVentas].map(vx => ({
+      producto: vx.equipo || '—',
+      imei:     vx.imei   || '',
+      precio:   parseFloat(vx.venta) || 0
+    }));
+  }
+
+  const totalBase = productosList
+    ? productosList.reduce((s,p) => s+(p.precio||0), 0)
+    : precioFinal;
+
+  const datosF = {
+    tipo:         v.tipo === 'contado' ? 'contado' : 'credito',
+    cliente:      v.cliente || '—',
+    cedula:       v.cedula  || '',
+    telefono:     v.telefono|| '',
+    correo:       v.correo  || '',
+    equipo:       v.equipo  || '—',
+    imei:         v.imei    || '',
+    asesor:       v.asesor  || '',
+    sede:         v.sede    || 'PLAY MÓVIL',
+    financiera:   financiera,
+    // Precios
+    precioBase:   totalBase,
+    precioFinal:  precioFinal,
+    descuento:    0,
+    iva:          0,
+    ivaPct:       0,
+    comision:     comisionFinanciera,
+    comisionAsesor,
+    ganancia,
+    prodAdicDesc: '',
+    prodAdicVal:  0,
+    // Multi-producto
+    productosList,
+    // Crédito
+    inicial:       cred ? (cred.inicial||0) : 0,
+    saldoFinanciar:cred ? (cred.saldo||0)   : 0,
+    cuotas:        cred ? (cred.cuotas||0)  : 0,
+    valorCuota:    cred ? (cred.valorCuota||0): 0,
+    intereses:     cred ? (cred.intereses||0) : 0,
+    tasaInteres:   0,
+    esMixto:       false,
+    // Fecha y número
+    fecha:   v.fecha || new Date().toLocaleDateString('es-CO',{timeZone:'America/Bogota'}),
+    numero: 'PM-' + v.id
+  };
+
+  mostrarFactura(datosF, !!(v.correo));
 }
 
 async function confirmarAnularVentaContado() {
@@ -9334,28 +9409,65 @@ function mostrarFactura(datos, enviarCorreo) {
 }
 
 function generarHTMLFactura(d) {
-  // Si tiene lista de productos, generar una fila por cada uno
-  const lineasProductos = (d.productosList && d.productosList.length > 0)
-    ? d.productosList.map(p => `
-    <tr>
-      <td style="padding:10px 8px;border-bottom:1px solid #f0f0f5;">${p.producto||p.equipo||'—'}${p.imei?'<br><span style="font-size:11px;color:#888;font-family:monospace;">IMEI: '+p.imei+'</span>':''}</td>
-      <td style="padding:10px 8px;border-bottom:1px solid #f0f0f5;text-align:center;">1</td>
-      <td style="padding:10px 8px;border-bottom:1px solid #f0f0f5;text-align:right;">${fmt(p.precio||0)}</td>
-      <td style="padding:10px 8px;border-bottom:1px solid #f0f0f5;text-align:right;">${fmt(p.precio||0)}</td>
-    </tr>`).join('')
-    : `<tr>
-      <td style="padding:10px 8px;border-bottom:1px solid #f0f0f5;">${d.equipo||'—'}${d.imei?'<br><span style="font-size:11px;color:#888;font-family:monospace;">IMEI: '+d.imei+'</span>':''}</td>
-      <td style="padding:10px 8px;border-bottom:1px solid #f0f0f5;text-align:center;">1</td>
-      <td style="padding:10px 8px;border-bottom:1px solid #f0f0f5;text-align:right;">${fmt(d.precioBase)}</td>
-      <td style="padding:10px 8px;border-bottom:1px solid #f0f0f5;text-align:right;">${fmt(d.precioBase)}</td>
-    </tr>`;
-  const lineaProducto = lineasProductos;
+  // ── Construir filas de productos ─────────────────────────────
+  const esMulti = d.productosList && d.productosList.length > 0;
+  let subtotalProductos = 0;
+
+  const filasProductos = esMulti
+    ? d.productosList.map((p, i) => {
+        const precio = p.precio || 0;
+        subtotalProductos += precio;
+        const numFila = d.productosList.length > 1 ? `<span style="font-size:10px;color:#aaa;margin-right:4px;">#${i+1}</span>` : '';
+        return `
+        <tr>
+          <td style="padding:11px 8px;border-bottom:1px solid #f0f0f5;vertical-align:top;">
+            <div style="font-weight:600;">${numFila}${p.producto||p.equipo||'—'}</div>
+            ${p.imei ? `<div style="font-size:11px;color:#0066cc;font-family:monospace;margin-top:2px;">📡 IMEI: ${p.imei}</div>` : ''}
+          </td>
+          <td style="padding:11px 8px;border-bottom:1px solid #f0f0f5;text-align:center;">1</td>
+          <td style="padding:11px 8px;border-bottom:1px solid #f0f0f5;text-align:right;">${fmt(precio)}</td>
+          <td style="padding:11px 8px;border-bottom:1px solid #f0f0f5;text-align:right;font-weight:600;">${fmt(precio)}</td>
+        </tr>`;
+      }).join('')
+    : (() => {
+        subtotalProductos = d.precioBase || 0;
+        return `
+        <tr>
+          <td style="padding:11px 8px;border-bottom:1px solid #f0f0f5;vertical-align:top;">
+            <div style="font-weight:600;">${d.equipo||'—'}</div>
+            ${d.imei ? `<div style="font-size:11px;color:#0066cc;font-family:monospace;margin-top:2px;">📡 IMEI: ${d.imei}</div>` : ''}
+          </td>
+          <td style="padding:11px 8px;border-bottom:1px solid #f0f0f5;text-align:center;">1</td>
+          <td style="padding:11px 8px;border-bottom:1px solid #f0f0f5;text-align:right;">${fmt(d.precioBase||0)}</td>
+          <td style="padding:11px 8px;border-bottom:1px solid #f0f0f5;text-align:right;font-weight:600;">${fmt(d.precioBase||0)}</td>
+        </tr>`;
+      })();
+
+  // Subtotal real calculado desde los productos
+  const subtotalReal = esMulti ? subtotalProductos : (d.precioBase||0);
+
+  // Separador visual si hay múltiples productos
+  const separadorMulti = esMulti && d.productosList.length > 1 ? `
+    <tr style="background:#f7f5fb;">
+      <td colspan="3" style="padding:7px 8px;font-size:11px;color:#888899;font-style:italic;">
+        ${d.productosList.length} productos en esta factura
+      </td>
+      <td style="padding:7px 8px;text-align:right;font-weight:700;font-size:13px;color:#6B2D8B;">
+        ${fmt(subtotalReal)}
+      </td>
+    </tr>` : '';
+
+  const lineaProducto = filasProductos + separadorMulti;
+
   const lineaAdic = d.prodAdicVal > 0 ? `
-    <tr>
-      <td style="padding:10px 8px;border-bottom:1px solid #f0f0f5;">${d.prodAdicDesc || 'Producto adicional'}</td>
+    <tr style="background:#fffbf0;">
+      <td style="padding:10px 8px;border-bottom:1px solid #f0f0f5;">
+        <div style="font-weight:600;">${d.prodAdicDesc || 'Producto adicional'}</div>
+        <div style="font-size:11px;color:#d97706;">Accesorio / Adicional</div>
+      </td>
       <td style="padding:10px 8px;border-bottom:1px solid #f0f0f5;text-align:center;">1</td>
       <td style="padding:10px 8px;border-bottom:1px solid #f0f0f5;text-align:right;">${fmt(d.prodAdicVal)}</td>
-      <td style="padding:10px 8px;border-bottom:1px solid #f0f0f5;text-align:right;">${fmt(d.prodAdicVal)}</td>
+      <td style="padding:10px 8px;border-bottom:1px solid #f0f0f5;text-align:right;font-weight:600;">${fmt(d.prodAdicVal)}</td>
     </tr>` : '';
 
   return `
@@ -9407,11 +9519,12 @@ function generarHTMLFactura(d) {
     <!-- Totales -->
     <div style="display:flex;justify-content:flex-end;">
       <div style="min-width:260px;">
-        <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;border-bottom:1px solid #f0ecf8;"><span style="color:#555;">Subtotal</span><span>${fmt(d.precioBase)}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;border-bottom:1px solid #f0ecf8;"><span style="color:#555;">Subtotal</span><span>${fmt(subtotalReal + (d.prodAdicVal||0))}</span></div>
         ${d.descuento > 0 ? `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;"><span style="color:#555;">Descuento</span><span style="color:#dc2626;">-${fmt(d.descuento)}</span></div>` : ''}
         ${d.prodAdicVal > 0 ? `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;"><span style="color:#555;">${d.prodAdicDesc||'Adicional'}</span><span>+${fmt(d.prodAdicVal)}</span></div>` : ''}
-        ${d.iva > 0 ? `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;"><span style="color:#555;">IVA</span><span style="color:#d97706;">${fmt(d.iva)}</span></div>` : ''}
-        ${d.comision > 0 ? `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;"><span style="color:#555;">Comisión financiera</span><span style="font-weight:600;color:#111;">${fmt(d.comision)}</span></div>` : ''}
+        ${(d.iva > 0 || d.ivaPct > 0) ? `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;"><span style="color:#d97706;">IVA${d.ivaPct>0?' ('+d.ivaPct+'%)':''}</span><span style="color:#d97706;">+${fmt(d.iva||0)}</span></div>` : ''}
+        ${d.comision > 0 ? `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;border-top:1px dashed #ece8f5;margin-top:4px;"><span style="color:#555;">📊 Comisión financiera<br><span style="font-size:10px;color:#aaa;">${d.financiera||''}</span></span><span style="font-weight:600;color:#dc2626;">-${fmt(d.comision)}</span></div>` : ''}
+        ${d.comisionAsesor > 0 ? `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;"><span style="color:#555;">💎 Comisión asesor</span><span style="font-weight:600;color:#6B2D8B;">-${fmt(d.comisionAsesor)}</span></div>` : ''}
         <div style="display:flex;justify-content:space-between;padding:10px 0;font-size:16px;font-weight:700;border-top:2px solid #6B2D8B;margin-top:6px;">
           <span>TOTAL</span><span style="color:#6B2D8B;">${fmt(d.precioFinal)}</span>
         </div>
