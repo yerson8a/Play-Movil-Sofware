@@ -1093,7 +1093,11 @@
           <span class="search-icon">🔍</span>
           <input type="text" class="form-control" id="searchCredCliente" placeholder="Buscar por cliente, cédula o equipo..." oninput="filtrarCreditosTexto()">
         </div>
-        <select class="form-control" style="width:200px;" id="filtroCredFinanciera" onchange="filtrarCreditosTexto()">
+        <div class="search-wrap" style="width:210px;">
+          <span class="search-icon">📡</span>
+          <input type="text" class="form-control" id="searchCredIMEI" placeholder="Buscar por IMEI / Serial..." oninput="filtrarCreditosPorIMEI(this.value)" style="padding-left:36px;" inputmode="numeric">
+        </div>
+        <select class="form-control" style="width:180px;" id="filtroCredFinanciera" onchange="filtrarCreditosTexto()">
           <option value="">Todas las financieras</option>
         </select>
         <button class="btn btn-ghost btn-sm" onclick="limpiarFiltrosCreditos()">✕ Limpiar</button>
@@ -4355,7 +4359,8 @@ function mapCredito(c) {
     docCedFront:  c.doc_cedula_frente  || null,
     docCedBack:   c.doc_cedula_reverso || null,
     docFoto:      c.doc_foto_entrega   || null,
-    docContrato:  c.doc_contrato       || null
+    docContrato:  c.doc_contrato       || null,
+    imei: c.imei || ''
   };
 }
 
@@ -5301,7 +5306,8 @@ function renderCreditos(filtro='activos'){
   if(txtBusca) data = data.filter(c =>
     (c.cliente||'').toLowerCase().includes(txtBusca) ||
     (c.cedula||'').includes(txtBusca) ||
-    (c.equipo||'').toLowerCase().includes(txtBusca)
+    (c.equipo||'').toLowerCase().includes(txtBusca) ||
+    (c.imei||'').includes(txtBusca)
   );
   if(finBusca) data = data.filter(c => c.financiera === finBusca);
 
@@ -5354,14 +5360,108 @@ let tabCreditosActual = 'activos';
 const _origSwitchCreditosTab = switchCreditosTab;
 
 function filtrarCreditosTexto() {
+  // Limpiar búsqueda IMEI
+  const imeiEl = document.getElementById('searchCredIMEI');
+  if(imeiEl) imeiEl.value = '';
   renderCreditos(tabCreditosActual);
+}
+
+async function filtrarCreditosPorIMEI(q) {
+  // Limpiar búsqueda general
+  const txtEl = document.getElementById('searchCredCliente');
+  if(txtEl) txtEl.value = '';
+  q = q.trim();
+  if(!q) { renderCreditos(tabCreditosActual); return; }
+
+  // Buscar en ventas cuál cliente tiene ese IMEI
+  let data = db.creditos;
+  // Primero buscar en ventas locales
+  const ventasConIMEI = db.ventas.filter(v => (v.imei||'').toLowerCase().includes(q.toLowerCase()));
+  if(ventasConIMEI.length) {
+    const cedulasIMEI = new Set(ventasConIMEI.map(v => v.cedula).filter(Boolean));
+    const clientesIMEI = new Set(ventasConIMEI.map(v => v.cliente).filter(Boolean));
+    data = data.filter(c =>
+      (c.cedula && cedulasIMEI.has(c.cedula)) ||
+      (c.cliente && clientesIMEI.has(c.cliente)) ||
+      (c.imei||'').includes(q)
+    );
+  } else {
+    // Si no hay en memoria, buscar en Supabase
+    try {
+      const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+      const r1 = await fetch(`${SUPABASE_URL}/rest/v1/ventas?select=cedula_cliente,cliente&imei=ilike.*${encodeURIComponent(q)}*&limit=20`, {headers});
+      const rows = await r1.json();
+      if(Array.isArray(rows) && rows.length) {
+        const cedulasSet = new Set(rows.map(r=>r.cedula_cliente).filter(Boolean));
+        const clientesSet= new Set(rows.map(r=>r.cliente).filter(Boolean));
+        data = data.filter(c =>
+          (c.cedula && cedulasSet.has(c.cedula)) ||
+          (c.cliente && clientesSet.has(c.cliente))
+        );
+      } else {
+        data = [];
+      }
+    } catch(e) { console.error(e); data = []; }
+  }
+
+  // Renderizar resultado filtrado
+  const grid = document.getElementById('creditosGrid');
+  if(!grid) return;
+  if(!data.length) {
+    grid.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-text">Sin creditos con ese IMEI</div></div>';
+    return;
+  }
+  // Reusar la lógica de render pero con data filtrada
+  const tabCurrent = tabCreditosActual;
+  let filtrada = data;
+  if(tabCurrent==='mora') filtrada=data.filter(c=>c.estado==='mora');
+  else if(tabCurrent==='pagados') filtrada=data.filter(c=>c.estado==='pagado');
+  else if(tabCurrent==='anulados') filtrada=data.filter(c=>c.estado==='anulado');
+  else filtrada=data.filter(c=>c.estado==='al_dia'||c.estado==='mora');
+  if(!filtrada.length) filtrada = data; // Si el tab filtra todo, mostrar todos
+
+  grid.innerHTML = filtrada.map(c => {
+    const pct = Math.round((c.pagadas/c.cuotas)*100)||0;
+    return `<div class="credito-card">
+      <div class="cc-header">
+        <div><div class="cc-name">${c.cliente}</div>
+          <div class="cc-equipo">📱 ${(c.equipo||'').substring(0,25)}</div>
+          <div class="cc-equipo" style="margin-top:2px;">👤 ${c.asesor}</div>
+        </div>
+        <div class="cc-monto">
+          <div class="cc-total">${fmt(c.saldo)}</div>
+          <div class="cc-saldo">saldo restante</div>
+          <span class="badge ${c.estado==='mora'?'badge-red':'badge-green'}" style="margin-top:4px;">${c.estado}</span>
+        </div>
+      </div>
+      <div class="cc-progress">
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text2);margin-bottom:5px;">
+          <span>${c.pagadas}/${c.cuotas} cuotas</span><span>${pct}%</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill green" style="width:${pct}%;"></div></div>
+      </div>
+      <div class="cc-footer" style="flex-direction:column;gap:8px;align-items:stretch;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div class="cc-asesor">Cedula: ${c.cedula}</div>
+          <button class="btn btn-sm btn-outline" onclick="registrarPago(${c.id})">+ Pago</button>
+        </div>
+        <div style="display:flex;gap:6px;border-top:1px solid #f0ecf8;padding-top:8px;">
+          <button class="btn btn-sm btn-ghost" style="flex:1;font-size:11px;" onclick="abrirCambioEquipo(${c.id})">Cambio</button>
+          <button class="btn btn-sm btn-ghost" style="flex:1;font-size:11px;color:#6B2D8B;" onclick="abrirBitacora(${c.id})">Bitacora</button>
+          ${esUsuarioAdmin()?`<button class="btn btn-sm btn-ghost" style="flex:1;font-size:11px;color:#dc2626;" onclick="confirmarAnularCredito(${c.id})">Anular</button>`:''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function limpiarFiltrosCreditos() {
   const s = document.getElementById('searchCredCliente');
   const f = document.getElementById('filtroCredFinanciera');
+  const imei = document.getElementById('searchCredIMEI');
   if(s) s.value = '';
   if(f) f.value = '';
+  if(imei) imei.value = '';
   renderCreditos(tabCreditosActual);
 }
 
