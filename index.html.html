@@ -1719,6 +1719,58 @@
   </div>
 </div>
 
+<!-- Modal Bitácora de Crédito -->
+<div class="modal-overlay" id="modalBitacora" style="z-index:9400;">
+  <div class="modal" style="max-width:600px;max-height:90vh;display:flex;flex-direction:column;">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">📋 Bitácora de Gestión</div>
+        <div id="bitacoraSubtitle" style="font-size:12px;color:#888899;margin-top:2px;"></div>
+      </div>
+      <button class="modal-close" onclick="closeModal('modalBitacora')">✕</button>
+    </div>
+
+    <!-- Formulario nueva gestión -->
+    <div style="background:#f7f5fb;border-radius:12px;padding:14px;margin-bottom:14px;flex-shrink:0;">
+      <div style="font-size:12px;font-weight:700;color:#6B2D8B;margin-bottom:10px;">➕ Registrar nueva gestión</div>
+      <div class="form-row" style="margin-bottom:8px;">
+        <div class="form-group">
+          <label class="form-label">Resultado *</label>
+          <select class="form-control" id="bitTipo">
+            <option value="pago">✅ Pagó / Realizó abono</option>
+            <option value="promesa_pago">🤝 Prometió pagar</option>
+            <option value="no_contesto">📵 No contestó</option>
+            <option value="mensaje">💬 Se dejó mensaje</option>
+            <option value="acuerdo">📝 Se llegó a un acuerdo</option>
+            <option value="rechazo">❌ Se negó a pagar</option>
+            <option value="otro">📌 Otro</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Fecha</label>
+          <input type="date" class="form-control" id="bitFecha">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nota / Detalle</label>
+        <textarea class="form-control" id="bitNota" rows="2"
+          placeholder="Ej: El cliente indicó que pagará el viernes 18, dijo que estaba en Medellín..."></textarea>
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-top:8px;">
+        <button class="btn btn-primary btn-sm" onclick="guardarBitacora()">💾 Registrar Gestión</button>
+      </div>
+    </div>
+
+    <!-- Historial -->
+    <div style="overflow-y:auto;flex:1;">
+      <div style="font-size:12px;font-weight:700;color:#555577;margin-bottom:8px;">🕐 Historial de gestiones</div>
+      <div id="bitacoraLista">
+        <div style="text-align:center;padding:24px;color:#888899;font-size:13px;">Cargando...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Modal Nueva Tarea -->
 <div class="modal-overlay" id="modalNuevaTarea">
   <div class="modal" style="max-width:680px;">
@@ -4290,6 +4342,7 @@ function mapCredito(c) {
     equipo: c.producto_desc || '—',
     asesor: c.asesor || '',
     financiera: c.financiera || '—',
+    bitacoraCount: 0,
     total: parseFloat(c.monto_total) || 0,
     inicial: parseFloat(c.inicial) || 0,
     saldo: parseFloat(c.saldo_pendiente) || 0,
@@ -5286,8 +5339,9 @@ function renderCreditos(filtro='activos'){
           ${c.docContrato?`<a href="${c.docContrato}" target="_blank" class="btn btn-sm btn-ghost" style="font-size:10px;padding:2px 8px;">📝 Contrato</a>`:''}
         </div>`:''}
         <div style="display:flex;gap:6px;border-top:1px solid #f0ecf8;padding-top:8px;">
-          <button class="btn btn-sm btn-ghost" style="flex:1;font-size:11px;" onclick="abrirCambioEquipo(${c.id})" title="Cambiar equipo">🔄 Cambio equipo</button>
-          ${esUsuarioAdmin()?`<button class="btn btn-sm btn-ghost" style="flex:1;font-size:11px;color:#dc2626;" onclick="confirmarAnularCredito(${c.id})" title="Anular venta">❌ Anular</button>`:``}
+          <button class="btn btn-sm btn-ghost" style="flex:1;font-size:11px;" onclick="abrirCambioEquipo(${c.id})" title="Cambiar equipo">🔄 Cambio</button>
+          <button class="btn btn-sm btn-ghost" style="flex:1;font-size:11px;color:#6B2D8B;border-color:#6B2D8B;" onclick="abrirBitacora(${c.id})" title="Bitácora de gestiones">📋 Bitácora${c.bitacoraCount>0?` <span style="background:#6B2D8B;color:#fff;border-radius:8px;padding:0 5px;font-size:10px;">${c.bitacoraCount}</span>`:''}</button>
+          ${esUsuarioAdmin()?`<button class="btn btn-sm btn-ghost" style="flex:1;font-size:11px;color:#dc2626;" onclick="confirmarAnularCredito(${c.id})" title="Anular">❌ Anular</button>`:``}
         </div>
       </div>
     </div>`;
@@ -6360,6 +6414,144 @@ function actualizarBadgeTareas() {
 window.addEventListener('load', () => setTimeout(actualizarBadgeTareas, 1500));
 
 // ============================================================
+// BITÁCORA DE CRÉDITOS
+// ============================================================
+let bitacoraCreditoId = null;
+
+const BITACORA_ICONOS = {
+  pago:          '✅',
+  promesa_pago:  '🤝',
+  no_contesto:   '📵',
+  mensaje:       '💬',
+  acuerdo:       '📝',
+  rechazo:       '❌',
+  otro:          '📌'
+};
+const BITACORA_LABELS = {
+  pago:          'Pagó / Realizó abono',
+  promesa_pago:  'Prometió pagar',
+  no_contesto:   'No contestó',
+  mensaje:       'Se dejó mensaje',
+  acuerdo:       'Acuerdo de pago',
+  rechazo:       'Se negó a pagar',
+  otro:          'Otro'
+};
+
+async function abrirBitacora(creditoId) {
+  bitacoraCreditoId = creditoId;
+  const c = db.creditos.find(x => x.id === creditoId);
+  if(!c) return;
+
+  // Subtítulo con info del crédito
+  const sub = document.getElementById('bitacoraSubtitle');
+  if(sub) sub.textContent = `${c.cliente} · ${c.equipo||'—'} · Saldo: ${fmt(c.saldo||0)}`;
+
+  // Fecha por defecto hoy
+  const fechaEl = document.getElementById('bitFecha');
+  if(fechaEl) fechaEl.value = fechaColombia();
+
+  // Limpiar campos
+  const tipoEl = document.getElementById('bitTipo');
+  if(tipoEl) tipoEl.value = 'pago';
+  const notaEl = document.getElementById('bitNota');
+  if(notaEl) notaEl.value = '';
+
+  openModal('modalBitacora');
+  await cargarBitacora(creditoId);
+}
+
+async function cargarBitacora(creditoId) {
+  const lista = document.getElementById('bitacoraLista');
+  if(!lista) return;
+  lista.innerHTML = '<div style="text-align:center;padding:24px;color:#888899;">⏳ Cargando...</div>';
+  try {
+    const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/bitacora_creditos?credito_id=eq.${creditoId}&order=created_at.desc&limit=50`,
+      {headers}
+    );
+    const rows = await res.json();
+    if(!Array.isArray(rows) || !rows.length) {
+      lista.innerHTML = '<div style="text-align:center;padding:24px;color:#888899;font-size:13px;">Sin gestiones registradas aún</div>';
+      return;
+    }
+    lista.innerHTML = rows.map(r => {
+      const icono = BITACORA_ICONOS[r.tipo] || '📌';
+      const label = BITACORA_LABELS[r.tipo] || r.tipo;
+      const colorBg = r.tipo==='pago'?'#f0fdf4':r.tipo==='rechazo'?'#fff5f5':r.tipo==='no_contesto'?'#fafafa':'#f7f5fb';
+      const colorBorder = r.tipo==='pago'?'#bbf7d0':r.tipo==='rechazo'?'#fecaca':r.tipo==='no_contesto'?'#e5e7eb':'#ece8f5';
+      return `
+      <div style="background:${colorBg};border:1px solid ${colorBorder};border-radius:10px;padding:12px;margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <span style="font-weight:700;font-size:13px;">${icono} ${label}</span>
+          <div style="text-align:right;">
+            <div style="font-size:11px;color:#888899;">${r.fecha||'—'} ${r.hora||''}</div>
+            <div style="font-size:11px;color:#6B2D8B;font-weight:600;">${(r.usuario||'').toUpperCase()}</div>
+          </div>
+        </div>
+        ${r.nota ? `<div style="font-size:13px;color:#333;line-height:1.5;border-top:1px solid rgba(0,0,0,0.06);padding-top:6px;margin-top:4px;">${r.nota}</div>` : ''}
+      </div>`;
+    }).join('');
+
+    // Actualizar contador en la tarjeta
+    const cMem = db.creditos.find(x=>x.id===creditoId);
+    if(cMem) cMem.bitacoraCount = rows.length;
+
+  } catch(e) {
+    lista.innerHTML = `<div style="color:#dc2626;padding:12px;">Error cargando bitácora: ${e.message}</div>`;
+  }
+}
+
+async function guardarBitacora() {
+  if(!bitacoraCreditoId) return;
+  const tipo  = document.getElementById('bitTipo')?.value||'otro';
+  const fecha = document.getElementById('bitFecha')?.value || fechaColombia();
+  const nota  = (document.getElementById('bitNota')?.value||'').trim().toUpperCase();
+
+  if(!tipo) { toast('Selecciona el resultado de la gestión','error'); return; }
+
+  // Hora actual Colombia
+  const ahora = new Date();
+  const offsetMs = -5 * 60 * 60 * 1000;
+  const col = new Date(ahora.getTime() + offsetMs - (ahora.getTimezoneOffset()*60000));
+  const hora = `${String(col.getUTCHours()).padStart(2,'0')}:${String(col.getUTCMinutes()).padStart(2,'0')}`;
+
+  const row = {
+    credito_id: bitacoraCreditoId,
+    tipo, fecha, hora,
+    nota: nota || null,
+    usuario: sesionActiva?.nombre?.toUpperCase() || 'SISTEMA'
+  };
+
+  try {
+    showLoader('Guardando gestión...');
+    const headers = {
+      'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'Content-Type': 'application/json', 'Prefer': 'return=representation'
+    };
+    await fetch(`${SUPABASE_URL}/rest/v1/bitacora_creditos`, {
+      method: 'POST', headers, body: JSON.stringify(row)
+    });
+    hideLoader();
+
+    // Limpiar nota y actualizar lista
+    const notaEl = document.getElementById('bitNota');
+    if(notaEl) notaEl.value = '';
+    const tipoEl = document.getElementById('bitTipo');
+    if(tipoEl) tipoEl.value = 'pago';
+
+    await cargarBitacora(bitacoraCreditoId);
+    toast(`Gestión "${BITACORA_LABELS[tipo]||tipo}" registrada ✅`);
+
+    // Actualizar tarjeta de crédito
+    renderCreditos(tabCreditosActual);
+  } catch(e) {
+    hideLoader();
+    toast('Error: '+e.message,'error');
+  }
+}
+
+// ============================================================
 // MÓDULO CLIENTES
 // ============================================================
 async function cargarClientes() {
@@ -6977,12 +7169,16 @@ async function guardarVentaContado(){
   }
   // Validar cliente
   if(!$U('vcCliente')) { toast('Selecciona un cliente','error'); return; }
-  // Validar asesor — admin debe escoger un asesor habilitado
+  // Validar asesor
   const asesorSelVC = ($U('vcAsesorSelect')||$U('vcAsesor')||'').trim();
   if(!asesorSelVC) { toast('Selecciona un asesor para la venta','error'); return; }
-  const asesorActivoVC = ASESORES_ACTIVOS.find(a => a.activo && a.nombre.toUpperCase() === asesorSelVC.toUpperCase());
-  if(!asesorActivoVC && sesionActiva?.rol === 'admin') {
+  const asesorObjVC = ASESORES_ACTIVOS.find(a => a.activo && a.nombre.toUpperCase() === asesorSelVC.toUpperCase());
+  if(!asesorObjVC) {
     toast('El asesor seleccionado no está habilitado. Escoge un asesor activo.','error'); return;
+  }
+  // Admin no puede cargarse ventas a sí mismo — debe ser rol asesor
+  if(asesorObjVC.rol === 'admin' && asesorObjVC.nombre.toUpperCase() === sesionActiva?.nombre?.toUpperCase()) {
+    toast('Los administradores no pueden cargarse ventas. Selecciona un asesor habilitado.','error'); return;
   }
 
   const ivaPct    = parseFloat($('vcIVA')?.value)||0;
@@ -7108,12 +7304,16 @@ async function guardarCredito(){
     toast('Agrega al menos un producto antes de guardar','error'); return;
   }
   if(!$U('crdCliente')) { toast('Selecciona un cliente','error'); return; }
-  // Validar asesor — admin debe escoger un asesor habilitado
+  // Validar asesor
   const asesorSelCrd = ($U('crdAsesorSelect')||$U('crdAsesor')||'').trim();
   if(!asesorSelCrd) { toast('Selecciona un asesor para la venta','error'); return; }
-  const asesorActivoCrd = ASESORES_ACTIVOS.find(a => a.activo && a.nombre.toUpperCase() === asesorSelCrd.toUpperCase());
-  if(!asesorActivoCrd && sesionActiva?.rol === 'admin') {
-    toast('El asesor seleccionado no está habilitado. Escoge un asesor activo del módulo Asesores.','error'); return;
+  const asesorObjCrd = ASESORES_ACTIVOS.find(a => a.activo && a.nombre.toUpperCase() === asesorSelCrd.toUpperCase());
+  if(!asesorObjCrd) {
+    toast('El asesor seleccionado no está habilitado. Escoge un asesor activo.','error'); return;
+  }
+  // Admin no puede cargarse ventas a sí mismo
+  if(asesorObjCrd.rol === 'admin' && asesorObjCrd.nombre.toUpperCase() === sesionActiva?.nombre?.toUpperCase()) {
+    toast('Los administradores no pueden cargarse ventas. Selecciona un asesor habilitado.','error'); return;
   }
 
   // Validar disponibilidad de cada IMEI
@@ -7466,7 +7666,35 @@ Esta acción marcará la venta como ANULADA y devolverá el equipo al inventario
       }
     }
 
-    // 3. Actualizar en memoria
+    // 3. Anular crédito vinculado (si existe) buscando por equipo + cliente
+    const equiposAnularV = (v.equipo||'').split('|').map(e=>e.trim()).filter(Boolean);
+    for(const eqNombre of equiposAnularV) {
+      // Buscar crédito activo con ese equipo y cliente
+      let resC = await fetch(
+        `${baseUrl}/creditos?select=id,estado&producto_desc=ilike.*${encodeURIComponent(eqNombre)}*&cliente=eq.${encodeURIComponent(v.cliente)}&estado=neq.anulado&limit=3`,
+        {headers}
+      );
+      let credRows = await resC.json();
+      // Si no hay por nombre, buscar por cedula
+      if(!credRows.length && v.cedula) {
+        resC = await fetch(
+          `${baseUrl}/creditos?select=id,estado&cedula_cliente=eq.${encodeURIComponent(v.cedula)}&estado=neq.anulado&limit=3`,
+          {headers}
+        );
+        credRows = await resC.json();
+      }
+      for(const cr of (Array.isArray(credRows)?credRows:[])) {
+        await fetch(`${baseUrl}/creditos?id=eq.${cr.id}`, {
+          method:'PATCH', headers,
+          body: JSON.stringify({ estado:'anulado', observaciones:'ANULADO: Anulación desde módulo ventas' })
+        });
+        // Actualizar memoria
+        const cMem = db.creditos.find(x=>x.id===cr.id);
+        if(cMem) cMem.estado = 'anulado';
+      }
+    }
+
+    // 4. Actualizar en memoria
     v.anulada   = true;
     v.venta     = 0;
     v.ganancia  = 0;
@@ -7475,6 +7703,7 @@ Esta acción marcará la venta como ANULADA y devolverá el equipo al inventario
     hideLoader();
     closeModal('modalDetalleVenta');
     renderVentas();
+    renderCreditos();
     renderInventario();
     renderContabilidad();
     renderComisiones();
