@@ -2857,7 +2857,7 @@
           <div class="form-row">
             <div class="form-group">
               <label class="form-label">% Comisión financiera</label>
-              <input type="number" class="form-control" id="crdComFinanciera" placeholder="0" oninput="recalcCredito()" min="0" max="100" step="0.1">
+              <input type="number" class="form-control" id="crdComFinanciera" placeholder="0" readonly style="background:#f7f5fb;cursor:not-allowed;" min="0" max="100" step="0.1">
               <div style="font-size:11px;color:#888899;margin-top:3px;">Comisión: <span id="crdComFinVal" style="color:#dc2626;font-weight:600;">$0</span></div>
             </div>
             <div class="form-group">
@@ -3230,7 +3230,7 @@
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Comisión Financiera (%)</label>
-          <input type="number" class="form-control" id="vcComFinanciera" placeholder="0" oninput="calcVContado()" min="0" max="100" step="0.5">
+          <input type="number" class="form-control" id="vcComFinanciera" placeholder="0" readonly style="background:#f7f5fb;cursor:not-allowed;" min="0" max="100" step="0.5">
           <div style="font-size:11px;color:var(--text2);margin-top:4px;">Valor comisión: <span id="vcComFinVal" style="color:var(--red);">$0</span></div>
         </div>
         <div class="form-group">
