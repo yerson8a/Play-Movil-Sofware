@@ -1820,7 +1820,7 @@
         <input type="date" class="form-control" id="tareaFechaLimite">
       </div>
       <div class="form-group">
-        <label class="form-label">Asesor responsable</label>
+        <label class="form-label">Responsable</label>
         <select class="form-control" id="tareaAsesor"></select>
       </div>
     </div>
@@ -1835,6 +1835,13 @@
           <label class="form-label">Cédula / Doc. cliente</label>
           <input type="text" class="form-control" id="tareaCedula" placeholder="No. documento">
         </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Teléfono</label>
+          <input type="text" class="form-control" id="tareaTelefono" placeholder="Teléfono de contacto" inputmode="numeric">
+        </div>
+        <div class="form-group"></div>
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -1879,6 +1886,7 @@
     <div style="display:flex;gap:8px;justify-content:space-between;margin-top:16px;">
       <button class="btn btn-ghost btn-sm" style="color:#dc2626;" onclick="eliminarTareaActual()">🗑️ Eliminar</button>
       <div style="display:flex;gap:8px;">
+        <button class="btn btn-outline btn-sm" style="color:#6B2D8B;border-color:#6B2D8B;" onclick="abrirBitacoraTarea(tareaSeleccionadaId)">📋 Bitácora</button>
         <button class="btn btn-ghost" onclick="closeModal('modalDetalleTarea')">Cerrar</button>
         <button class="btn btn-primary btn-sm" id="btnCompletarTarea" onclick="cambiarEstadoTareaActual('completada')">✅ Completar</button>
         <button class="btn btn-outline btn-sm" id="btnProcesoTarea" onclick="cambiarEstadoTareaActual('en_proceso')">🔄 En Proceso</button>
@@ -4869,6 +4877,12 @@ function openModal(id) {
   el.classList.add('open');
 }
 function closeModal(id) {
+  // Restaurar botón bitácora para créditos cuando se cierre
+  if(id === 'modalBitacora') {
+    const btnGuardar = document.querySelector('#modalBitacora .btn-primary');
+    if(btnGuardar) btnGuardar.setAttribute('onclick', 'guardarBitacora()');
+    bitacoraTareaId = null;
+  }
   const el = $(id);
   if(!el) return;
   el.classList.remove('open');
@@ -6426,6 +6440,7 @@ function mapTarea(t) {
     cedula:        t.cedula || '',
     equipo:        t.equipo || '',
     imei:          t.imei || '',
+    telefono:      t.telefono || '',
     proveedor:     t.proveedor || '',
     valor:         parseFloat(t.valor) || 0,
     notas:         t.notas || '',
@@ -6439,7 +6454,7 @@ let tabTareasActual = 'pendiente';
 
 function abrirModalNuevaTareaInit() {
   // Limpiar campos
-  ['tareaTitulo','tareaCliente','tareaCedula','tareaEquipo','tareaIMEI',
+  ['tareaTitulo','tareaCliente','tareaCedula','tareaTelefono','tareaEquipo','tareaIMEI',
    'tareaProveedor','tareaNotas'].forEach(id=>{ const e=document.getElementById(id); if(e) e.value=''; });
   const tv = document.getElementById('tareaValor'); if(tv) tv.value='';
   // Fecha mínima = hoy + 2 días
@@ -6450,12 +6465,20 @@ function abrirModalNuevaTareaInit() {
     fl.min = `${y}-${m}-${d}`;
     fl.value= `${y}-${m}-${d}`;
   }
-  // Poblar asesores
+  // Poblar todos los usuarios del sistema
   const sel = document.getElementById('tareaAsesor');
   if(sel) {
-    sel.innerHTML = '<option value="">Sin asignar</option>' +
-      ASESORES_ACTIVOS.filter(a=>a.activo).map(a=>`<option value="${a.nombre}">${a.nombre}</option>`).join('');
-    if(sesionActiva) sel.value = sesionActiva.nombre.toUpperCase();
+    // Cargar todos los usuarios desde Supabase
+    sbFetch('sistema_usuarios', { filter:'activo=eq.true', select:'nombre,rol' }).then(users => {
+      if(!users || !users.length) {
+        sel.innerHTML = '<option value="">Sin asignar</option>' +
+          ASESORES_ACTIVOS.filter(a=>a.activo).map(a=>`<option value="${a.nombre}">${a.nombre.toUpperCase()}</option>`).join('');
+      } else {
+        sel.innerHTML = '<option value="">Sin asignar</option>' +
+          users.map(u=>`<option value="${(u.nombre||'').toUpperCase()}">${(u.nombre||'').toUpperCase()} (${u.rol||''})</option>`).join('');
+      }
+      if(sesionActiva) sel.value = sesionActiva.nombre.toUpperCase();
+    });
   }
   openModal('modalNuevaTarea');
 }
@@ -6482,6 +6505,7 @@ async function guardarTarea() {
     asesor:        (document.getElementById('tareaAsesor')?.value||'').toUpperCase()||null,
     cliente:       (document.getElementById('tareaCliente')?.value||'').toUpperCase()||null,
     cedula:        document.getElementById('tareaCedula')?.value||null,
+    telefono:      document.getElementById('tareaTelefono')?.value||null,
     equipo:        (document.getElementById('tareaEquipo')?.value||'').toUpperCase()||null,
     imei:          document.getElementById('tareaIMEI')?.value||null,
     proveedor:     (document.getElementById('tareaProveedor')?.value||'').toUpperCase()||null,
@@ -6673,6 +6697,94 @@ function actualizarBadgeTareas() {
 
 // Actualizar badge al cargar
 window.addEventListener('load', () => setTimeout(actualizarBadgeTareas, 1500));
+
+// ============================================================
+// BITÁCORA DE TAREAS
+// ============================================================
+let bitacoraTareaId = null;
+
+async function abrirBitacoraTarea(tareaId) {
+  bitacoraTareaId = tareaId;
+  const t = db.tareas.find(x=>x.id===tareaId);
+  if(!t) return;
+  const sub = document.getElementById('bitacoraSubtitle');
+  if(sub) sub.textContent = 'TAREA: ' + (t.titulo||'').substring(0,40) + ' · ' + (t.cliente||'Sin cliente');
+  const fechaEl = document.getElementById('bitFecha');
+  if(fechaEl) fechaEl.value = fechaColombia();
+  const tipoEl = document.getElementById('bitTipo');
+  if(tipoEl) tipoEl.value = 'otro';
+  const notaEl = document.getElementById('bitNota');
+  if(notaEl) notaEl.value = '';
+  // Temporalmente cambiar onclick del botón guardar
+  const btnGuardar = document.querySelector('#modalBitacora .btn-primary');
+  if(btnGuardar) btnGuardar.setAttribute('onclick', 'guardarBitacoraTarea()');
+  openModal('modalBitacora');
+  await cargarBitacoraTarea(tareaId);
+}
+
+async function cargarBitacoraTarea(tareaId) {
+  const lista = document.getElementById('bitacoraLista');
+  if(!lista) return;
+  lista.innerHTML = '<div style="text-align:center;padding:24px;color:#888899;">Cargando...</div>';
+  try {
+    const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/bitacora_creditos?credito_id=eq.${tareaId}&order=created_at.desc&limit=50`,
+      {headers}
+    );
+    const rows = await res.json();
+    if(!Array.isArray(rows) || !rows.length) {
+      lista.innerHTML = '<div style="text-align:center;padding:24px;color:#888899;">Sin registros en la bitacora</div>';
+      return;
+    }
+    lista.innerHTML = rows.map(r => {
+      const icono = BITACORA_ICONOS[r.tipo] || '📌';
+      const label = BITACORA_LABELS[r.tipo] || r.tipo;
+      const colorBg = r.tipo==='pago'?'#f0fdf4':r.tipo==='rechazo'?'#fff5f5':r.tipo==='no_contesto'?'#fafafa':'#f7f5fb';
+      const colorBorder = r.tipo==='pago'?'#bbf7d0':r.tipo==='rechazo'?'#fecaca':r.tipo==='no_contesto'?'#e5e7eb':'#ece8f5';
+      return `<div style="background:${colorBg};border:1px solid ${colorBorder};border-radius:10px;padding:12px;margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <span style="font-weight:700;font-size:13px;">${icono} ${label}</span>
+          <div style="text-align:right;">
+            <div style="font-size:11px;color:#888899;">${r.fecha||''} ${r.hora||''}</div>
+            <div style="font-size:11px;color:#6B2D8B;font-weight:600;">${(r.usuario||'').toUpperCase()}</div>
+          </div>
+        </div>
+        ${r.nota ? `<div style="font-size:13px;color:#333;line-height:1.5;border-top:1px solid rgba(0,0,0,0.06);padding-top:6px;">${r.nota}</div>` : ''}
+      </div>`;
+    }).join('');
+  } catch(e) {
+    lista.innerHTML = '<div style="color:#dc2626;padding:12px;">Error: '+e.message+'</div>';
+  }
+}
+
+async function guardarBitacoraTarea() {
+  if(!bitacoraTareaId) return;
+  const tipo  = document.getElementById('bitTipo')?.value||'otro';
+  const fecha = document.getElementById('bitFecha')?.value || fechaColombia();
+  const nota  = (document.getElementById('bitNota')?.value||'').trim().toUpperCase();
+  const ahora = new Date();
+  const col = new Date(ahora.getTime() - 5*60*60*1000);
+  const hora = String(col.getUTCHours()).padStart(2,'0')+':'+String(col.getUTCMinutes()).padStart(2,'0');
+  const row = {
+    credito_id: bitacoraTareaId,
+    tipo, fecha, hora,
+    nota: nota || null,
+    usuario: sesionActiva?.nombre?.toUpperCase() || 'SISTEMA'
+  };
+  try {
+    showLoader('Guardando...');
+    const headers = { 'apikey':SUPABASE_KEY, 'Authorization':'Bearer '+SUPABASE_KEY, 'Content-Type':'application/json', 'Prefer':'return=representation' };
+    await fetch(`${SUPABASE_URL}/rest/v1/bitacora_creditos`, { method:'POST', headers, body:JSON.stringify(row) });
+    hideLoader();
+    document.getElementById('bitNota').value='';
+    await cargarBitacoraTarea(bitacoraTareaId);
+    toast('Registro guardado en bitacora');
+  } catch(e) { hideLoader(); toast('Error: '+e.message,'error'); }
+}
+
+// Restaurar onclick al cerrar bitácora de tarea
+const _origCloseModal = typeof closeModal === 'function' ? closeModal : null;
 
 // ============================================================
 // CÁLCULO DE MORA POR FECHAS DE CUOTA
