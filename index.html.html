@@ -7524,7 +7524,7 @@ async function guardarVentaContado(){
       const ganProd     = pFinal - costoProd - comProd;
 
       const row = {
-        equipo: p.producto||'—', imei: p.imei||'',
+        producto: p.producto||'—', imei: p.imei||'',
         cliente, cedula_cliente: cedula, telefono_cliente: telefono,
         asesor, valor_venta: pFinal, valor_compra: costoProd,
         ganancia: ganProd, financiera: finSel, forma_pago: 'Contado',
