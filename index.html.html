@@ -2925,6 +2925,30 @@
             </div>
           </div>
 
+          <!-- Fechas de pago quincenal (obligatorias) -->
+          <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:12px;margin-top:10px;">
+            <div style="font-size:12px;font-weight:700;color:#d97706;margin-bottom:8px;">📅 Fechas de Pago Quincenal (obligatorio)</div>
+            <div style="font-size:11px;color:#92400e;margin-bottom:10px;">
+              El cliente pagará 2 veces al mes en las fechas seleccionadas. De estas fechas depende la detección automática de mora.
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Primera cuota *</label>
+                <input type="date" class="form-control" id="crdPrimerPago" onchange="recalcFechasCuotas()">
+                <div style="font-size:10px;color:#888899;margin-top:2px;">Día del mes: <span id="crdDia1">—</span></div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Segunda cuota *</label>
+                <input type="date" class="form-control" id="crdSegundoPago" onchange="recalcFechasCuotas()">
+                <div style="font-size:10px;color:#888899;margin-top:2px;">Día del mes: <span id="crdDia2">—</span></div>
+              </div>
+            </div>
+            <div id="crdProximasCuotas" style="display:none;background:#fff;border-radius:8px;padding:8px;margin-top:8px;font-size:11px;">
+              <div style="font-weight:700;color:#555;margin-bottom:4px;">Próximas cuotas estimadas:</div>
+              <div id="crdListaProximas" style="color:#666;"></div>
+            </div>
+          </div>
+
           <!-- Pago mixto: valor financiado + efectivo -->
           <div id="crdPagoMixtoSection" style="display:none;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px;margin-top:10px;">
             <div style="font-size:12px;font-weight:700;color:#16a34a;margin-bottom:10px;">💳 Distribución del Pago Mixto</div>
@@ -4378,7 +4402,11 @@ function mapCredito(c) {
     docCedBack:   c.doc_cedula_reverso || null,
     docFoto:      c.doc_foto_entrega   || null,
     docContrato:  c.doc_contrato       || null,
-    imei: c.imei || ''
+    imei: c.imei || '',
+    fechaPrimerPago:  c.fecha_primer_pago  || null,
+    fechaSegundoPago: c.fecha_segundo_pago || null,
+    diaPago1:         c.dia_pago_1 || null,
+    diaPago2:         c.dia_pago_2 || null
   };
 }
 
@@ -4545,6 +4573,10 @@ async function guardarCreditoDB(datos) {
       cuotas_total: datos.cuotas,
       cuotas_pagadas: 0,
       valor_cuota: datos.valorCuota || null,
+      fecha_primer_pago:  datos.fechaPrimerPago  || null,
+      fecha_segundo_pago: datos.fechaSegundoPago || null,
+      dia_pago_1:         datos.diaPago1 || null,
+      dia_pago_2:         datos.diaPago2 || null,
       frecuencia: datos.frecuencia || 'Mensual',
       fecha_inicio: fechaColombia(),
       estado: 'al_dia',
@@ -5328,6 +5360,13 @@ function renderVentas_data(data){
 }
 
 function renderCreditos(filtro='activos'){
+  // Actualizar estado mora automáticamente por fechas
+  db.creditos.forEach(c => {
+    if(c.estado === 'pagado' || c.estado === 'anulado') return;
+    const px = calcularProximaCuota(c);
+    if(px.enMora) c.estado = 'mora';
+    else if(c.estado === 'mora') c.estado = 'al_dia';
+  });
   // Actualizar badge del menu con creditos en mora
   const mora = db.creditos.filter(c=>c.estado==='mora').length;
   const badge = document.getElementById('creditoBadge');
@@ -5397,6 +5436,17 @@ function renderCreditos(filtro='activos'){
           <span>${c.pagadas}/${c.cuotas} cuotas</span><span>${pct}%</span>
         </div>
         <div class="progress-bar"><div class="progress-fill green" style="width:${pct}%;"></div></div>
+        ${(()=>{
+          const px = calcularProximaCuota(c);
+          if(!px.fecha) return '<div style="font-size:10px;color:#888899;margin-top:6px;">📅 Sin fechas de pago configuradas</div>';
+          if(px.enMora) {
+            return `<div style="background:#fee2e2;border:1px solid #fecaca;border-radius:6px;padding:5px 8px;margin-top:6px;font-size:11px;color:#dc2626;font-weight:600;">⚠️ EN MORA · Cuota del ${px.fecha} · ${px.diasAtraso} día(s) de atraso</div>`;
+          }
+          const diasRest = -px.diasAtraso;
+          const colorP = diasRest <= 3 ? '#d97706' : '#16a34a';
+          const bgP    = diasRest <= 3 ? '#fff7ed' : '#f0fdf4';
+          return `<div style="background:${bgP};border-radius:6px;padding:5px 8px;margin-top:6px;font-size:11px;color:${colorP};font-weight:600;">📅 Próx. cuota: ${px.fecha} · En ${diasRest} día(s)</div>`;
+        })()}
       </div>
       <div class="cc-footer" style="flex-direction:column;gap:8px;align-items:stretch;">
         <div style="display:flex;justify-content:space-between;align-items:center;">
@@ -5506,6 +5556,17 @@ async function filtrarCreditosPorIMEI(q) {
           <span>${c.pagadas}/${c.cuotas} cuotas</span><span>${pct}%</span>
         </div>
         <div class="progress-bar"><div class="progress-fill green" style="width:${pct}%;"></div></div>
+        ${(()=>{
+          const px = calcularProximaCuota(c);
+          if(!px.fecha) return '<div style="font-size:10px;color:#888899;margin-top:6px;">📅 Sin fechas de pago configuradas</div>';
+          if(px.enMora) {
+            return `<div style="background:#fee2e2;border:1px solid #fecaca;border-radius:6px;padding:5px 8px;margin-top:6px;font-size:11px;color:#dc2626;font-weight:600;">⚠️ EN MORA · Cuota del ${px.fecha} · ${px.diasAtraso} día(s) de atraso</div>`;
+          }
+          const diasRest = -px.diasAtraso;
+          const colorP = diasRest <= 3 ? '#d97706' : '#16a34a';
+          const bgP    = diasRest <= 3 ? '#fff7ed' : '#f0fdf4';
+          return `<div style="background:${bgP};border-radius:6px;padding:5px 8px;margin-top:6px;font-size:11px;color:${colorP};font-weight:600;">📅 Próx. cuota: ${px.fecha} · En ${diasRest} día(s)</div>`;
+        })()}
       </div>
       <div class="cc-footer" style="flex-direction:column;gap:8px;align-items:stretch;">
         <div style="display:flex;justify-content:space-between;align-items:center;">
@@ -6614,6 +6675,43 @@ function actualizarBadgeTareas() {
 window.addEventListener('load', () => setTimeout(actualizarBadgeTareas, 1500));
 
 // ============================================================
+// CÁLCULO DE MORA POR FECHAS DE CUOTA
+// ============================================================
+function calcularProximaCuota(credito) {
+  // Retorna: { fecha, diasAtraso, enMora, vencida }
+  if(!credito.fechaPrimerPago || !credito.fechaSegundoPago || !credito.diaPago1 || !credito.diaPago2) {
+    return { fecha:null, diasAtraso:0, enMora:false };
+  }
+  const pagadas = credito.pagadas || 0;
+  const f1 = new Date(credito.fechaPrimerPago);
+  const f2 = new Date(credito.fechaSegundoPago);
+
+  // La próxima cuota es (pagadas + 1)
+  const idxProx = pagadas; // 0-indexed
+  const esPar = idxProx % 2 === 0;
+  const meses = Math.floor(idxProx / 2);
+
+  const prox = new Date(esPar ? f1 : f2);
+  prox.setUTCMonth(prox.getUTCMonth() + meses);
+
+  // Si el día elegido no existe en ese mes (ej: 31 en febrero), ajustar al último día
+  const diaOrig = esPar ? credito.diaPago1 : credito.diaPago2;
+  const ultDiaMes = new Date(Date.UTC(prox.getUTCFullYear(), prox.getUTCMonth()+1, 0)).getUTCDate();
+  prox.setUTCDate(Math.min(diaOrig, ultDiaMes));
+
+  // Hoy en Colombia
+  const hoy = new Date(fechaColombia());
+  const diasAtraso = Math.floor((hoy - prox)/(1000*60*60*24));
+
+  return {
+    fecha: prox.toISOString().slice(0,10),
+    diasAtraso,
+    enMora: diasAtraso > 0,
+    vencida: diasAtraso > 3
+  };
+}
+
+// ============================================================
 // BITÁCORA DE CRÉDITOS
 // ============================================================
 let bitacoraCreditoId = null;
@@ -7516,6 +7614,16 @@ async function guardarCredito(){
     toast('Los administradores no pueden cargarse ventas. Selecciona un asesor habilitado.','error'); return;
   }
 
+  // Validar fechas de pago quincenal
+  const fPP = document.getElementById('crdPrimerPago')?.value;
+  const fSP = document.getElementById('crdSegundoPago')?.value;
+  if(!fPP || !fSP) {
+    toast('Debes escoger las 2 fechas de pago quincenal','error'); return;
+  }
+  if(new Date(fSP) <= new Date(fPP)) {
+    toast('La segunda fecha debe ser posterior a la primera','error'); return;
+  }
+
   // Validar disponibilidad de cada IMEI
   for(const p of productosVentaCrd) {
     const imeiCheck = (p.imei||'').replace(/[^0-9]/g,'');
@@ -7551,7 +7659,11 @@ async function guardarCredito(){
     docCedBack:   getUrlArchivo('upCedBack'),
     docFoto:      getUrlArchivo('upFotoEntrega'),
     docContrato:  getUrlArchivo('upContrato'),
-    financiera:   ((($('crdFinanciera')?.value||'CONTADO:0').split(':')[0]).substring(0,50)).substring(0,50)
+    financiera:   ((($('crdFinanciera')?.value||'CONTADO:0').split(':')[0]).substring(0,50)).substring(0,50),
+    fechaPrimerPago:  fPP,
+    fechaSegundoPago: fSP,
+    diaPago1:         new Date(fPP).getUTCDate(),
+    diaPago2:         new Date(fSP).getUTCDate()
   };
 
   try {
@@ -8048,6 +8160,10 @@ function abrirModalCredito() {
     'crdCorreo','crdNumContrato','crdInicialManual','crdProdAdicDesc'
   ];
   camposCrd.forEach(id => { const e=document.getElementById(id); if(e) e.value=''; });
+  // Limpiar fechas cuotas
+  ['crdPrimerPago','crdSegundoPago'].forEach(id => { const e=document.getElementById(id); if(e) e.value=''; });
+  const wrap = document.getElementById('crdProximasCuotas'); if(wrap) wrap.style.display='none';
+
   // Limpiar inputs money
   ['crdCosto','crdVentaBase','crdDescuento','crdProdAdicVal'].forEach(id => {
     const e=document.getElementById(id); if(e) e.value='';
@@ -8845,6 +8961,51 @@ async function buscarIMEICredito(val){
 
 function autoComisionFinanciera(){const sel=$('vcFinanciera').value;const pct=parseFloat(sel.split(':')[1])||0;$('vcComFinanciera').value=pct;calcVContado();}
 function autoComisionCredito(){const sel=$('crdFinanciera').value;const pct=parseFloat(sel.split(':')[1])||0;$('crdComFinanciera').value=pct;recalcCredito();}
+
+// Calcula próximas fechas de cuota basado en los 2 días del mes
+function recalcFechasCuotas() {
+  const f1 = document.getElementById('crdPrimerPago')?.value;
+  const f2 = document.getElementById('crdSegundoPago')?.value;
+  const lista = document.getElementById('crdListaProximas');
+  const wrap  = document.getElementById('crdProximasCuotas');
+  if(!f1 || !f2) { if(wrap) wrap.style.display='none'; return; }
+
+  const d1 = new Date(f1), d2 = new Date(f2);
+  const dia1 = d1.getUTCDate(), dia2 = d2.getUTCDate();
+  const spanD1 = document.getElementById('crdDia1');
+  const spanD2 = document.getElementById('crdDia2');
+  if(spanD1) spanD1.textContent = dia1;
+  if(spanD2) spanD2.textContent = dia2;
+
+  // Validar orden
+  if(d2 <= d1) {
+    toast('La segunda fecha debe ser posterior a la primera','error');
+    return;
+  }
+  // Validar que sean quincenales (entre 10 y 20 dias de diferencia)
+  const diffDias = Math.round((d2-d1)/(1000*60*60*24));
+  if(diffDias < 10 || diffDias > 20) {
+    toast('Las fechas deben ser quincenales (aprox 15 dias de diferencia)','error');
+  }
+
+  // Calcular próximas 4 cuotas
+  const plazo = parseInt(document.getElementById('crdPlazoQuincenas')?.value)||12;
+  const preview = [];
+  for(let i=0; i<Math.min(plazo, 8); i++) {
+    const fecha = new Date(d1);
+    const esPar = i % 2 === 0;
+    if(esPar) {
+      fecha.setUTCMonth(d1.getUTCMonth() + Math.floor(i/2));
+    } else {
+      fecha.setUTCFullYear(d2.getUTCFullYear());
+      fecha.setUTCMonth(d2.getUTCMonth() + Math.floor(i/2));
+      fecha.setUTCDate(dia2);
+    }
+    preview.push('Cuota ' + (i+1) + ': ' + fecha.toISOString().slice(0,10));
+  }
+  if(lista) lista.innerHTML = preview.join(' · ');
+  if(wrap) wrap.style.display = 'block';
+}
 
 function calcVContado(){
   const costo=getMoneyValue('vcCompra');
