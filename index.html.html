@@ -1794,7 +1794,7 @@
 </div>
 
 <!-- Modal Nueva Tarea -->
-<div class="modal-overlay" id="modalNuevaTarea">
+<div class="modal-overlay" id="modalNuevaTarea" style="z-index:9700;">
   <div class="modal" style="max-width:680px;">
     <div class="modal-header">
       <div class="modal-title">📋 Nueva Tarea Pendiente</div>
@@ -1876,7 +1876,7 @@
 </div>
 
 <!-- Modal Ver/Editar Tarea -->
-<div class="modal-overlay" id="modalDetalleTarea">
+<div class="modal-overlay" id="modalDetalleTarea" style="z-index:9700;">
   <div class="modal" style="max-width:540px;">
     <div class="modal-header">
       <div class="modal-title" id="detalleTareaTitulo">📋 Detalle de Tarea</div>
@@ -6739,7 +6739,23 @@ function crearTareaDesdeVenta(origen) {
     return;
   }
 
-  // Pre-llenar modal de tarea con datos del cliente
+  // Tomar datos del primer producto de la venta (lista multi-producto)
+  const productos = origen === 'credito' ? productosVentaCrd : productosVentaVC;
+  const primerProd = Array.isArray(productos) && productos.length ? productos[0] : null;
+
+  // Nombre consolidado de equipos
+  const equipoConsolidado = productos && productos.length
+    ? productos.map(p => p.producto).filter(Boolean).join(' | ')
+    : '';
+  const imeiConsolidado = productos && productos.length
+    ? productos.map(p => p.imei).filter(Boolean).join(' | ')
+    : '';
+  // Suma total de precios (valor de la venta completa)
+  const valorTotal = productos && productos.length
+    ? productos.reduce((s,p) => s + (p.precio||0), 0)
+    : 0;
+
+  // Pre-llenar modal de tarea con datos del cliente y venta
   abrirModalNuevaTareaInit();
   setTimeout(()=>{
     const elTitulo = document.getElementById('tareaTitulo');
@@ -6750,12 +6766,22 @@ function crearTareaDesdeVenta(origen) {
     if(elCedula) elCedula.value = cedula;
     const elTel = document.getElementById('tareaTelefono');
     if(elTel) elTel.value = telefono;
+    // Equipo consolidado
+    const elEquipo = document.getElementById('tareaEquipo');
+    if(elEquipo) elEquipo.value = equipoConsolidado.toUpperCase();
+    // IMEI del primer producto (o consolidado)
+    const elIMEI = document.getElementById('tareaIMEI');
+    if(elIMEI) elIMEI.value = (primerProd?.imei || imeiConsolidado.split('|')[0] || '').trim();
+    // Valor total de la venta
+    if(valorTotal > 0) setMoneyValue('tareaValor', valorTotal);
     // Prioridad alta por defecto
     const elPri = document.getElementById('tareaPrioridad');
     if(elPri) elPri.value = 'alta';
-    // Nota inicial
+    // Nota inicial con monto
     const elNotas = document.getElementById('tareaNotas');
-    if(elNotas) elNotas.value = 'SALDO PENDIENTE DE LA VENTA ' + (origen==='credito'?'CRÉDITO':'CONTADO') + ' DEL ' + fechaColombia();
+    if(elNotas) elNotas.value = 'SALDO PENDIENTE DE LA VENTA ' + (origen==='credito'?'CREDITO':'CONTADO') +
+      ' DEL ' + fechaColombia() +
+      (valorTotal>0 ? ' | VALOR VENTA: ' + fmt(valorTotal) : '');
   }, 150);
 
   // Guardar origen para mostrar confirmación al cerrar
