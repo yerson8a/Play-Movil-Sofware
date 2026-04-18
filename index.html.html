@@ -9685,14 +9685,24 @@ async function marcarProductoVendido(imei, nombreEquipo) {
 // VALIDACION IMEI / EQUIPO DUPLICADO
 // ============================================================
 async function validarDisponibilidadProducto(imei, nombreEquipo) {
-  // Verificar primero si ya existe una venta con este IMEI (anti-duplicado)
+  // Verificar si ya existe una venta ACTIVA (no anulada) con este IMEI
   if(imei && imei.length > 5) {
     try {
       const headers2 = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
-      const resV = await fetch(`${SUPABASE_URL}/rest/v1/ventas?select=id&imei=eq.${imei}&limit=1`, {headers:headers2});
+      // Filtrar: IMEI igual, valor_venta > 0 (no anulada), y observaciones no empieza con ANULADA
+      const resV = await fetch(
+        `${SUPABASE_URL}/rest/v1/ventas?select=id,observaciones,valor_venta&imei=eq.${imei}&limit=5`,
+        {headers:headers2}
+      );
       const ventasExist = await resV.json();
-      if(Array.isArray(ventasExist) && ventasExist.length > 0) {
-        toast('Este IMEI ya tiene una venta registrada. No se puede duplicar.','error');
+      // Filtrar solo las ventas NO anuladas (valor_venta > 0 Y observaciones no empieza con ANULADA)
+      const activas = Array.isArray(ventasExist)
+        ? ventasExist.filter(v =>
+            (parseFloat(v.valor_venta)||0) > 0 &&
+            !(v.observaciones||'').toUpperCase().startsWith('ANULADA'))
+        : [];
+      if(activas.length > 0) {
+        toast('Este IMEI ya tiene una venta ACTIVA registrada. No se puede duplicar.','error');
         return false;
       }
     } catch(e) { console.error(e); }
