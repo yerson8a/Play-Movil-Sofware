@@ -3149,6 +3149,18 @@
       </div>
     </div><!-- /form-row -->
 
+    <!-- Tarea de saldo pendiente -->
+    <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:12px;margin-top:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:200px;">
+          <div style="font-size:12px;font-weight:700;color:#d97706;">📋 Saldo pendiente del cliente</div>
+          <div style="font-size:11px;color:#92400e;margin-top:2px;">Si el cliente queda debiendo un saldo extra, crea una tarea para agendar el cobro.</div>
+        </div>
+        <button type="button" class="btn btn-sm" style="background:#d97706;color:#fff;" onclick="crearTareaDesdeVenta('credito')">+ Crear Tarea de Saldo</button>
+      </div>
+      <div id="crdTareaCreada" style="display:none;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:8px;margin-top:8px;font-size:12px;color:#16a34a;"></div>
+    </div>
+
     <div style="display:flex;gap:10px;justify-content:space-between;align-items:center;margin-top:16px;">
       <div style="font-size:12px;color:#888899;">* Campos obligatorios</div>
       <div style="display:flex;gap:10px;">
@@ -3383,6 +3395,18 @@
         <label class="form-label">Observaciones</label>
         <input type="text" class="form-control" id="vcObservaciones" placeholder="Notas adicionales de la venta...">
       </div>
+    </div>
+
+    <!-- Tarea de saldo pendiente -->
+    <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:12px;margin:12px 0;">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:200px;">
+          <div style="font-size:12px;font-weight:700;color:#d97706;">📋 Saldo pendiente del cliente</div>
+          <div style="font-size:11px;color:#92400e;margin-top:2px;">Si el cliente queda debiendo un saldo, crea una tarea de cobro que se agendará en el módulo Tareas.</div>
+        </div>
+        <button type="button" class="btn btn-sm" style="background:#d97706;color:#fff;" onclick="crearTareaDesdeVenta('contado')">+ Crear Tarea de Saldo</button>
+      </div>
+      <div id="vcTareaCreada" style="display:none;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:8px;margin-top:8px;font-size:12px;color:#16a34a;"></div>
     </div>
 
     <div style="display:flex;gap:10px;justify-content:space-between;align-items:center;">
@@ -6699,6 +6723,63 @@ function actualizarBadgeTareas() {
 window.addEventListener('load', () => setTimeout(actualizarBadgeTareas, 1500));
 
 // ============================================================
+// CREAR TAREA DE SALDO PENDIENTE DESDE VENTA
+// ============================================================
+let _tareaVentaPendiente = null; // { origen: 'contado'|'credito', titulo, fecha, valor, notas }
+
+function crearTareaDesdeVenta(origen) {
+  // Datos del cliente desde el modal correspondiente
+  const pref = origen === 'credito' ? 'crd' : 'vc';
+  const cliente  = document.getElementById(pref+'Cliente')?.value || '';
+  const cedula   = document.getElementById(pref+'Cedula')?.value || '';
+  const telefono = document.getElementById(pref+'Telefono')?.value || '';
+
+  if(!cliente) {
+    toast('Selecciona primero un cliente en la venta','error');
+    return;
+  }
+
+  // Pre-llenar modal de tarea con datos del cliente
+  abrirModalNuevaTareaInit();
+  setTimeout(()=>{
+    const elTitulo = document.getElementById('tareaTitulo');
+    if(elTitulo) elTitulo.value = 'COBRO SALDO PENDIENTE - ' + cliente.toUpperCase();
+    const elCliente = document.getElementById('tareaCliente');
+    if(elCliente) elCliente.value = cliente.toUpperCase();
+    const elCedula = document.getElementById('tareaCedula');
+    if(elCedula) elCedula.value = cedula;
+    const elTel = document.getElementById('tareaTelefono');
+    if(elTel) elTel.value = telefono;
+    // Prioridad alta por defecto
+    const elPri = document.getElementById('tareaPrioridad');
+    if(elPri) elPri.value = 'alta';
+    // Nota inicial
+    const elNotas = document.getElementById('tareaNotas');
+    if(elNotas) elNotas.value = 'SALDO PENDIENTE DE LA VENTA ' + (origen==='credito'?'CRÉDITO':'CONTADO') + ' DEL ' + fechaColombia();
+  }, 150);
+
+  // Guardar origen para mostrar confirmación al cerrar
+  _tareaVentaPendiente = { origen };
+}
+
+// Sobrescribir guardarTarea para notificar al modal de venta si aplica
+const _origGuardarTarea = guardarTarea;
+guardarTarea = async function() {
+  const origenInfo = _tareaVentaPendiente;
+  await _origGuardarTarea.apply(this, arguments);
+  if(origenInfo && origenInfo.origen) {
+    const divId = origenInfo.origen === 'credito' ? 'crdTareaCreada' : 'vcTareaCreada';
+    const div = document.getElementById(divId);
+    if(div) {
+      const ultima = db.tareas && db.tareas.length ? db.tareas[0] : null;
+      div.innerHTML = '✅ Tarea creada: <strong>' + (ultima?.titulo||'Saldo pendiente') + '</strong> · Fecha límite: ' + (ultima?.fechaLimite||'—');
+      div.style.display = 'block';
+    }
+    _tareaVentaPendiente = null;
+  }
+};
+
+// ============================================================
 // BITÁCORA DE TAREAS
 // ============================================================
 let bitacoraTareaId = null;
@@ -8274,6 +8355,9 @@ function imprimirDetalleVenta() {
 // ABRIR MODALES DE VENTA CON ASESOR LOGUEADO
 // ============================================================
 function abrirModalCredito() {
+  // Ocultar confirmación de tarea previa
+  const divT = document.getElementById('crdTareaCreada');
+  if(divT) { divT.style.display = 'none'; divT.innerHTML = ''; }
   // Limpiar todos los campos del formulario
   const camposCrd = [
     'crdIMEI','crdEquipo','crdCliente','crdCedula','crdTelefono',
