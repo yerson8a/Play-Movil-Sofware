@@ -3146,7 +3146,7 @@
       <div style="display:flex;gap:10px;">
         <button class="btn btn-ghost" onclick="closeModal('modalNuevoCredito')">Cancelar</button>
         <button class="btn btn-outline" onclick="previsualizarFactura()">👁️ Ver Factura</button>
-        <button class="btn btn-primary" onclick="guardarCredito()">💾 Guardar Crédito</button>
+        <button class="btn btn-primary" id="btnGuardarCredito" onclick="guardarCredito()">💾 Guardar Crédito</button>
       </div>
     </div>
   </div>
@@ -3381,7 +3381,7 @@
       <div style="font-size:12px;color:var(--text2);">* Campos obligatorios</div>
       <div style="display:flex;gap:10px;">
         <button class="btn btn-ghost" onclick="closeModal('modalVentaContado')">Cancelar</button>
-        <button class="btn btn-primary" onclick="guardarVentaContado()">💾 Guardar Venta</button>
+        <button class="btn btn-primary" id="btnGuardarVentaContado" onclick="guardarVentaContado()">💾 Guardar Venta</button>
       </div>
     </div>
   </div>
@@ -7460,10 +7460,16 @@ async function actualizarProducto() {
   } catch(e) { hideLoader(); toast('Error: '+e.message,'error'); }
 }
 
+let _guardandoVenta = false;
 async function guardarVentaContado(){
+  // Prevenir doble clic
+  if(_guardandoVenta) { toast('Venta en proceso, espera...','error'); return; }
+  _guardandoVenta = true;
+  const btnG = document.getElementById('btnGuardarVentaContado');
+  if(btnG) { btnG.disabled = true; btnG.textContent = '⏳ Procesando...'; }
   // Validar productos
   if(!productosVentaVC || productosVentaVC.length === 0) {
-    toast('Agrega al menos un producto antes de guardar','error'); return;
+    toast('Agrega al menos un producto antes de guardar','error'); _guardandoVenta=false; if(btnG){btnG.disabled=false;btnG.textContent='💾 Guardar Venta';} return;
   }
   // Validar cliente
   if(!$U('vcCliente')) { toast('Selecciona un cliente','error'); return; }
@@ -7541,6 +7547,8 @@ async function guardarVentaContado(){
     }
 
     hideLoader();
+    _guardandoVenta = false;
+    if(btnG){ btnG.disabled=false; btnG.textContent='💾 Guardar Venta'; }
     closeModal('modalVentaContado');
 
     // Mostrar modal comisión y factura
@@ -7618,10 +7626,10 @@ async function guardarCredito(){
   const fPP = document.getElementById('crdPrimerPago')?.value;
   const fSP = document.getElementById('crdSegundoPago')?.value;
   if(!fPP || !fSP) {
-    toast('Debes escoger las 2 fechas de pago quincenal','error'); return;
+    toast('Debes escoger las 2 fechas de pago quincenal','error'); _guardandoVenta=false; if(btnGC){btnGC.disabled=false;btnGC.textContent='💾 Guardar Crédito';} return;
   }
   if(new Date(fSP) <= new Date(fPP)) {
-    toast('La segunda fecha debe ser posterior a la primera','error'); return;
+    toast('La segunda fecha debe ser posterior a la primera','error'); _guardandoVenta=false; if(btnGC){btnGC.disabled=false;btnGC.textContent='💾 Guardar Crédito';} return;
   }
 
   // Validar disponibilidad de cada IMEI
@@ -9565,6 +9573,18 @@ async function marcarProductoVendido(imei, nombreEquipo) {
 // VALIDACION IMEI / EQUIPO DUPLICADO
 // ============================================================
 async function validarDisponibilidadProducto(imei, nombreEquipo) {
+  // Verificar primero si ya existe una venta con este IMEI (anti-duplicado)
+  if(imei && imei.length > 5) {
+    try {
+      const headers2 = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+      const resV = await fetch(`${SUPABASE_URL}/rest/v1/ventas?select=id&imei=eq.${imei}&limit=1`, {headers:headers2});
+      const ventasExist = await resV.json();
+      if(Array.isArray(ventasExist) && ventasExist.length > 0) {
+        toast('Este IMEI ya tiene una venta registrada. No se puede duplicar.','error');
+        return false;
+      }
+    } catch(e) { console.error(e); }
+  }
   // Si hay IMEI buscar en Supabase si ya está vendido
   if(imei && imei.length > 5) {
     const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
