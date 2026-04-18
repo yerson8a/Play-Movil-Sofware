@@ -6123,13 +6123,13 @@ async function guardarProveedor(){
     tel1:document.getElementById('provTel1').value||'',
     tel2:document.getElementById('provTel2').value||'',
     correo:document.getElementById('provCorreo').value||'',
-    web:document.getElementById('provWeb').value||'',
-    ciudad:document.getElementById('provCiudad').value||'',
-    direccion:document.getElementById('provDireccion').value||'',
+    web:(document.getElementById('provWeb').value||'').toUpperCase(),
+    ciudad:(document.getElementById('provCiudad').value||'').toUpperCase(),
+    direccion:(document.getElementById('provDireccion').value||'').toUpperCase(),
     categoria:cats,
     plazo:document.getElementById('provPlazo').value,
     garantiaMeses:parseInt(document.getElementById('provGarantiaMeses').value)||0,
-    obs:document.getElementById('provObservaciones').value||''
+    obs:(document.getElementById('provObservaciones').value||'').toUpperCase()
   };
   try {
     showLoader('Registrando proveedor...');
@@ -6248,10 +6248,10 @@ async function actualizarProveedor() {
     telefono1: document.getElementById('editProvTel1').value||null,
     telefono2: document.getElementById('editProvTel2').value||null,
     correo:    document.getElementById('editProvCorreo').value||null,
-    ciudad:    document.getElementById('editProvCiudad').value||null,
-    direccion: document.getElementById('editProvDireccion').value||null,
+    ciudad:    (document.getElementById('editProvCiudad').value||'').toUpperCase()||null,
+    direccion: (document.getElementById('editProvDireccion').value||'').toUpperCase()||null,
     estado:    document.getElementById('editProvEstado').value,
-    observaciones: document.getElementById('editProvObs').value||null
+    observaciones: (document.getElementById('editProvObs').value||'').toUpperCase()||null
   };
 
   try {
@@ -6289,9 +6289,9 @@ async function guardarCompra(){
   const datos={
     tipo:tipoProductoSeleccionado,
     fecha:document.getElementById('cmpFecha').value||fechaColombia(),
-    producto:document.getElementById('cmpProducto').value||'Sin nombre',
-    marca:document.getElementById('cmpMarca').value||'',
-    modelo:document.getElementById('cmpModelo').value||'',
+    producto:(document.getElementById('cmpProducto').value||'Sin nombre').toUpperCase(),
+    marca:(document.getElementById('cmpMarca').value||'').toUpperCase(),
+    modelo:(document.getElementById('cmpModelo').value||'').toUpperCase(),
     color:document.getElementById('cmpColor').value||'',
     imei1:tipoProductoSeleccionado==='Celular'?(document.getElementById('cmpIMEI1').value||''):'',
     imei2:tipoProductoSeleccionado==='Celular'?(document.getElementById('cmpIMEI2').value||''):'',
@@ -6301,12 +6301,12 @@ async function guardarCompra(){
     condicion:document.getElementById('cmpCondicion').value,
     cantidad:parseInt(document.getElementById('cmpCantidad').value)||1,
     proveedorId:provId,
-    facturaProv:document.getElementById('cmpFacturaProv').value||'',
+    facturaProv:(document.getElementById('cmpFacturaProv').value||'').toUpperCase(),
     valorCompra:getMoneyValue('cmpValorCompra'),
     formaPago:document.getElementById('cmpFormaPago').value,
     sede:document.getElementById('cmpSede').value,
     garantiaMeses:parseInt(document.getElementById('cmpGarantiaMeses').value)||0,
-    obs:document.getElementById('cmpObservaciones').value||''
+    obs:(document.getElementById('cmpObservaciones').value||'').toUpperCase()
   };
   try{
     await guardarCompraDB(datos);
@@ -6402,7 +6402,7 @@ function abrirModalNuevaTareaInit() {
 // Botón de nueva tarea usa abrirModalNuevaTareaInit() directamente en HTML
 
 async function guardarTarea() {
-  const titulo = document.getElementById('tareaTitulo')?.value?.trim();
+  const titulo = (document.getElementById('tareaTitulo')?.value||'').trim().toUpperCase();
   const fecha  = document.getElementById('tareaFechaLimite')?.value;
   if(!titulo) { toast('El título es obligatorio','error'); return; }
   if(!fecha)  { toast('La fecha límite es obligatoria','error'); return; }
@@ -6425,7 +6425,7 @@ async function guardarTarea() {
     imei:          document.getElementById('tareaIMEI')?.value||null,
     proveedor:     (document.getElementById('tareaProveedor')?.value||'').toUpperCase()||null,
     valor:         getMoneyValue('tareaValor')||0,
-    notas:         document.getElementById('tareaNotas')?.value||null,
+    notas:         (document.getElementById('tareaNotas')?.value||'').toUpperCase()||null,
     estado:        'pendiente',
     creado_por:    sesionActiva?.nombre?.toUpperCase()||''
   };
@@ -6867,11 +6867,11 @@ async function guardarCliente() {
     tipo_doc:        tipoDoc,
     documento,
     telefono:        document.getElementById('cliTelefono')?.value||null,
-    correo:          document.getElementById('cliCorreo')?.value||null,
-    ciudad:          document.getElementById('cliCiudad')?.value||null,
-    direccion:       document.getElementById('cliDireccion')?.value||null,
+    correo:          (document.getElementById('cliCorreo')?.value||'').toUpperCase()||null,
+    ciudad:          (document.getElementById('cliCiudad')?.value||'').toUpperCase()||null,
+    direccion:       (document.getElementById('cliDireccion')?.value||'').toUpperCase()||null,
     fecha_nacimiento:document.getElementById('cliFechaNac')?.value||null,
-    observaciones:   document.getElementById('cliObs')?.value||null,
+    observaciones:   (document.getElementById('cliObs')?.value||'').toUpperCase()||null,
     fecha_registro:  fechaColombia()
   };
 
@@ -6918,9 +6918,9 @@ async function actualizarCliente() {
     nombre, tipo_doc: document.getElementById('editCliTipoDoc')?.value,
     documento: doc,
     telefono: document.getElementById('editCliTelefono')?.value||null,
-    correo:   document.getElementById('editCliCorreo')?.value||null,
-    ciudad:   document.getElementById('editCliCiudad')?.value||null,
-    observaciones: document.getElementById('editCliObs')?.value||null
+    correo:   (document.getElementById('editCliCorreo')?.value||'').toUpperCase()||null,
+    ciudad:   (document.getElementById('editCliCiudad')?.value||'').toUpperCase()||null,
+    observaciones: (document.getElementById('editCliObs')?.value||'').toUpperCase()||null
   };
   try {
     showLoader('Actualizando...');
@@ -7546,7 +7546,7 @@ async function guardarCredito(){
     total: precioFinal, inicial: ini,
     saldo: totalFinanciar, cuotas: quincenas, valorCuota,
     frecuencia: 'Quincenal', sede: sedeActual,
-    obs: ($('crdObservaciones')?.value ? $('crdObservaciones').value + (prodAdicDesc?' | Prod. adicional: '+prodAdicDesc+' ('+fmt(prodAdicVal)+')':'') : (prodAdicDesc?'Prod. adicional: '+prodAdicDesc+' ('+fmt(prodAdicVal)+')':'')), 
+    obs: ($U('crdObservaciones') ? $U('crdObservaciones') + (prodAdicDesc?' | Prod. adicional: '+prodAdicDesc+' ('+fmt(prodAdicVal)+')':'') : (prodAdicDesc?'Prod. adicional: '+prodAdicDesc+' ('+fmt(prodAdicVal)+')':'')), 
     docCedFront:  getUrlArchivo('upCedFront'),
     docCedBack:   getUrlArchivo('upCedBack'),
     docFoto:      getUrlArchivo('upFotoEntrega'),
@@ -8360,7 +8360,7 @@ function imprimirReciboAbono() {
 async function guardarGasto(){
   const tipo=$('gastoTipo').value;
   const val=getMoneyValue('gastoValor');
-  const datos={tipo,detalle:$('gastoDetalle').value||'—',valor:val};
+  const datos={tipo,detalle:($('gastoDetalle').value||'—').toUpperCase(),valor:val};
   try{
     await guardarGastoDB(datos);
     closeModal('modalNuevoGasto');
@@ -8371,8 +8371,8 @@ async function guardarGasto(){
 
 async function guardarGarantia(){
   const datos={
-    ref:$('garRef').value||'—',
-    detalle:$('garDetalle').value||'—',
+    ref:($('garRef').value||'—').toUpperCase(),
+    detalle:($('garDetalle').value||'—').toUpperCase(),
     tecnico:$('garTecnico').value||'—'
   };
   try{
@@ -9162,8 +9162,8 @@ async function ejecutarAnulacion() {
   const tipo = document.getElementById('anularTipo').value;
 
   if(tipo === 'anular') {
-    const motivo = document.getElementById('anularMotivo')?.value || '';
-    const obs = document.getElementById('anularObs')?.value || '';
+    const motivo = (document.getElementById('anularMotivo')?.value || '').toUpperCase();
+    const obs = (document.getElementById('anularObs')?.value || '').toUpperCase();
     const credito = db.creditos.find(c => c.id === id);
     if(!credito) return;
 
