@@ -1571,7 +1571,7 @@
           <div class="section-title">💵 Cajas por Sede</div>
           <div class="section-sub">Control de caja menor por punto de venta</div>
         </div>
-        <button class="btn btn-primary btn-sm" onclick="openModal('modalNuevaCaja')">+ Nueva Caja</button>
+        <button class="btn btn-primary btn-sm" id="btnNuevaCaja" onclick="if(esUsuarioAdmin()){openModal('modalNuevaCaja');}else{toast('Solo el usuario administrador puede crear cajas','error');}">+ Nueva Caja</button>
       </div>
       <div class="grid-3" style="margin-bottom:20px;">
         <div class="stat-card green"><div class="stat-label">Total en Cajas</div><div class="stat-value green" id="statTotalCajas">$0</div></div>
@@ -10974,6 +10974,10 @@ async function cargarCajas() {
 }
 
 function renderCajas() {
+  // Ocultar botón Nueva Caja si no es admin
+  const btnNC = document.getElementById('btnNuevaCaja');
+  if(btnNC) btnNC.style.display = esUsuarioAdmin() ? '' : 'none';
+
   // Filtrar cajas según permisos del usuario
   let data = dbAdmin.cajas;
   if(sesionActiva && sesionActiva.rol !== 'admin' && sesionActiva.cajas_permitidas) {
@@ -11011,14 +11015,15 @@ function renderCajas() {
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <button class="btn btn-sm btn-primary" onclick="abrirMovimientoCaja(${c.id}, '${c.nombre}')">+ Movimiento</button>
         <button class="btn btn-sm btn-ghost" onclick="verMovimientosCaja(${c.id}, '${c.nombre}')">📋 Movimientos</button>
-        <button class="btn btn-sm btn-ghost" onclick="toggleEstadoCaja(${c.id})">${c.estado === 'activa' ? '⏸️' : '▶️'}</button>
-        <button class="btn btn-sm btn-ghost" style="color:#dc2626;" onclick="eliminarCaja(${c.id})">🗑️</button>
+        ${esUsuarioAdmin()?`<button class="btn btn-sm btn-ghost" onclick="toggleEstadoCaja(${c.id})">${c.estado === 'activa' ? '⏸️' : '▶️'}</button>`:''}
+        ${esUsuarioAdmin()?`<button class="btn btn-sm btn-ghost" style="color:#dc2626;" onclick="eliminarCaja(${c.id})">🗑️</button>`:''}
       </div>
     </div>`).join('') :
     '<div class="empty-state"><div class="empty-icon">💵</div><div class="empty-text">Sin cajas registradas. Crea una caja para cada sede.</div></div>';
 }
 
 async function guardarCaja() {
+  if(!esUsuarioAdmin()) { toast('Solo el usuario administrador puede crear cajas','error'); closeModal('modalNuevaCaja'); return; }
   const nombre = document.getElementById('cajaNombre').value.trim();
   const sedeId = document.getElementById('cajaSede').value;
   if (!nombre) { toast('El nombre es obligatorio', 'error'); return; }
@@ -11088,6 +11093,7 @@ async function registrarMovimientoCaja() {
 }
 
 async function toggleEstadoCaja(id) {
+  if(!esUsuarioAdmin()) { toast('Solo el usuario administrador puede activar/desactivar cajas','error'); return; }
   const c = dbAdmin.cajas.find(x => x.id === id);
   if (!c) return;
   c.estado = c.estado === 'activa' ? 'inactiva' : 'activa';
@@ -11099,6 +11105,7 @@ async function toggleEstadoCaja(id) {
 }
 
 async function eliminarCaja(id) {
+  if(!esUsuarioAdmin()) { toast('Solo el usuario administrador puede eliminar cajas','error'); return; }
   if (!confirm('¿Eliminar esta caja?')) return;
   dbAdmin.cajas = dbAdmin.cajas.filter(x => x.id !== id);
   try {
