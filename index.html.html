@@ -9528,12 +9528,19 @@ function previsualizarFactura() {
     asesor:  (sesionActiva?.rol==='admin' ? ($('crdAsesorSelect')?.value||$('crdAsesor')?.value||'') : ($('crdAsesor')?.value||'')),
     numContrato: $('crdNumContrato')?.value||'',
     sede: sedeActual,
-    precioBase:base, iva:ivaVal, descuento:desc,
+    precioBase:base, iva:ivaVal, ivaPct: ivaPct||0, descuento:desc,
     prodAdicDesc, prodAdicVal, comision:comVal,
     precioFinal, ganancia:0, inicial:ini,
     saldoFinanciar:totalFin, cuotas:quincenas,
     valorCuota, financiera:finSel,
     intereses:totalInt, tasaInteres:aplicaInt?tasaInt:0,
+    productosList: (productosVentaCrd && productosVentaCrd.length > 0)
+      ? productosVentaCrd.map(p => ({
+          producto: p.producto || '—',
+          imei:     p.imei     || '',
+          precio:   p.precio   || 0
+        }))
+      : null,
     fecha:new Date().toLocaleDateString('es-CO',{timeZone:'America/Bogota'}),
     numero:'PREVIA-'+Date.now().toString().slice(-4)
   };
