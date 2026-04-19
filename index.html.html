@@ -5314,7 +5314,7 @@ function renderVentas(filtro){
 }
 
 function switchVentasTab(tab,el){document.querySelectorAll('#mod-ventas .tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');renderVentas(tab);}
-function aplicarFiltrosVentas() {
+async function aplicarFiltrosVentas() {
   const q      = (document.getElementById('searchVentas')?.value||'').toLowerCase();
   const qImei  = (document.getElementById('searchVentasIMEI')?.value||'').trim();
   const asesor = document.getElementById('filtroAsesorVentas')?.value||'';
@@ -5331,7 +5331,21 @@ function aplicarFiltrosVentas() {
     (v.imei||'').includes(q) ||
     (v.cedula||'').includes(q)
   );
-  if(qImei) data = data.filter(v => (v.imei||'').includes(qImei));
+  if(qImei) {
+    // Buscar en venta principal Y en ventas_detalle
+    let ventaIdsConIMEI = new Set();
+    data.forEach(v => { if((v.imei||'').includes(qImei)) ventaIdsConIMEI.add(v.id); });
+    // Consultar ventas_detalle si hay suficientes caracteres
+    if(qImei.length >= 4) {
+      try {
+        const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/ventas_detalle?select=venta_id&imei=ilike.*${encodeURIComponent(qImei)}*`, {headers});
+        const rows = await res.json();
+        if(Array.isArray(rows)) rows.forEach(r => ventaIdsConIMEI.add(r.venta_id));
+      } catch(e){ console.error(e); }
+    }
+    data = data.filter(v => ventaIdsConIMEI.has(v.id));
+  }
   if(asesor) data = data.filter(v => v.asesor === asesor);
   if(fin) data = data.filter(v => v.financiera === fin);
   if(fDesde) data = data.filter(v => (v.fecha||'') >= fDesde);
@@ -7734,36 +7748,56 @@ async function guardarVentaContado(){
 
   showLoader('Registrando venta...');
   try {
-    // Guardar una venta por producto, la primera es la "principal" para la factura
-    let ventaPrincipal = null;
+    // ─── UNA sola venta maestra con N productos en ventas_detalle ───
+    const productosStr = productosVentaVC.map(p=>p.producto).join(' | ');
+    const imeiPrincipal = productosVentaVC[0]?.imei||'';
+    const nMulti = productosVentaVC.length;
+
+    const rowMaestra = {
+      producto: nMulti > 1 ? `${nMulti} productos: ${productosStr.substring(0,180)}` : (productosVentaVC[0].producto||'—'),
+      imei: imeiPrincipal,
+      cliente, cedula_cliente: cedula, telefono_cliente: telefono,
+      asesor, valor_venta: precioFinal, valor_compra: totalCosto,
+      ganancia, financiera: finSel, forma_pago: 'Contado',
+      comision_asesor: 0, sede_id: sedeActual.includes('ARMENIA')?2:1,
+      observaciones: obs + (nMulti>1 ? ` | Venta con ${nMulti} productos` : ''),
+      fecha_venta: fechaColombia()
+    };
+    const resM = await sbFetch('ventas', { method:'POST', body:rowMaestra });
+    const ventaPrincipal = mapVenta(resM[0]);
+    db.ventas.unshift(ventaPrincipal);
+
+    // Guardar cada producto en ventas_detalle
     for(let i=0; i<productosVentaVC.length; i++) {
       const p = productosVentaVC[i];
-      const esPrincipal = i === 0;
       const precioProd  = p.precio||0;
       const costoProd   = p.costo||0;
-      // Prorratear descuento y comisión proporcional
       const pct         = totalBase > 0 ? precioProd/totalBase : 1/productosVentaVC.length;
       const descProd    = Math.round(desc * pct);
       const pFinal      = precioProd - descProd;
       const comProd     = Math.round(pFinal * comPct/100);
       const ganProd     = pFinal - costoProd - comProd;
 
-      const row = {
-        producto: p.producto||'—', imei: p.imei||'',
-        cliente, cedula_cliente: cedula, telefono_cliente: telefono,
-        asesor, valor_venta: pFinal, valor_compra: costoProd,
-        ganancia: ganProd, financiera: finSel, forma_pago: 'Contado',
-        comision_asesor: 0, sede_id: sedeActual.includes('ARMENIA')?2:1,
-        observaciones: obs + (productosVentaVC.length>1 ? ` | Factura agrupada (${productosVentaVC.length} productos)` : ''),
-        fecha_venta: fechaColombia()
-      };
-      const res = await sbFetch('ventas', { method:'POST', body:row });
-      const nueva = mapVenta(res[0]);
-      db.ventas.unshift(nueva);
-      if(esPrincipal) ventaPrincipal = nueva;
+      await sbFetch('ventas_detalle', { method:'POST', body: {
+        venta_id: ventaPrincipal.id,
+        producto: p.producto||'—',
+        imei: p.imei||'',
+        valor_compra: costoProd,
+        valor_venta: pFinal,
+        ganancia: ganProd,
+        descuento: descProd,
+        comision_financiera: comProd
+      }});
       // Marcar como vendido
       await marcarProductoVendido(p.imei||'', p.producto||'');
     }
+
+    // Guardar detalle en memoria también
+    ventaPrincipal.detalles = productosVentaVC.map((p,i) => ({
+      producto: p.producto, imei: p.imei,
+      valor_venta: p.precio - Math.round(desc * (totalBase>0 ? p.precio/totalBase : 1/nMulti)),
+      valor_compra: p.costo
+    }));
 
     hideLoader();
     _guardandoVenta = false;
@@ -7896,17 +7930,42 @@ async function guardarCredito(){
   try {
     await guardarCreditoDB(datos);
 
-    const imeiVenta = imeiPrincipal;
-    await guardarVentaDB({
-      equipo:datos.equipo, imei:imeiVenta,
-      cliente:datos.cliente, cedula:datos.cedula,
-      asesor:datos.asesor, costo, venta:precioFinal, ganancia,
-      financiera:finSel, tipo:'credito', sede:sedeActual
-    });
+    // UNA venta maestra con detalle por producto
+    const nProdC = productosVentaCrd.length;
+    const productosStrC = productosVentaCrd.map(p=>p.producto).join(' | ');
+    const rowVM = {
+      producto: nProdC > 1 ? `${nProdC} productos: ${productosStrC.substring(0,180)}` : (productosVentaCrd[0].producto||datos.equipo),
+      imei: imeiPrincipal,
+      cliente: datos.cliente, cedula_cliente: datos.cedula||null, telefono_cliente: datos.telefono||null,
+      asesor: datos.asesor, valor_venta: precioFinal, valor_compra: costo,
+      ganancia, financiera: finSel, forma_pago: 'Credito',
+      comision_asesor: 0, sede_id: sedeActual.includes('ARMENIA')?2:1,
+      observaciones: (datos.obs||'') + (nProdC>1 ? ` | Venta con ${nProdC} productos` : ''),
+      fecha_venta: fechaColombia()
+    };
+    const resVM = await sbFetch('ventas', { method:'POST', body:rowVM });
+    const ventaMaestraCred = mapVenta(resVM[0]);
+    db.ventas.unshift(ventaMaestraCred);
 
-    // Marcar producto como VENDIDO en Supabase usando IMEI o nombre
-    // Marcar TODOS los productos como vendidos
+    // Guardar cada producto en ventas_detalle
+    const totalBaseCrd = productosVentaCrd.reduce((s,p)=>s+(p.precio||0),0);
     for(const p of productosVentaCrd) {
+      const pctC      = totalBaseCrd > 0 ? (p.precio||0)/totalBaseCrd : 1/nProdC;
+      const descProdC = Math.round((desc||0) * pctC);
+      const pFinalC   = (p.precio||0) - descProdC;
+      const comProdC  = Math.round(pFinalC * comPct/100);
+      const ganProdC  = pFinalC - (p.costo||0) - comProdC;
+
+      await sbFetch('ventas_detalle', { method:'POST', body: {
+        venta_id: ventaMaestraCred.id,
+        producto: p.producto||'—',
+        imei: p.imei||'',
+        valor_compra: p.costo||0,
+        valor_venta: pFinalC,
+        ganancia: ganProdC,
+        descuento: descProdC,
+        comision_financiera: comProdC
+      }});
       await marcarProductoVendido(p.imei||'', p.producto||'');
     }
 
@@ -8082,7 +8141,7 @@ function verDetalleProducto(id) {
   openModal('modalDetalleProducto');
 }
 
-function verDetalleVenta(id) {
+async function verDetalleVenta(id) {
   const v = db.ventas.find(x => x.id === id);
   if(!v) return;
   ventaDetalleActualId = id;
@@ -8096,19 +8155,45 @@ function verDetalleVenta(id) {
     btnAnular.style.display = (!v.anulada && esAdmin) ? 'inline-flex' : 'none';
   }
 
+  // Cargar detalles de productos desde ventas_detalle
+  let detalles = [];
+  try {
+    const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/ventas_detalle?venta_id=eq.${id}&order=id.asc`, {headers});
+    detalles = await res.json() || [];
+  } catch(e){ console.error(e); }
+
   const fila = (label, valor, color) =>
     `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f0ecf8;">
       <span style="font-size:13px;color:#888899;">${label}</span>
       <strong style="font-size:13px;${color?'color:'+color+';':''}">${valor}</strong>
     </div>`;
 
+  // Si hay múltiples productos, mostrar bloque con todos
+  const bloqueProductos = detalles.length > 1
+    ? `<div style="background:#f7f5fb;border-radius:12px;padding:14px;margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:700;color:#6B2D8B;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">📦 ${detalles.length} Productos en esta venta</div>
+        ${detalles.map((d,i) => `
+          <div style="padding:10px;background:#fff;border-radius:8px;margin-bottom:8px;border:1px solid #ece8f5;">
+            <div style="font-weight:600;font-size:13px;">#${i+1} · ${d.producto||'—'}</div>
+            ${d.imei?`<div style="font-family:monospace;font-size:11px;color:#0066cc;margin-top:2px;">📡 ${d.imei}</div>`:''}
+            <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:12px;">
+              <span style="color:#888;">Venta: ${fmt(d.valor_venta||0)}</span>
+              <span style="color:#16a34a;">Ganancia: ${fmt(d.ganancia||0)}</span>
+            </div>
+          </div>
+        `).join('')}
+      </div>`
+    : '';
+
   contenido.innerHTML = `
     <div style="background:#f7f5fb;border-radius:12px;padding:16px;margin-bottom:16px;">
       <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:16px;color:#6B2D8B;margin-bottom:4px;">
-        📱 ${v.equipo || '—'}
+        📱 ${detalles.length > 1 ? detalles.length + ' productos' : (v.equipo || '—')}
       </div>
       <div style="font-size:12px;color:#888899;">Venta registrada el ${v.fecha || '—'}</div>
     </div>
+    ${bloqueProductos}
     <div style="margin-bottom:4px;">
       ${fila('IMEI / Serial', (v.imei && v.imei.length>3 ? v.imei : (db.compras.find(c=>c.producto===v.equipo)?.imei1||'—')), '#0066cc')}
       ${fila('Cliente', v.cliente || '—')}
@@ -8172,24 +8257,37 @@ async function verFacturaVenta() {
   // Estimar comisión financiera desde la diferencia (precio - costo - ganancia)
   const comisionFinanciera = Math.max(0, precioFinal - costo - ganancia - comisionAsesor);
 
-  // Buscar otros productos de la misma factura (mismo cliente, misma fecha)
-  const otraVentas = db.ventas.filter(x =>
-    x.id !== v.id &&
-    x.cliente === v.cliente &&
-    x.fecha === v.fecha &&
-    x.asesor === v.asesor &&
-    !x.anulada
-  );
-
-  // Construir lista de productos
+  // Cargar productos desde ventas_detalle (una sola fuente de verdad)
   let productosList = null;
-  if(otraVentas.length > 0) {
-    // Venta multi-producto: incluir la actual y las demás del mismo grupo
-    productosList = [v, ...otraVentas].map(vx => ({
-      producto: vx.equipo || '—',
-      imei:     vx.imei   || '',
-      precio:   parseFloat(vx.venta) || 0
-    }));
+  try {
+    const headersF = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+    const resD = await fetch(`${SUPABASE_URL}/rest/v1/ventas_detalle?venta_id=eq.${v.id}&order=id.asc`, {headers:headersF});
+    const detalles = await resD.json();
+    if(Array.isArray(detalles) && detalles.length > 0) {
+      productosList = detalles.map(d => ({
+        producto: d.producto || '—',
+        imei:     d.imei     || '',
+        precio:   parseFloat(d.valor_venta) || 0
+      }));
+    }
+  } catch(e){ console.error(e); }
+
+  // Si no hay detalle (ventas antiguas), fallback al grupo de ventas
+  if(!productosList) {
+    const otraVentas = db.ventas.filter(x =>
+      x.id !== v.id &&
+      x.cliente === v.cliente &&
+      x.fecha === v.fecha &&
+      x.asesor === v.asesor &&
+      !x.anulada
+    );
+    if(otraVentas.length > 0) {
+      productosList = [v, ...otraVentas].map(vx => ({
+        producto: vx.equipo || '—',
+        imei:     vx.imei   || '',
+        precio:   parseFloat(vx.venta) || 0
+      }));
+    }
   }
 
   const totalBase = productosList
@@ -8255,15 +8353,16 @@ async function confirmarAnularVentaContado() {
   const resumen = { ventasAnuladas:0, creditosAnulados:0, equiposDevueltos:[] };
 
   try {
-    // ── PASO 1: Anular TODAS las ventas del mismo grupo (cliente+fecha+asesor) ──
-    const todasVentasGrupo = db.ventas.filter(x =>
-      x.cliente === v.cliente &&
-      x.fecha   === v.fecha   &&
-      x.asesor  === v.asesor  &&
-      !x.anulada
-    );
-    // Incluir la venta actual si no estaba en el filtro
-    if(!todasVentasGrupo.find(x=>x.id===v.id)) todasVentasGrupo.push(v);
+    // ── PASO 1: Anular esta venta y su detalle ──
+    // Cargar detalles de productos de la venta
+    let detallesAnular = [];
+    try {
+      const rD = await fetch(`${base}/ventas_detalle?venta_id=eq.${v.id}`, {headers});
+      detallesAnular = await rD.json() || [];
+    } catch(e){ console.error(e); }
+
+    // Solo anular la venta actual (ya no hay múltiples ventas por producto)
+    const todasVentasGrupo = [v];
 
     for(const vx of todasVentasGrupo) {
       await fetch(`${base}/ventas?id=eq.${vx.id}`, {
@@ -8278,35 +8377,40 @@ async function confirmarAnularVentaContado() {
       if(vMem){ vMem.anulada=true; vMem.venta=0; vMem.ganancia=0; }
       resumen.ventasAnuladas++;
 
-      // ── PASO 2: Devolver cada equipo al inventario ──────────
-      const imeiVx = (vx.imei||'').replace(/[^0-9]/g,'');
-      let devuelto = false;
+      // ── PASO 2: Devolver cada producto del detalle al inventario ──
+      // Si hay detalles, iterar cada producto individual; si no, usar la venta
+      const productosADevolver = detallesAnular.length > 0
+        ? detallesAnular.map(d => ({ imei: d.imei||'', producto: d.producto||'' }))
+        : [{ imei: vx.imei||'', producto: vx.equipo||'' }];
 
-      // 2a. Buscar por IMEI exacto
-      if(imeiVx.length >= 5) {
-        let rP = await fetch(`${base}/productos?select=id,producto&imei1=eq.${imeiVx}&estado=eq.VENDIDO&limit=1`,{headers});
-        let pRows = await rP.json();
-        if(!pRows.length){ rP=await fetch(`${base}/productos?select=id,producto&imei2=eq.${imeiVx}&estado=eq.VENDIDO&limit=1`,{headers}); pRows=await rP.json(); }
-        if(pRows.length){ 
-          await fetch(`${base}/productos?id=eq.${pRows[0].id}`,{method:'PATCH',headers,body:JSON.stringify({estado:'DISPONIBLE'})});
-          const inv=db.inventario.find(i=>i.id===pRows[0].id); if(inv) inv.estado='DISPONIBLE';
-          const comp=db.compras.find(c=>c.id===pRows[0].id); if(comp) comp.estado='DISPONIBLE';
-          resumen.equiposDevueltos.push(pRows[0].producto||vx.equipo);
-          devuelto=true;
+      for(const prodAnul of productosADevolver) {
+        const imeiVx = (prodAnul.imei||'').replace(/[^0-9]/g,'');
+        let devuelto = false;
+        // 2a. Buscar por IMEI exacto
+        if(imeiVx.length >= 5) {
+          let rP = await fetch(`${base}/productos?select=id,producto&imei1=eq.${imeiVx}&estado=eq.VENDIDO&limit=1`,{headers});
+          let pRows = await rP.json();
+          if(!pRows.length){ rP=await fetch(`${base}/productos?select=id,producto&imei2=eq.${imeiVx}&estado=eq.VENDIDO&limit=1`,{headers}); pRows=await rP.json(); }
+          if(pRows.length){
+            await fetch(`${base}/productos?id=eq.${pRows[0].id}`,{method:'PATCH',headers,body:JSON.stringify({estado:'DISPONIBLE'})});
+            const inv=db.inventario.find(i=>i.id===pRows[0].id); if(inv) inv.estado='DISPONIBLE';
+            const comp=db.compras.find(c=>c.id===pRows[0].id); if(comp) comp.estado='DISPONIBLE';
+            resumen.equiposDevueltos.push(pRows[0].producto||prodAnul.producto);
+            devuelto=true;
+          }
         }
-      }
-      // 2b. Si no encontró por IMEI, buscar por nombre exacto
-      if(!devuelto && vx.equipo) {
-        const equipoNombre = vx.equipo.split('|')[0].trim();
-        let rP = await fetch(`${base}/productos?select=id,producto&producto=eq.${encodeURIComponent(equipoNombre)}&estado=eq.VENDIDO&limit=1`,{headers});
-        let pRows = await rP.json();
-        // 2c. Si no hay exacto, buscar por ilike
-        if(!pRows.length){ rP=await fetch(`${base}/productos?select=id,producto&producto=ilike.*${encodeURIComponent(equipoNombre.substring(0,15))}*&estado=eq.VENDIDO&limit=1`,{headers}); pRows=await rP.json(); }
-        if(pRows.length){
-          await fetch(`${base}/productos?id=eq.${pRows[0].id}`,{method:'PATCH',headers,body:JSON.stringify({estado:'DISPONIBLE'})});
-          const inv=db.inventario.find(i=>i.id===pRows[0].id); if(inv) inv.estado='DISPONIBLE';
-          const comp=db.compras.find(c=>c.id===pRows[0].id); if(comp) comp.estado='DISPONIBLE';
-          resumen.equiposDevueltos.push(pRows[0].producto||equipoNombre);
+        // 2b. Si no encontró por IMEI, buscar por nombre exacto
+        if(!devuelto && prodAnul.producto) {
+          const equipoNombre = prodAnul.producto.split('|')[0].trim();
+          let rP = await fetch(`${base}/productos?select=id,producto&producto=eq.${encodeURIComponent(equipoNombre)}&estado=eq.VENDIDO&limit=1`,{headers});
+          let pRows = await rP.json();
+          if(!pRows.length){ rP=await fetch(`${base}/productos?select=id,producto&producto=ilike.*${encodeURIComponent(equipoNombre.substring(0,15))}*&estado=eq.VENDIDO&limit=1`,{headers}); pRows=await rP.json(); }
+          if(pRows.length){
+            await fetch(`${base}/productos?id=eq.${pRows[0].id}`,{method:'PATCH',headers,body:JSON.stringify({estado:'DISPONIBLE'})});
+            const inv=db.inventario.find(i=>i.id===pRows[0].id); if(inv) inv.estado='DISPONIBLE';
+            const comp=db.compras.find(c=>c.id===pRows[0].id); if(comp) comp.estado='DISPONIBLE';
+            resumen.equiposDevueltos.push(pRows[0].producto||equipoNombre);
+          }
         }
       }
     }
