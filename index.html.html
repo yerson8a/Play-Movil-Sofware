@@ -7974,7 +7974,7 @@ async function guardarCredito(){
       telefono:datos.telefono, correo:datos.correo,
       equipo:datos.equipo, imei:$('crdIMEI')?.value||'',
       asesor:datos.asesor, sede:sedeActual,
-      precioBase:base, iva:ivaVal, descuento:desc,
+      precioBase:base, iva:ivaVal, ivaPct: ivaPct||0, descuento:desc,
       prodAdicDesc, prodAdicVal, comision:comValFactura,
       comisionReal:comVal, esMixto,
       valorFinanciero: esMixto ? valorFinanciero : 0,
@@ -7983,6 +7983,12 @@ async function guardarCredito(){
       saldoFinanciar:totalFinanciar, cuotas:quincenas,
       valorCuota, financiera:finSel,
       intereses:totalIntereses, tasaInteres:aplicaInt?tasaInt:0,
+      // Lista de productos individual para factura desglosada
+      productosList: productosVentaCrd.map(p => ({
+        producto: p.producto || '—',
+        imei:     p.imei     || '',
+        precio:   p.precio   || 0
+      })),
       fecha:new Date().toLocaleDateString('es-CO',{timeZone:'America/Bogota'}),
       numero:'PM-'+Date.now().toString().slice(-6)
     };
