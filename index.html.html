@@ -11456,7 +11456,7 @@ async function hacerLogin() {
     // Buscar usuario en Supabase
     const res = await sbFetch('sistema_usuarios', {
       filter: `usuario=eq.${usuario}&password_hash=eq.${hash}&activo=eq.true`,
-      select: 'id,usuario,nombre,rol,sede_id'
+      select: 'id,usuario,nombre,rol,sede_id,modulos_permitidos'
     });
 
     if (!res || res.length === 0) {
