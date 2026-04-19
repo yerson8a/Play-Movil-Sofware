@@ -3611,13 +3611,28 @@
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;" class="perm-label"><input type="checkbox" name="permiso" value="sedes" style="width:15px;height:15px;accent-color:#6B2D8B;"> 🏢 Sedes</label>
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;" class="perm-label"><input type="checkbox" name="permiso" value="usuarios" style="width:15px;height:15px;accent-color:#6B2D8B;"> 👤 Usuarios</label>
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;" class="perm-label"><input type="checkbox" name="permiso" value="financieras" style="width:15px;height:15px;accent-color:#6B2D8B;"> 🏦 Financieras</label>
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;" class="perm-label"><input type="checkbox" name="permiso" value="cajas" style="width:15px;height:15px;accent-color:#6B2D8B;"> 💵 Cajas</label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;" class="perm-label"><input type="checkbox" name="permiso" value="cajas" onchange="toggleCajasEspecificas(this)" style="width:15px;height:15px;accent-color:#6B2D8B;"> 💵 Cajas</label>
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;" class="perm-label"><input type="checkbox" name="permiso" value="clientes" style="width:15px;height:15px;accent-color:#6B2D8B;"> 👥 Clientes</label>
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;" class="perm-label"><input type="checkbox" name="permiso" value="proveedores" style="width:15px;height:15px;accent-color:#6B2D8B;"> 🏭 Proveedores</label>
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;" class="perm-label"><input type="checkbox" name="permiso" value="productos" style="width:15px;height:15px;accent-color:#6B2D8B;"> 📦 Productos</label>
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;" class="perm-label"><input type="checkbox" name="permiso" value="tareas" style="width:15px;height:15px;accent-color:#6B2D8B;"> 📋 Tareas</label>
       </div>
       <div style="font-size:11px;color:#888899;margin-top:6px;">Sin selección = acceso completo según su rol.</div>
+
+      <!-- Cajas específicas (visible solo si caja está marcada) -->
+      <div id="bloqueCajasEspecificas" style="display:none;margin-top:12px;padding:12px;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <div style="font-size:12px;font-weight:700;color:#d97706;">💵 Cajas específicas que puede ver</div>
+          <div style="display:flex;gap:4px;">
+            <button type="button" class="btn btn-sm btn-ghost" style="font-size:10px;padding:2px 8px;" onclick="marcarTodasCajas(true)">✓ Todas</button>
+            <button type="button" class="btn btn-sm btn-ghost" style="font-size:10px;padding:2px 8px;" onclick="marcarTodasCajas(false)">✕ Ninguna</button>
+          </div>
+        </div>
+        <div id="listaCajasPermitidas" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px;max-height:150px;overflow-y:auto;">
+          <!-- Se llena dinámicamente -->
+        </div>
+        <div style="font-size:10px;color:#92400e;margin-top:6px;">Sin selección = el usuario ve todas las cajas</div>
+      </div>
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
       <button class="btn btn-ghost" onclick="closeModal('modalEditarUsuario')">Cancelar</button>
@@ -10649,7 +10664,59 @@ function abrirEditarUsuario(id) {
     }
   });
 
+  // Cargar cajas permitidas del usuario
+  const cajaChkE = document.querySelector('#permisosGrid input[name="permiso"][value="cajas"]');
+  let cajasUser = [];
+  try {
+    const rawC = u.cajas_permitidas;
+    if(rawC && rawC !== 'null') cajasUser = JSON.parse(rawC);
+  } catch(e) {}
+  const bloqueC = document.getElementById('bloqueCajasEspecificas');
+  if(cajaChkE && cajaChkE.checked) {
+    if(bloqueC) bloqueC.style.display = 'block';
+    poblarListaCajasPermitidas(cajasUser);
+  } else {
+    if(bloqueC) bloqueC.style.display = 'none';
+  }
+
   openModal('modalEditarUsuario');
+}
+
+// Mostrar u ocultar bloque de cajas específicas
+function toggleCajasEspecificas(checkbox) {
+  const bloque = document.getElementById('bloqueCajasEspecificas');
+  if(!bloque) return;
+  if(checkbox.checked) {
+    bloque.style.display = 'block';
+    poblarListaCajasPermitidas();
+  } else {
+    bloque.style.display = 'none';
+  }
+}
+
+// Poblar lista de cajas disponibles
+function poblarListaCajasPermitidas(seleccionadas) {
+  const div = document.getElementById('listaCajasPermitidas');
+  if(!div) return;
+  const cajas = dbAdmin?.cajas || [];
+  if(!cajas.length) {
+    div.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#888;font-size:12px;padding:8px;">No hay cajas creadas. Crea cajas primero.</div>';
+    return;
+  }
+  const sedes = { 1: 'Pereira', 2: 'Armenia' };
+  const selSet = new Set(seleccionadas || []);
+  div.innerHTML = cajas.map(c => `
+    <label style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:#fff;border:1px solid #fed7aa;border-radius:6px;cursor:pointer;font-size:12px;">
+      <input type="checkbox" name="caja_permitida" value="${c.id}" ${selSet.has(c.id)?'checked':''} style="width:14px;height:14px;accent-color:#d97706;">
+      <div style="flex:1;">
+        <div style="font-weight:600;">${c.nombre}</div>
+        <div style="font-size:10px;color:#888;">${sedes[c.sede_id]||c.sede_nombre||'—'}</div>
+      </div>
+    </label>`).join('');
+}
+
+function marcarTodasCajas(todas) {
+  document.querySelectorAll('input[name="caja_permitida"]').forEach(cb => cb.checked = todas);
 }
 
 async function actualizarUsuario() {
@@ -10670,12 +10737,23 @@ async function actualizarUsuario() {
     modulos_permitidos = checked.length === total ? null : JSON.stringify(checked);
   }
 
+  // Recolectar cajas específicas permitidas
+  let cajas_permitidas = null;
+  const cajaChk = document.querySelector('#permisosGrid input[name="permiso"][value="cajas"]');
+  if(cajaChk && cajaChk.checked && rol !== 'admin') {
+    const seleccionadas = Array.from(document.querySelectorAll('input[name="caja_permitida"]:checked')).map(cb => parseInt(cb.value));
+    const total = document.querySelectorAll('input[name="caja_permitida"]').length;
+    // Si marcó todas o ninguna = null (ve todas las cajas); si marcó algunas = JSON array
+    cajas_permitidas = (seleccionadas.length > 0 && seleccionadas.length < total) ? JSON.stringify(seleccionadas) : null;
+  }
+
   const row = {
     nombre:             document.getElementById('editUsuNombre').value,
     rol,
     sede_id:            document.getElementById('editUsuSede').value ? parseInt(document.getElementById('editUsuSede').value) : null,
     activo:             document.getElementById('editUsuActivo').value === 'true',
-    modulos_permitidos
+    modulos_permitidos,
+    cajas_permitidas
   };
   if(pass) row.password_hash = await sha256(pass);
 
@@ -10886,7 +10964,17 @@ async function cargarCajas() {
 }
 
 function renderCajas() {
-  const data = dbAdmin.cajas;
+  // Filtrar cajas según permisos del usuario
+  let data = dbAdmin.cajas;
+  if(sesionActiva && sesionActiva.rol !== 'admin' && sesionActiva.cajas_permitidas) {
+    try {
+      const permitidas = JSON.parse(sesionActiva.cajas_permitidas);
+      if(Array.isArray(permitidas) && permitidas.length > 0) {
+        const setIds = new Set(permitidas.map(Number));
+        data = data.filter(c => setIds.has(c.id));
+      }
+    } catch(e){}
+  }
   const total = data.reduce((a, c) => a + (parseFloat(c.saldo) || 0), 0);
   const activas = data.filter(c => c.estado === 'activa').length;
   const inactivas = data.length - activas;
@@ -11456,7 +11544,7 @@ async function hacerLogin() {
     // Buscar usuario en Supabase
     const res = await sbFetch('sistema_usuarios', {
       filter: `usuario=eq.${usuario}&password_hash=eq.${hash}&activo=eq.true`,
-      select: 'id,usuario,nombre,rol,sede_id,modulos_permitidos'
+      select: 'id,usuario,nombre,rol,sede_id,modulos_permitidos,cajas_permitidas'
     });
 
     if (!res || res.length === 0) {
