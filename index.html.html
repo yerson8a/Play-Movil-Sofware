@@ -1742,7 +1742,7 @@
 </div>
 
 <!-- Modal Bitácora de Crédito -->
-<div class="modal-overlay" id="modalBitacora" style="z-index:9400;">
+<div class="modal-overlay" id="modalBitacora" style="z-index:9800;">
   <div class="modal" style="max-width:600px;max-height:90vh;display:flex;flex-direction:column;">
     <div class="modal-header">
       <div>
@@ -8882,7 +8882,95 @@ function desactivarProveedor(id){
   const p=db.proveedores.find(x=>x.id===id);
   if(p){p.estado=p.estado==='activo'?'inactivo':'activo';renderTablaProveedores(db.proveedores);toast('Estado actualizado');}
 }
-function exportarInventario(){toast('Exportando...','success');}
+function exportarInventario(){
+  try {
+    const data = (db.inventario || []).filter(p => p.estado !== 'VENDIDO' && p.estado !== 'BAJA');
+    if(!data.length) { toast('No hay productos para exportar','error'); return; }
+
+    // Preparar datos para CSV/Excel
+    const headers = ['ID','Producto','Marca','Modelo','IMEI 1','IMEI 2','Serial','V.Compra','V.Venta','Margen','Estado','Sede','Proveedor','Fecha'];
+    const rows = data.map(p => [
+      p.id||'',
+      p.producto||'',
+      p.marca||'',
+      p.modelo||'',
+      p.imei1||'',
+      p.imei2||'',
+      p.serial||'',
+      p.costo||0,
+      p.precio||0,
+      (p.precio||0) - (p.costo||0),
+      p.estado||'',
+      p.sede||'',
+      p.proveedor||'',
+      p.fecha||''
+    ]);
+
+    // Construir archivo Excel usando formato XML (compatible con Excel)
+    const escapeXML = s => String(s||'').replace(/[<>&"']/g, c => ({
+      '<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&apos;'
+    })[c]);
+
+    let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
+    xml += '<?mso-application progid="Excel.Sheet"?>\n';
+    xml += '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"';
+    xml += ' xmlns:o="urn:schemas-microsoft-com:office:office"';
+    xml += ' xmlns:x="urn:schemas-microsoft-com:office:excel"';
+    xml += ' xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"';
+    xml += ' xmlns:html="http://www.w3.org/TR/REC-html40">\n';
+
+    // Estilos
+    xml += '<Styles>\n';
+    xml += '<Style ss:ID="Header"><Font ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#6B2D8B" ss:Pattern="Solid"/></Style>\n';
+    xml += '<Style ss:ID="Money"><NumberFormat ss:Format="#,##0"/></Style>\n';
+    xml += '</Styles>\n';
+
+    xml += '<Worksheet ss:Name="Inventario">\n<Table>\n';
+
+    // Anchos de columna
+    [60, 200, 120, 120, 130, 130, 100, 90, 90, 90, 100, 100, 130, 90].forEach(w =>
+      xml += `<Column ss:Width="${w}"/>\n`
+    );
+
+    // Header
+    xml += '<Row>';
+    headers.forEach(h => xml += `<Cell ss:StyleID="Header"><Data ss:Type="String">${escapeXML(h)}</Data></Cell>`);
+    xml += '</Row>\n';
+
+    // Filas
+    rows.forEach(r => {
+      xml += '<Row>';
+      r.forEach((val, i) => {
+        const isMoney = i === 7 || i === 8 || i === 9;
+        const isNum = isMoney || i === 0;
+        if(isNum && typeof val === 'number') {
+          xml += `<Cell${isMoney ? ' ss:StyleID="Money"' : ''}><Data ss:Type="Number">${val}</Data></Cell>`;
+        } else {
+          xml += `<Cell><Data ss:Type="String">${escapeXML(val)}</Data></Cell>`;
+        }
+      });
+      xml += '</Row>\n';
+    });
+
+    xml += '</Table>\n</Worksheet>\n</Workbook>';
+
+    // Descargar
+    const blob = new Blob([xml], { type: 'application/vnd.ms-excel;charset=utf-8' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    const fechaStr = fechaColombia();
+    a.href = url;
+    a.download = 'Inventario_PlayMovil_' + fechaStr + '.xls';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    toast('Inventario exportado: ' + data.length + ' productos');
+  } catch(e) {
+    toast('Error al exportar: ' + e.message, 'error');
+  }
+}
 
 // ============================================================
 // TRAZABILIDAD IMEI
