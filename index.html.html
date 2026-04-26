@@ -1145,7 +1145,23 @@
             <label class="form-label">Valor de Costo (P.L)</label>
             <div class="input-money-wrap"><input type="text" class="form-control" id="simCosto" placeholder="0" oninput="fmtMoneyInput(this);calcularSim()" inputmode="numeric"></div>
           </div>
+          <!-- Modo de precio: margen automatico o manual -->
           <div class="form-group">
+            <label class="form-label">Modo de Precio de Venta</label>
+            <div style="display:flex;gap:8px;">
+              <label style="flex:1;display:flex;align-items:center;gap:6px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;cursor:pointer;background:#f7f5fb;">
+                <input type="radio" name="simModoPrecio" value="margen" checked onchange="cambiarModoPrecio()" style="accent-color:#6B2D8B;">
+                <span style="font-size:12px;font-weight:600;">📊 Por margen</span>
+              </label>
+              <label style="flex:1;display:flex;align-items:center;gap:6px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;cursor:pointer;">
+                <input type="radio" name="simModoPrecio" value="manual" onchange="cambiarModoPrecio()" style="accent-color:#6B2D8B;">
+                <span style="font-size:12px;font-weight:600;">✏️ Manual</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Margen de ganancia (solo si modo=margen) -->
+          <div class="form-group" id="simMargenGroup">
             <label class="form-label">Margen de Ganancia</label>
             <select class="form-control" id="simMargen" onchange="calcularSim()">
               <option value="0.2">20%</option>
@@ -1153,7 +1169,7 @@
               <option value="0.3">30%</option>
               <option value="0.35">35%</option>
               <option value="0.4">40%</option>
-              <option value="0.45" selected>45% — Estándar Play Móvil</option>
+              <option value="0.45" selected>45%</option>
               <option value="0.5">50%</option>
               <option value="0.55">55%</option>
               <option value="0.6">60%</option>
@@ -1162,6 +1178,15 @@
               <option value="0.75">75%</option>
               <option value="0.8">80%</option>
             </select>
+          </div>
+
+          <!-- Precio manual (solo si modo=manual) -->
+          <div class="form-group" id="simPrecioManualGroup" style="display:none;">
+            <label class="form-label">Precio de Venta Manual</label>
+            <div class="input-money-wrap">
+              <input type="text" class="form-control" id="simPrecioManual" placeholder="0" oninput="fmtMoneyInput(this);calcularSim()" inputmode="numeric">
+            </div>
+            <div style="font-size:11px;color:#888899;margin-top:4px;">El asesor define el precio final de venta</div>
           </div>
 
           <!-- Inicial personalizada -->
@@ -1177,25 +1202,77 @@
           <div class="form-group">
             <label class="form-label">Plazo (quincenas)</label>
             <select class="form-control" id="simQuincenas" onchange="calcularSim()">
+              <option value="1">1 quincena (0.5 meses)</option>
               <option value="2">2 quincenas (1 mes)</option>
+              <option value="3">3 quincenas (1.5 meses)</option>
               <option value="4">4 quincenas (2 meses)</option>
+              <option value="5">5 quincenas (2.5 meses)</option>
               <option value="6">6 quincenas (3 meses)</option>
+              <option value="7">7 quincenas (3.5 meses)</option>
               <option value="8">8 quincenas (4 meses)</option>
+              <option value="9">9 quincenas (4.5 meses)</option>
               <option value="10">10 quincenas (5 meses)</option>
+              <option value="11">11 quincenas (5.5 meses)</option>
               <option value="12" selected>12 quincenas (6 meses)</option>
+              <option value="13">13 quincenas (6.5 meses)</option>
               <option value="14">14 quincenas (7 meses)</option>
+              <option value="15">15 quincenas (7.5 meses)</option>
               <option value="16">16 quincenas (8 meses)</option>
+              <option value="17">17 quincenas (8.5 meses)</option>
               <option value="18">18 quincenas (9 meses)</option>
+              <option value="19">19 quincenas (9.5 meses)</option>
               <option value="20">20 quincenas (10 meses)</option>
+              <option value="21">21 quincenas (10.5 meses)</option>
               <option value="22">22 quincenas (11 meses)</option>
+              <option value="23">23 quincenas (11.5 meses)</option>
               <option value="24">24 quincenas (12 meses)</option>
+              <option value="25">25 quincenas (12.5 meses)</option>
+              <option value="26">26 quincenas (13 meses)</option>
+              <option value="27">27 quincenas (13.5 meses)</option>
+              <option value="28">28 quincenas (14 meses)</option>
+              <option value="29">29 quincenas (14.5 meses)</option>
               <option value="30">30 quincenas (15 meses)</option>
+              <option value="31">31 quincenas (15.5 meses)</option>
+              <option value="32">32 quincenas (16 meses)</option>
+              <option value="33">33 quincenas (16.5 meses)</option>
+              <option value="34">34 quincenas (17 meses)</option>
+              <option value="35">35 quincenas (17.5 meses)</option>
               <option value="36">36 quincenas (18 meses)</option>
+              <option value="37">37 quincenas (18.5 meses)</option>
+              <option value="38">38 quincenas (19 meses)</option>
+              <option value="39">39 quincenas (19.5 meses)</option>
+              <option value="40">40 quincenas (20 meses)</option>
+              <option value="41">41 quincenas (20.5 meses)</option>
               <option value="42">42 quincenas (21 meses)</option>
+              <option value="43">43 quincenas (21.5 meses)</option>
+              <option value="44">44 quincenas (22 meses)</option>
+              <option value="45">45 quincenas (22.5 meses)</option>
+              <option value="46">46 quincenas (23 meses)</option>
+              <option value="47">47 quincenas (23.5 meses)</option>
               <option value="48">48 quincenas (24 meses)</option>
+              <option value="49">49 quincenas (24.5 meses)</option>
+              <option value="50">50 quincenas (25 meses)</option>
+              <option value="51">51 quincenas (25.5 meses)</option>
+              <option value="52">52 quincenas (26 meses)</option>
+              <option value="53">53 quincenas (26.5 meses)</option>
               <option value="54">54 quincenas (27 meses)</option>
+              <option value="55">55 quincenas (27.5 meses)</option>
+              <option value="56">56 quincenas (28 meses)</option>
+              <option value="57">57 quincenas (28.5 meses)</option>
+              <option value="58">58 quincenas (29 meses)</option>
+              <option value="59">59 quincenas (29.5 meses)</option>
               <option value="60">60 quincenas (30 meses)</option>
+              <option value="61">61 quincenas (30.5 meses)</option>
+              <option value="62">62 quincenas (31 meses)</option>
+              <option value="63">63 quincenas (31.5 meses)</option>
+              <option value="64">64 quincenas (32 meses)</option>
+              <option value="65">65 quincenas (32.5 meses)</option>
               <option value="66">66 quincenas (33 meses)</option>
+              <option value="67">67 quincenas (33.5 meses)</option>
+              <option value="68">68 quincenas (34 meses)</option>
+              <option value="69">69 quincenas (34.5 meses)</option>
+              <option value="70">70 quincenas (35 meses)</option>
+              <option value="71">71 quincenas (35.5 meses)</option>
               <option value="72">72 quincenas (36 meses)</option>
             </select>
           </div>
@@ -9082,9 +9159,31 @@ function verTrazabilidad(id){
 // ============================================================
 // SIMULADOR (igual que el original)
 // ============================================================
+function cambiarModoPrecio() {
+  const modo = document.querySelector('input[name="simModoPrecio"]:checked')?.value || 'margen';
+  const grpMargen = document.getElementById('simMargenGroup');
+  const grpManual = document.getElementById('simPrecioManualGroup');
+  if(modo === 'manual') {
+    if(grpMargen) grpMargen.style.display = 'none';
+    if(grpManual) grpManual.style.display = '';
+  } else {
+    if(grpMargen) grpMargen.style.display = '';
+    if(grpManual) grpManual.style.display = 'none';
+  }
+  // Actualizar borde visual de los radios
+  document.querySelectorAll('input[name="simModoPrecio"]').forEach(r => {
+    const lab = r.closest('label');
+    if(lab) lab.style.background = r.checked ? '#f7f5fb' : '';
+    if(lab) lab.style.borderColor = r.checked ? '#6B2D8B' : 'var(--border)';
+  });
+  calcularSim();
+}
+
 function calcularSim(){
   const costo     = getMoneyValue('simCosto');
+  const modo      = document.querySelector('input[name="simModoPrecio"]:checked')?.value || 'margen';
   const margen    = parseFloat($('simMargen').value) || 0.45;
+  const precioMan = getMoneyValue('simPrecioManual');
   const asesor    = $('simAsesor').value || '—';
   const modelo    = $('simModelo').value || 'Equipo';
   const inicialP  = getMoneyValue('simInicial');
@@ -9097,7 +9196,19 @@ function calcularSim(){
     return;
   }
 
-  const precioVenta = Math.round(costo / (1 - margen));
+  // Calcular precio de venta segun el modo
+  let precioVenta;
+  if(modo === 'manual') {
+    if(!precioMan || precioMan <= costo) {
+      $('simResultado').innerHTML = '<div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:14px;color:#d97706;text-align:center;"><strong>Ingresa el precio de venta manual</strong><br><span style="font-size:12px;">Debe ser mayor al costo de ' + fmt(costo) + '</span></div>';
+      $('simTablaWrap').style.display = 'none';
+      return;
+    }
+    precioVenta = precioMan;
+  } else {
+    precioVenta = Math.round(costo / (1 - margen));
+  }
+
   const ganancia    = precioVenta - costo;
   const pctReal     = ((ganancia / precioVenta) * 100).toFixed(1);
   const meses       = quincenas / 2;
@@ -9119,7 +9230,7 @@ function calcularSim(){
       <div class="sim-result">
         <div class="sim-row"><span class="sim-row-label">📱 Modelo</span><span class="sim-row-value" style="font-size:14px;">${modelo}</span></div>
         <div class="sim-row"><span class="sim-row-label">💲 Costo</span><span class="sim-row-value text-muted">${fmt(costo)}</span></div>
-        <div class="sim-row"><span class="sim-row-label">🏷️ Precio Venta (${(margen*100).toFixed(0)}%)</span><span class="sim-row-value highlight">${fmt(precioVenta)}</span></div>
+        <div class="sim-row"><span class="sim-row-label">🏷️ Precio Venta ${modo==="manual"?"(manual)":"("+(margen*100).toFixed(0)+"%)"}</span><span class="sim-row-value highlight">${fmt(precioVenta)}</span></div>
         <div class="sim-row"><span class="sim-row-label">💚 Ganancia</span><span class="sim-row-value green">${fmt(ganancia)}</span></div>
         <div class="sim-row"><span class="sim-row-label">📊 Margen real</span><span class="sim-row-value">${pctReal}%</span></div>
         <div class="sim-row"><span class="sim-row-label">👤 Asesor</span><span class="sim-row-value" style="font-size:14px;">${asesor}</span></div>
@@ -9152,7 +9263,7 @@ function calcularSim(){
     <div class="sim-result">
       <div class="sim-row"><span class="sim-row-label">📱 Modelo</span><span class="sim-row-value" style="font-size:14px;">${modelo}</span></div>
       <div class="sim-row"><span class="sim-row-label">💲 Costo</span><span class="sim-row-value text-muted">${fmt(costo)}</span></div>
-      <div class="sim-row"><span class="sim-row-label">🏷️ Precio Venta (${(margen*100).toFixed(0)}%)</span><span class="sim-row-value highlight">${fmt(precioVenta)}</span></div>
+      <div class="sim-row"><span class="sim-row-label">🏷️ Precio Venta ${modo==="manual"?"(manual)":"("+(margen*100).toFixed(0)+"%)"}</span><span class="sim-row-value highlight">${fmt(precioVenta)}</span></div>
       <div class="sim-row"><span class="sim-row-label">💚 Ganancia</span><span class="sim-row-value green">${fmt(ganancia)}</span></div>
       <div class="sim-row"><span class="sim-row-label">📊 Margen real</span><span class="sim-row-value">${pctReal}%</span></div>
       <div class="sim-row"><span class="sim-row-label">📅 Plazo</span><span class="sim-row-value">${quincenas} quincenas (${meses} meses)</span></div>
