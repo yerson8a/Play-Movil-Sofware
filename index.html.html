@@ -1129,7 +1129,7 @@
       <div class="section-header">
         <div>
           <div class="section-title">🧮 Simulador de Ventas</div>
-          <div class="section-sub">Calcula precio de venta con margen del 45% e iniciales</div>
+          <div class="section-sub">Calcula precio de venta, inicial, intereses y cuotas quincenales</div>
         </div>
       </div>
 
@@ -1161,21 +1161,59 @@
               <option value="0.7">70%</option>
               <option value="0.75">75%</option>
               <option value="0.8">80%</option>
-              <option value="0.85">85%</option>
-              <option value="0.9">90%</option>
             </select>
           </div>
+
+          <!-- Inicial personalizada -->
+          <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:12px;margin-bottom:12px;">
+            <label class="form-label" style="color:#d97706;font-weight:700;">💰 Inicial Personalizada</label>
+            <div class="input-money-wrap">
+              <input type="text" class="form-control" id="simInicial" placeholder="0" oninput="fmtMoneyInput(this);calcularSim()" inputmode="numeric">
+            </div>
+            <div style="font-size:11px;color:#92400e;margin-top:4px;">Deja en blanco para ver opciones de 20%, 30% y 40% automaticas</div>
+          </div>
+
+          <!-- Plazo en quincenas -->
+          <div class="form-group">
+            <label class="form-label">Plazo (quincenas)</label>
+            <select class="form-control" id="simQuincenas" onchange="calcularSim()">
+              <option value="2">2 quincenas (1 mes)</option>
+              <option value="4">4 quincenas (2 meses)</option>
+              <option value="6">6 quincenas (3 meses)</option>
+              <option value="8">8 quincenas (4 meses)</option>
+              <option value="10">10 quincenas (5 meses)</option>
+              <option value="12" selected>12 quincenas (6 meses)</option>
+              <option value="14">14 quincenas (7 meses)</option>
+              <option value="16">16 quincenas (8 meses)</option>
+              <option value="18">18 quincenas (9 meses)</option>
+              <option value="20">20 quincenas (10 meses)</option>
+              <option value="22">22 quincenas (11 meses)</option>
+              <option value="24">24 quincenas (12 meses)</option>
+              <option value="30">30 quincenas (15 meses)</option>
+              <option value="36">36 quincenas (18 meses)</option>
+              <option value="42">42 quincenas (21 meses)</option>
+              <option value="48">48 quincenas (24 meses)</option>
+              <option value="54">54 quincenas (27 meses)</option>
+              <option value="60">60 quincenas (30 meses)</option>
+              <option value="66">66 quincenas (33 meses)</option>
+              <option value="72">72 quincenas (36 meses)</option>
+            </select>
+          </div>
+
+          <!-- Interes editable -->
+          <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:12px;margin-bottom:12px;">
+            <label class="form-label" style="color:#0369a1;font-weight:700;">📊 Interes sobre el Saldo Financiado</label>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input type="number" class="form-control" id="simTasaInteres" placeholder="0" min="0" max="100" step="0.1" value="0" oninput="calcularSim()" style="width:100px;">
+              <span style="font-weight:700;color:#0369a1;">% mensual</span>
+            </div>
+            <div style="font-size:11px;color:#075985;margin-top:4px;">Edita el porcentaje (0 = sin interes)</div>
+          </div>
+
           <div class="form-group">
             <label class="form-label">Asesor Comercial</label>
             <select class="form-control" id="simAsesor" onchange="calcularSim()">
               <option value="">Cargando asesores...</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Tipo de Cliente</label>
-            <select class="form-control" id="simTipoCliente" onchange="calcularSim()">
-              <option value="normal">Cliente Normal</option>
-              <option value="reportado">Cliente Reportado (requiere inicial mayor)</option>
             </select>
           </div>
 
@@ -1197,13 +1235,13 @@
 
       <!-- Tabla comparativa -->
       <div class="card mt-16" id="simTablaWrap" style="display:none;">
-        <div class="card-title">📊 Comparativa de Iniciales y Saldos</div>
+        <div class="card-title">📊 Comparativa de Iniciales (sin inicial personalizada)</div>
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>% Inicial</th><th>Valor Inicial</th><th>Saldo a Financiar</th>
-                <th>Cuota 6 meses</th><th>Cuota 12 meses</th><th>Cuota 18 meses</th>
+                <th>% Inicial</th><th>Valor Inicial</th><th>Saldo</th>
+                <th>Total c/Interes</th><th>Cuota Quincenal</th>
               </tr>
             </thead>
             <tbody id="tbodySim"></tbody>
@@ -9045,30 +9083,115 @@ function verTrazabilidad(id){
 // SIMULADOR (igual que el original)
 // ============================================================
 function calcularSim(){
-  const costo=getMoneyValue('simCosto');
-  const margen=parseFloat($('simMargen').value)||0.45;
-  const asesor=$('simAsesor').value;
-  const tipo=$('simTipoCliente').value;
-  const modelo=$('simModelo').value||'Equipo';
-  if(!costo){$('simResultado').innerHTML='<div class="empty-state"><div class="empty-icon">🧮</div><div class="empty-text">Ingresa el costo del equipo</div></div>';$('simTablaWrap').style.display='none';return;}
-  const precioVenta=Math.round(costo/(1-margen));
-  const ganancia=precioVenta-costo;
-  const pctReal=((ganancia/precioVenta)*100).toFixed(1);
-  const pcts=tipo==='reportado'?[0.30,0.40,0.50]:[0.20,0.30,0.40];
-  $('simResultado').innerHTML=`<div class="sim-result">
-    <div class="sim-row"><span class="sim-row-label">📱 Modelo</span><span class="sim-row-value" style="font-size:14px;">${modelo}</span></div>
-    <div class="sim-row"><span class="sim-row-label">💲 Costo</span><span class="sim-row-value text-muted">${fmt(costo)}</span></div>
-    <div class="sim-row"><span class="sim-row-label">🏷️ Precio Venta (${(margen*100).toFixed(0)}%)</span><span class="sim-row-value highlight">${fmt(precioVenta)}</span></div>
-    <div class="sim-row"><span class="sim-row-label">💚 Ganancia</span><span class="sim-row-value green">${fmt(ganancia)}</span></div>
-    <div class="sim-row"><span class="sim-row-label">📊 Margen real</span><span class="sim-row-value">${pctReal}%</span></div>
-    <div class="sim-row"><span class="sim-row-label">👤 Asesor</span><span class="sim-row-value" style="font-size:14px;">${asesor}</span></div>
-  </div>
-  <div style="margin-top:16px;">
-    <div style="font-size:13px;color:var(--text2);margin-bottom:12px;">Elige el % de inicial:</div>
-    <div class="inicial-cards">${pcts.map(p=>{const ini=Math.round(precioVenta*p);const saldo=precioVenta-ini;return `<div class="inicial-card" onclick="selectInicial(this,${p},${ini},${saldo})"><div class="inicial-pct">${(p*100).toFixed(0)}%</div><div class="inicial-label">Inicial</div><div class="inicial-amount">${fmt(ini)}</div><div class="saldo-amount">Saldo: ${fmt(saldo)}</div></div>`;}).join('')}</div>
-  </div>`;
-  $('simTablaWrap').style.display='block';
-  $('tbodySim').innerHTML=pcts.map(p=>{const ini=Math.round(precioVenta*p);const saldo=precioVenta-ini;return `<tr><td style="font-weight:700;color:var(--pink);">${(p*100).toFixed(0)}%</td><td style="color:var(--green);font-weight:600;">${fmt(ini)}</td><td style="font-weight:600;">${fmt(saldo)}</td><td>${fmt(Math.round(saldo/6))}</td><td>${fmt(Math.round(saldo/12))}</td><td>${fmt(Math.round(saldo/18))}</td></tr>`;}).join('');
+  const costo     = getMoneyValue('simCosto');
+  const margen    = parseFloat($('simMargen').value) || 0.45;
+  const asesor    = $('simAsesor').value || '—';
+  const modelo    = $('simModelo').value || 'Equipo';
+  const inicialP  = getMoneyValue('simInicial');
+  const quincenas = parseInt($('simQuincenas').value) || 12;
+  const tasaInt   = parseFloat($('simTasaInteres').value) || 0;
+
+  if(!costo) {
+    $('simResultado').innerHTML = '<div class="empty-state"><div class="empty-icon">🧮</div><div class="empty-text">Ingresa el costo del equipo</div></div>';
+    $('simTablaWrap').style.display = 'none';
+    return;
+  }
+
+  const precioVenta = Math.round(costo / (1 - margen));
+  const ganancia    = precioVenta - costo;
+  const pctReal     = ((ganancia / precioVenta) * 100).toFixed(1);
+  const meses       = quincenas / 2;
+
+  // Calculo con inicial personalizada
+  if(inicialP > 0) {
+    const saldoFinanciar = precioVenta - inicialP;
+    if(saldoFinanciar <= 0) {
+      $('simResultado').innerHTML = '<div style="background:#fee2e2;border:1px solid #fecaca;border-radius:10px;padding:14px;color:#dc2626;">La inicial es mayor o igual al precio de venta.</div>';
+      return;
+    }
+    // Interes simple sobre el saldo total durante los meses
+    const interesTotal = Math.round(saldoFinanciar * (tasaInt/100) * meses);
+    const totalConInt  = saldoFinanciar + interesTotal;
+    const valorCuota   = Math.round(totalConInt / quincenas);
+    const totalAPagar  = inicialP + totalConInt;
+
+    $('simResultado').innerHTML = `
+      <div class="sim-result">
+        <div class="sim-row"><span class="sim-row-label">📱 Modelo</span><span class="sim-row-value" style="font-size:14px;">${modelo}</span></div>
+        <div class="sim-row"><span class="sim-row-label">💲 Costo</span><span class="sim-row-value text-muted">${fmt(costo)}</span></div>
+        <div class="sim-row"><span class="sim-row-label">🏷️ Precio Venta (${(margen*100).toFixed(0)}%)</span><span class="sim-row-value highlight">${fmt(precioVenta)}</span></div>
+        <div class="sim-row"><span class="sim-row-label">💚 Ganancia</span><span class="sim-row-value green">${fmt(ganancia)}</span></div>
+        <div class="sim-row"><span class="sim-row-label">📊 Margen real</span><span class="sim-row-value">${pctReal}%</span></div>
+        <div class="sim-row"><span class="sim-row-label">👤 Asesor</span><span class="sim-row-value" style="font-size:14px;">${asesor}</span></div>
+      </div>
+      <div style="margin-top:14px;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:14px;">
+        <div style="font-size:12px;font-weight:700;color:#d97706;margin-bottom:10px;">💰 Plan de Pagos</div>
+        <div class="sim-row" style="border-bottom:1px solid #fed7aa;"><span class="sim-row-label">Inicial pagada</span><span class="sim-row-value green" style="font-weight:700;">${fmt(inicialP)}</span></div>
+        <div class="sim-row" style="border-bottom:1px solid #fed7aa;"><span class="sim-row-label">Saldo a financiar</span><span class="sim-row-value">${fmt(saldoFinanciar)}</span></div>
+        <div class="sim-row" style="border-bottom:1px solid #fed7aa;"><span class="sim-row-label">Interes (${tasaInt}% x ${meses} meses)</span><span class="sim-row-value" style="color:#dc2626;">+${fmt(interesTotal)}</span></div>
+        <div class="sim-row" style="border-bottom:1px solid #fed7aa;"><span class="sim-row-label">Total con interes</span><span class="sim-row-value" style="font-weight:700;">${fmt(totalConInt)}</span></div>
+        <div class="sim-row" style="border-bottom:1px solid #fed7aa;"><span class="sim-row-label">Plazo</span><span class="sim-row-value">${quincenas} quincenas (${meses} meses)</span></div>
+        <div class="sim-row" style="background:#fff;border-radius:8px;padding:10px;margin-top:6px;border:1px solid #fed7aa;">
+          <span class="sim-row-label" style="font-weight:700;color:#d97706;">Cuota quincenal</span>
+          <span class="sim-row-value" style="color:#d97706;font-size:18px;font-weight:700;">${fmt(valorCuota)}</span>
+        </div>
+      </div>
+      <div style="background:#6B2D8B;color:#fff;border-radius:10px;padding:14px;margin-top:10px;text-align:center;">
+        <div style="font-size:12px;opacity:0.85;">TOTAL A PAGAR (Inicial + Cuotas)</div>
+        <div style="font-size:24px;font-weight:700;margin-top:4px;">${fmt(totalAPagar)}</div>
+      </div>`;
+
+    $('simTablaWrap').style.display = 'none';
+    return;
+  }
+
+  // Sin inicial personalizada — mostrar opciones 20%, 30%, 40%
+  const pcts = [0.20, 0.30, 0.40];
+
+  $('simResultado').innerHTML = `
+    <div class="sim-result">
+      <div class="sim-row"><span class="sim-row-label">📱 Modelo</span><span class="sim-row-value" style="font-size:14px;">${modelo}</span></div>
+      <div class="sim-row"><span class="sim-row-label">💲 Costo</span><span class="sim-row-value text-muted">${fmt(costo)}</span></div>
+      <div class="sim-row"><span class="sim-row-label">🏷️ Precio Venta (${(margen*100).toFixed(0)}%)</span><span class="sim-row-value highlight">${fmt(precioVenta)}</span></div>
+      <div class="sim-row"><span class="sim-row-label">💚 Ganancia</span><span class="sim-row-value green">${fmt(ganancia)}</span></div>
+      <div class="sim-row"><span class="sim-row-label">📊 Margen real</span><span class="sim-row-value">${pctReal}%</span></div>
+      <div class="sim-row"><span class="sim-row-label">📅 Plazo</span><span class="sim-row-value">${quincenas} quincenas (${meses} meses)</span></div>
+      <div class="sim-row"><span class="sim-row-label">📊 Interes</span><span class="sim-row-value">${tasaInt}% mensual</span></div>
+      <div class="sim-row"><span class="sim-row-label">👤 Asesor</span><span class="sim-row-value" style="font-size:14px;">${asesor}</span></div>
+    </div>
+    <div style="margin-top:16px;">
+      <div style="font-size:13px;color:var(--text2);margin-bottom:12px;">Elige el % de inicial o ingresa una personalizada arriba:</div>
+      <div class="inicial-cards">${pcts.map(p => {
+        const ini = Math.round(precioVenta * p);
+        const saldo = precioVenta - ini;
+        const interes = Math.round(saldo * (tasaInt/100) * meses);
+        const totalI = saldo + interes;
+        const cuota = Math.round(totalI / quincenas);
+        return `<div class="inicial-card" onclick="selectInicial(this,${p},${ini},${saldo})">
+          <div class="inicial-pct">${(p*100).toFixed(0)}%</div>
+          <div class="inicial-label">Inicial</div>
+          <div class="inicial-amount">${fmt(ini)}</div>
+          <div class="saldo-amount">Cuota: ${fmt(cuota)}</div>
+        </div>`;
+      }).join('')}</div>
+    </div>`;
+
+  // Tabla comparativa con interes
+  $('simTablaWrap').style.display = 'block';
+  $('tbodySim').innerHTML = pcts.map(p => {
+    const ini = Math.round(precioVenta * p);
+    const saldo = precioVenta - ini;
+    const interes = Math.round(saldo * (tasaInt/100) * meses);
+    const totalI = saldo + interes;
+    const cuota = Math.round(totalI / quincenas);
+    return `<tr>
+      <td style="font-weight:700;color:var(--pink);">${(p*100).toFixed(0)}%</td>
+      <td style="color:var(--green);font-weight:600;">${fmt(ini)}</td>
+      <td>${fmt(saldo)}</td>
+      <td style="font-weight:600;">${fmt(totalI)}</td>
+      <td style="color:#d97706;font-weight:700;">${fmt(cuota)}</td>
+    </tr>`;
+  }).join('');
 }
 
 function selectInicial(el,pct,ini,saldo){document.querySelectorAll('.inicial-card').forEach(c=>c.classList.remove('selected'));el.classList.add('selected');toast(`Inicial del ${(pct*100).toFixed(0)}%: ${fmt(ini)} — Saldo: ${fmt(saldo)}`,'success');}
