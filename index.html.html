@@ -5778,6 +5778,14 @@ function limpiarFiltrosCreditos() {
 async function renderContabilidad(){
   const ahora = new Date();
   const mesActual = ahora.getFullYear()+'-'+String(ahora.getMonth()+1).padStart(2,'0');
+
+  // Cargar registros de gastos del mes (nominas y comisiones)
+  let regGastosMes = [];
+  try {
+    const r = await sbFetch('registros_gastos?mes=eq.' + mesActual);
+    regGastosMes = Array.isArray(r) ? r : [];
+  } catch(e) {}
+  const nominasRegistradas = new Set(regGastosMes.filter(r=>r.tipo==='nomina').map(r=>(r.asesor||'').toUpperCase()));
   const ventasMes = db.ventas.filter(v=>v.fecha&&v.fecha.startsWith(mesActual)&&!v.anulada);
   const ingresosMes = ventasMes.reduce((a,v)=>a+v.venta,0);
   const gastosMes = db.gastos.filter(g=>g.fecha&&g.fecha.startsWith(mesActual)).reduce((a,g)=>a+g.pago,0);
@@ -5850,7 +5858,10 @@ async function renderContabilidad(){
   const nc = $('nominaContent');
   if(nc) nc.innerHTML=`
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-      <span style="font-size:12px;color:#888899;">Salarios del mes: <strong>${mesActual}</strong></span>
+      <div>
+        <span style="font-size:12px;color:#888899;">Salarios del mes: <strong>${mesActual}</strong></span>
+        <div style="font-size:10px;color:#d97706;margin-top:2px;">⚠️ El boton "Registrar salario" solo agrega el salario base. Las comisiones se registran desde el modulo Comisiones.</div>
+      </div>
       <button class="btn btn-sm btn-ghost" style="font-size:11px;" onclick="editarTodasNominas('${mesActual}')">✏️ Editar salarios</button>
     </div>
     <div class="table-wrap"><table>
@@ -5869,7 +5880,9 @@ async function renderContabilidad(){
           <td style="color:#16a34a;">${fmt(com)}</td>
           <td style="font-weight:700;color:#6B2D8B;">${fmt(total)}</td>
           <td>
-            <button class="btn btn-sm btn-ghost" style="font-size:11px;" onclick="descontarNominaDeGastos('${n.nombre}',${total},'${mesActual}')">➡️ Registrar en gastos</button>
+            ${nominasRegistradas.has(n.nombre.toUpperCase())
+              ? `<span class="badge badge-green" style="font-size:11px;padding:4px 10px;">✓ Registrado en gastos</span>`
+              : `<button class="btn btn-sm btn-ghost" style="font-size:11px;" onclick="descontarNominaDeGastos('${n.nombre}',${n.salario},'${mesActual}')" title="Registra solo el salario base.">➡️ Registrar salario</button>`}
           </td>
         </tr>`;
       }).join('')}
@@ -5981,12 +5994,51 @@ function editarTodasNominas(mes) {
   );
 }
 
-async function descontarNominaDeGastos(nombre, monto, mes) {
-  if(!confirm(`¿Registrar nómina de ${nombre} (${fmt(monto)}) como gasto en ${mes}?`)) return;
+async function descontarNominaDeGastos(nombre, salarioBase, mes) {
+  if(!salarioBase || salarioBase <= 0) { toast('Salario invalido','error'); return; }
+
+  // Verificar si ya fue registrado este mes
   try {
-    await guardarGastoDB({ tipo:'gasto', detalle:`Nómina ${nombre} — ${mes}`, valor:monto });
-    toast(`Nómina de ${nombre} registrada en gastos ✅`);
-  } catch(e) { toast('Error: '+e.message,'error'); }
+    const yaReg = await sbFetch('registros_gastos?tipo=eq.nomina&asesor=eq.' + encodeURIComponent(nombre) + '&mes=eq.' + mes);
+    if(Array.isArray(yaReg) && yaReg.length > 0) {
+      alert('Esta nomina YA fue registrada como gasto.\n\nAsesor: ' + nombre + '\nMes: ' + mes + '\nMonto: ' + fmt(yaReg[0].monto) + '\nRegistrado por: ' + (yaReg[0].registrado_por||'sistema'));
+      return;
+    }
+  } catch(e) { console.error(e); }
+
+  if(!confirm('Registrar SOLO el salario base de ' + nombre + ' (' + fmt(salarioBase) + ') como gasto?\n\nNota: las comisiones se registran por separado desde el modulo Comisiones.')) return;
+
+  try {
+    showLoader('Registrando...');
+    // Crear el gasto
+    const gastoCreado = await sbFetch('gastos', {
+      method:'POST',
+      body:{
+        tipo:'gasto',
+        detalle:'NOMINA ' + nombre.toUpperCase() + ' - ' + mes,
+        pago: salarioBase,
+        entrada: 0,
+        fecha: fechaColombia(),
+        observaciones: 'Salario base de nomina registrado desde Contabilidad'
+      }
+    });
+    const gastoId = gastoCreado && gastoCreado[0] ? gastoCreado[0].id : null;
+
+    // Registrar en tracking
+    await sbFetch('registros_gastos', {
+      method:'POST',
+      body:{
+        tipo:'nomina', asesor:nombre, mes, monto:salarioBase,
+        gasto_id:gastoId, registrado_por: sesionActiva?.nombre?.toUpperCase()||'SISTEMA'
+      }
+    });
+
+    // Recargar gastos
+    await cargarDatos();
+    hideLoader();
+    renderContabilidad();
+    toast('Salario de ' + nombre + ' registrado correctamente');
+  } catch(e) { hideLoader(); toast('Error: '+e.message,'error'); }
 }
 
 function switchContabTab(tab,el){
@@ -11725,7 +11777,16 @@ function cerrarModalComision() {
   toast('Venta registrada ✅');
 }
 
-function renderComisiones() {
+async function renderComisiones() {
+  // Cargar registros de comisiones del mes
+  const mesC = (document.getElementById('comisionesMes')?.value) || mesColombia();
+  let comisRegistradas = new Set();
+  try {
+    const rC = await sbFetch('registros_gastos?tipo=eq.comision&mes=eq.' + mesC);
+    if(Array.isArray(rC)) comisRegistradas = new Set(rC.map(r => (r.asesor||'').toUpperCase()));
+  } catch(e) {}
+  window._comisRegistradas = comisRegistradas;
+
   const mesSelect = document.getElementById('comisionesMes');
   // Poblar selector de meses con últimos 12 meses
   if(mesSelect && mesSelect.options.length === 0) {
@@ -11814,9 +11875,9 @@ function renderComisiones() {
       <td style="color:${f.totalBonosAsesor>=0?'#16a34a':'#dc2626'};">${fmt(f.totalBonosAsesor)}</td>
       <td style="font-weight:700;color:#6B2D8B;">${fmt(f.totalPagar)}</td>
       <td>
-        <button class="btn btn-sm btn-ghost" style="font-size:11px;" onclick="descontarDeGastos('${f.asesor}',${f.totalPagar},'${mesActual}')">
-          ➡️ A Gastos
-        </button>
+        ${(window._comisRegistradas && window._comisRegistradas.has(f.asesor.toUpperCase()))
+          ? `<span class="badge badge-green" style="font-size:11px;padding:4px 10px;">✓ Registrado en gastos</span>`
+          : `<button class="btn btn-sm btn-ghost" style="font-size:11px;" onclick="descontarDeGastos('${f.asesor}',${f.totalPagar},'${mesActual}')">➡️ A Gastos</button>`}
       </td>
     </tr>`).join('');
 }
@@ -11879,15 +11940,43 @@ async function eliminarBono(id) {
 }
 
 async function descontarDeGastos(asesor, monto, mes) {
-  if(!confirm(`¿Registrar ${fmt(monto)} como gasto de comisión para ${asesor} en ${mes}?`)) return;
+  // Verificar si ya fue registrado este mes
   try {
-    await guardarGastoDB({
-      tipo: 'gasto',
-      detalle: `Comisión ${asesor} — ${mes}`,
-      valor: monto
+    const yaReg = await sbFetch('registros_gastos?tipo=eq.comision&asesor=eq.' + encodeURIComponent(asesor) + '&mes=eq.' + mes);
+    if(Array.isArray(yaReg) && yaReg.length > 0) {
+      alert('Esta comision YA fue registrada como gasto.\n\nAsesor: ' + asesor + '\nMes: ' + mes + '\nMonto: ' + fmt(yaReg[0].monto) + '\nRegistrado por: ' + (yaReg[0].registrado_por||'sistema'));
+      return;
+    }
+  } catch(e) { console.error(e); }
+
+  if(!confirm('Registrar ' + fmt(monto) + ' como gasto de comision para ' + asesor + ' en ' + mes + '?')) return;
+  try {
+    showLoader('Registrando...');
+    const gastoCreado = await sbFetch('gastos', {
+      method:'POST',
+      body:{
+        tipo:'gasto',
+        detalle:'COMISION ' + asesor.toUpperCase() + ' - ' + mes,
+        pago: monto, entrada: 0,
+        fecha: fechaColombia(),
+        observaciones: 'Comision (incluye bonos/descuentos) registrada desde modulo Comisiones'
+      }
     });
-    toast(`Comisión de ${asesor} registrada en gastos ✅`);
-  } catch(e) { toast('Error: '+e.message,'error'); }
+    const gastoId = gastoCreado && gastoCreado[0] ? gastoCreado[0].id : null;
+
+    await sbFetch('registros_gastos', {
+      method:'POST',
+      body:{
+        tipo:'comision', asesor, mes, monto,
+        gasto_id:gastoId, registrado_por: sesionActiva?.nombre?.toUpperCase()||'SISTEMA'
+      }
+    });
+
+    await cargarDatos();
+    hideLoader();
+    renderComisiones();
+    toast('Comision de ' + asesor + ' registrada en gastos');
+  } catch(e) { hideLoader(); toast('Error: '+e.message,'error'); }
 }
 
 // ── Gastos fijos EDITABLES ────────────────────────────────────
