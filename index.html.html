@@ -6010,16 +6010,16 @@ async function descontarNominaDeGastos(nombre, salarioBase, mes) {
 
   try {
     showLoader('Registrando...');
-    // Crear el gasto
+    // Crear el gasto (usar columnas correctas)
     const gastoCreado = await sbFetch('gastos', {
       method:'POST',
       body:{
-        tipo:'gasto',
-        detalle:'NOMINA ' + nombre.toUpperCase() + ' - ' + mes,
-        pago: salarioBase,
-        entrada: 0,
-        fecha: fechaColombia(),
-        observaciones: 'Salario base de nomina registrado desde Contabilidad'
+        categoria: 'Gasto',
+        descripcion: 'NOMINA ' + nombre.toUpperCase() + ' - ' + mes,
+        valor: salarioBase,
+        metodo_pago: 'Efectivo',
+        sede_id: sesionActiva?.sede_id || 1,
+        fecha_gasto: fechaColombia()
       }
     });
     const gastoId = gastoCreado && gastoCreado[0] ? gastoCreado[0].id : null;
@@ -11955,11 +11955,12 @@ async function descontarDeGastos(asesor, monto, mes) {
     const gastoCreado = await sbFetch('gastos', {
       method:'POST',
       body:{
-        tipo:'gasto',
-        detalle:'COMISION ' + asesor.toUpperCase() + ' - ' + mes,
-        pago: monto, entrada: 0,
-        fecha: fechaColombia(),
-        observaciones: 'Comision (incluye bonos/descuentos) registrada desde modulo Comisiones'
+        categoria: 'Gasto',
+        descripcion: 'COMISION ' + asesor.toUpperCase() + ' - ' + mes,
+        valor: monto,
+        metodo_pago: 'Efectivo',
+        sede_id: sesionActiva?.sede_id || 1,
+        fecha_gasto: fechaColombia()
       }
     });
     const gastoId = gastoCreado && gastoCreado[0] ? gastoCreado[0].id : null;
