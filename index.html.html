@@ -6034,7 +6034,7 @@ async function descontarNominaDeGastos(nombre, salarioBase, mes) {
     });
 
     // Recargar gastos
-    await cargarDatos();
+    await cargarDatosPorSede(sesionActiva);
     hideLoader();
     renderContabilidad();
     toast('Salario de ' + nombre + ' registrado correctamente');
@@ -11973,7 +11973,7 @@ async function descontarDeGastos(asesor, monto, mes) {
       }
     });
 
-    await cargarDatos();
+    await cargarDatosPorSede(sesionActiva);
     hideLoader();
     renderComisiones();
     toast('Comision de ' + asesor + ' registrada en gastos');
