@@ -5203,7 +5203,7 @@ function showModule(name) {
   else if(name==='asesores') { cargarAsesoresActivos().then(()=>renderAsesores()); }
   else if(name==='garantias') { cargarGarantias(); }
   else if(name==='servicio')  { cargarServicio(); }
-  else if(name==='comisiones'){ renderComisiones(); }
+  else if(name==='comisiones'){ cargarBonosComisiones().then(()=>renderComisiones()); }
   else if(name==='sedes') cargarSedes();
   else if(name==='usuarios') { cargarUsuarios(); poblarSelectSedes(); }
   else if(name==='financieras') cargarFinancieras();
@@ -11821,18 +11821,61 @@ function renderComisiones() {
     </tr>`).join('');
 }
 
-function guardarBonoComision() {
+async function guardarBonoComision() {
   const asesor   = document.getElementById('bonoAsesor')?.value;
   const tipo     = document.getElementById('bonoTipo')?.value;
   const valor    = getMoneyValue('bonoValor');
-  const concepto = document.getElementById('bonoConcepto')?.value?.trim();
-  if(!valor||!concepto) { toast('Completa valor y concepto','error'); return; }
+  const concepto = (document.getElementById('bonoConcepto')?.value||'').trim().toUpperCase();
+  if(!valor || !concepto) { toast('Completa valor y concepto','error'); return; }
   const mesSelect = document.getElementById('comisionesMes');
   const mes = mesSelect?.value || mesColombia();
-  dbE3.bonos.push({ asesor, tipo, valor, concepto, mes });
-  closeModal('modalNuevoBonoComision');
-  renderComisiones();
-  toast(`${tipo==='bono'?'Bono':'Descuento'} registrado para ${asesor} ✅`);
+
+  try {
+    showLoader('Guardando...');
+    const row = { asesor, tipo, valor, concepto, mes, creado_por: sesionActiva?.nombre?.toUpperCase()||'SISTEMA' };
+    const res = await sbFetch('bonos_comisiones', { method:'POST', body:row });
+    // Agregar a memoria con el id real
+    if(res && res[0]) {
+      dbE3.bonos.push({ id: res[0].id, asesor, tipo, valor, concepto, mes });
+    } else {
+      dbE3.bonos.push({ asesor, tipo, valor, concepto, mes });
+    }
+    hideLoader();
+    closeModal('modalNuevoBonoComision');
+    renderComisiones();
+    toast((tipo==='bono'?'Bono':'Descuento') + ' registrado para ' + asesor);
+  } catch(e) {
+    hideLoader();
+    toast('Error: '+e.message,'error');
+  }
+}
+
+// Cargar bonos desde Supabase
+async function cargarBonosComisiones() {
+  try {
+    const res = await sbFetch('bonos_comisiones', { order: 'created_at.desc' });
+    dbE3.bonos = (res || []).map(b => ({
+      id:       b.id,
+      asesor:   b.asesor,
+      tipo:     b.tipo,
+      valor:    parseFloat(b.valor) || 0,
+      concepto: b.concepto || '',
+      mes:      b.mes
+    }));
+  } catch(e) {
+    dbE3.bonos = [];
+  }
+}
+
+// Eliminar bono individual
+async function eliminarBono(id) {
+  if(!confirm('Eliminar este bono/descuento?')) return;
+  try {
+    await sbFetch('bonos_comisiones?id=eq.'+id, { method:'DELETE' });
+    dbE3.bonos = dbE3.bonos.filter(b => b.id !== id);
+    renderComisiones();
+    toast('Eliminado');
+  } catch(e) { toast('Error: '+e.message,'error'); }
 }
 
 async function descontarDeGastos(asesor, monto, mes) {
@@ -11967,6 +12010,7 @@ async function activarSesion(user) {
   cargarAsesoresActivos();
   cargarClientes(); // Necesario para búsqueda en modales de venta
   cargarTareasSupabase().then(() => actualizarBadgeTareas()); // Tareas compartidas
+  cargarBonosComisiones(); // Bonos de comisiones
 
   toast(`Bienvenido, ${user.nombre} 👋`);
 }
