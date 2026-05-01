@@ -1366,6 +1366,14 @@
             <div class="stat-delta" id="contGananciaDelta">Este mes</div>
           </div>
         </div>
+        <!-- Tarjeta Resumen Consolidado de Gastos -->
+        <div class="card" style="margin-bottom:20px;background:linear-gradient(135deg,#fff5f5 0%,#fff7ed 100%);border:2px solid #fed7aa;">
+          <div class="card-title" style="color:#d97706;">📊 Resumen Consolidado de Gastos del Mes</div>
+          <div id="resumenGastosConsolidado" style="padding:8px 0;">
+            <div style="text-align:center;padding:20px;color:#888;">Cargando...</div>
+          </div>
+        </div>
+
         <div class="grid-2">
           <div class="card">
             <div class="card-title">💸 Gastos Fijos Mensuales</div>
@@ -5786,6 +5794,9 @@ async function renderContabilidad(){
     regGastosMes = Array.isArray(r) ? r : [];
   } catch(e) {}
   const nominasRegistradas = new Set(regGastosMes.filter(r=>r.tipo==='nomina').map(r=>(r.asesor||'').toUpperCase()));
+
+  // Renderizar resumen consolidado
+  await renderResumenGastosConsolidado(mesActual);
   const ventasMes = db.ventas.filter(v=>v.fecha&&v.fecha.startsWith(mesActual)&&!v.anulada);
   const ingresosMes = ventasMes.reduce((a,v)=>a+v.venta,0);
   const gastosMes = db.gastos.filter(g=>g.fecha&&g.fecha.startsWith(mesActual)).reduce((a,g)=>a+g.pago,0);
@@ -5992,6 +6003,95 @@ function editarTodasNominas(mes) {
       toast('Nóminas actualizadas ✅');
     }
   );
+}
+
+async function renderResumenGastosConsolidado(mes) {
+  const div = document.getElementById('resumenGastosConsolidado');
+  if(!div) return;
+
+  // 1. Gastos del mes (todos los registros de la tabla gastos del mes)
+  const gastosMes = (db.gastos||[]).filter(g => (g.fecha||'').startsWith(mes) && (g.tipo === 'gasto' || g.categoria === 'Gasto'));
+  const totalGastosMes = gastosMes.reduce((s,g) => s + (parseFloat(g.valor)||parseFloat(g.pago)||0), 0);
+
+  // 2. Gastos fijos del mes (de la tabla configuracion_contabilidad)
+  let totalGastosFijos = 0;
+  try {
+    const fijos = await cargarGastosFijosMes(mes);
+    totalGastosFijos = (fijos || []).reduce((s,f) => s + (parseFloat(f.valor)||0), 0);
+  } catch(e) {}
+
+  // 3. Gastos por caja - consultar movimientos_caja del mes con tipo "salida"
+  let gastosPorCaja = {};
+  try {
+    const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+    // Cargar todas las cajas
+    const resCajas = await fetch(SUPABASE_URL + '/rest/v1/cajas?select=id,nombre,sede_id', {headers});
+    const cajas = await resCajas.json();
+    // Cargar movimientos del mes con tipo salida o gasto
+    const mesIni = mes + '-01';
+    const mesFinDate = new Date(mes + '-01');
+    mesFinDate.setMonth(mesFinDate.getMonth() + 1);
+    const mesFin = mesFinDate.toISOString().slice(0,10);
+    const resMov = await fetch(
+      SUPABASE_URL + '/rest/v1/movimientos_caja?fecha=gte.' + mesIni + '&fecha=lt.' + mesFin + '&select=caja_id,monto,tipo',
+      {headers}
+    );
+    const movs = await resMov.json();
+    if(Array.isArray(cajas) && Array.isArray(movs)) {
+      cajas.forEach(c => {
+        const movsC = movs.filter(m => m.caja_id === c.id && (m.tipo === 'salida' || m.tipo === 'gasto' || m.tipo === 'retiro'));
+        const total = movsC.reduce((s,m) => s + Math.abs(parseFloat(m.monto)||0), 0);
+        gastosPorCaja[c.nombre] = total;
+      });
+    }
+  } catch(e) { console.error('Error cargando cajas:', e); }
+
+  const totalGastosCajas = Object.values(gastosPorCaja).reduce((s,v) => s+v, 0);
+  const totalGeneral = totalGastosMes + totalGastosFijos + totalGastosCajas;
+
+  // Construir UI
+  const cajasHtml = Object.keys(gastosPorCaja).length > 0
+    ? Object.entries(gastosPorCaja).map(([nombre, valor]) => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:#fff;border-radius:8px;border:1px solid #fed7aa;margin-bottom:6px;">
+          <div>
+            <div style="font-size:11px;color:#888;text-transform:uppercase;font-weight:700;">💵 ${nombre}</div>
+            <div style="font-size:10px;color:#888;">Salidas registradas en la caja</div>
+          </div>
+          <div style="font-size:16px;font-weight:700;color:#dc2626;">${fmt(valor)}</div>
+        </div>`).join('')
+    : '<div style="padding:8px;font-size:12px;color:#888;text-align:center;">Sin movimientos de salida en cajas este mes</div>';
+
+  div.innerHTML = `
+    <!-- Tarjetas grandes -->
+    <div class="grid-4" style="margin-bottom:14px;">
+      <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #fecaca;">
+        <div style="font-size:11px;color:#888;text-transform:uppercase;font-weight:700;">📒 Gastos del Mes</div>
+        <div style="font-size:22px;font-weight:700;color:#dc2626;margin-top:4px;">${fmt(totalGastosMes)}</div>
+        <div style="font-size:10px;color:#888;margin-top:2px;">${gastosMes.length} registros</div>
+      </div>
+      <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #fed7aa;">
+        <div style="font-size:11px;color:#888;text-transform:uppercase;font-weight:700;">🔁 Gastos Fijos</div>
+        <div style="font-size:22px;font-weight:700;color:#d97706;margin-top:4px;">${fmt(totalGastosFijos)}</div>
+        <div style="font-size:10px;color:#888;margin-top:2px;">Recurrentes mensuales</div>
+      </div>
+      <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #c7d2fe;">
+        <div style="font-size:11px;color:#888;text-transform:uppercase;font-weight:700;">💵 Cajas (salidas)</div>
+        <div style="font-size:22px;font-weight:700;color:#4f46e5;margin-top:4px;">${fmt(totalGastosCajas)}</div>
+        <div style="font-size:10px;color:#888;margin-top:2px;">${Object.keys(gastosPorCaja).length} cajas</div>
+      </div>
+      <div style="background:#6B2D8B;color:#fff;border-radius:10px;padding:14px;">
+        <div style="font-size:11px;opacity:0.85;text-transform:uppercase;font-weight:700;">💰 Total Consolidado</div>
+        <div style="font-size:22px;font-weight:700;margin-top:4px;">${fmt(totalGeneral)}</div>
+        <div style="font-size:10px;opacity:0.85;margin-top:2px;">Mes ${mes}</div>
+      </div>
+    </div>
+
+    <!-- Detalle por caja -->
+    <div style="margin-top:10px;">
+      <div style="font-size:12px;font-weight:700;color:#92400e;margin-bottom:8px;">💵 Salidas por Caja</div>
+      ${cajasHtml}
+    </div>
+  `;
 }
 
 async function descontarNominaDeGastos(nombre, salarioBase, mes) {
