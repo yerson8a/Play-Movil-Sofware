@@ -6033,20 +6033,19 @@ async function renderResumenGastosConsolidado(mes) {
     mesFinDate.setMonth(mesFinDate.getMonth() + 1);
     const mesFin = mesFinDate.toISOString().slice(0,10);
     const resMov = await fetch(
-      SUPABASE_URL + '/rest/v1/movimientos_caja?fecha=gte.' + mesIni + '&fecha=lt.' + mesFin + '&select=caja_id,monto,tipo',
+      SUPABASE_URL + '/rest/v1/movimientos_caja?fecha=gte.' + mesIni + '&fecha=lt.' + mesFin + '&select=caja_id,valor,tipo',
       {headers}
     );
     const movs = await resMov.json();
     if(Array.isArray(cajas) && Array.isArray(movs)) {
       cajas.forEach(c => {
-        // Filtrar movimientos negativos (salidas) o tipo salida/gasto/retiro
+        // Filtrar movimientos tipo salida (los reales en la BD)
         const movsC = movs.filter(m => {
           if(m.caja_id !== c.id) return false;
-          const monto = parseFloat(m.monto) || 0;
           const tipo = (m.tipo||'').toLowerCase();
-          return monto < 0 || ['salida','gasto','retiro','pago'].includes(tipo);
+          return ['salida','gasto','retiro','pago'].includes(tipo);
         });
-        const total = movsC.reduce((s,m) => s + Math.abs(parseFloat(m.monto)||0), 0);
+        const total = movsC.reduce((s,m) => s + Math.abs(parseFloat(m.valor)||0), 0);
         if(total > 0) gastosPorCaja[c.nombre] = total;
       });
     }
