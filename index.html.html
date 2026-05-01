@@ -5891,9 +5891,12 @@ async function renderContabilidad(){
           <td style="color:#16a34a;">${fmt(com)}</td>
           <td style="font-weight:700;color:#6B2D8B;">${fmt(total)}</td>
           <td>
-            ${nominasRegistradas.has(n.nombre.toUpperCase())
-              ? `<span class="badge badge-green" style="font-size:11px;padding:4px 10px;">✓ Registrado en gastos</span>`
-              : `<button class="btn btn-sm btn-ghost" style="font-size:11px;" onclick="descontarNominaDeGastos('${n.nombre}',${n.salario},'${mesActual}')" title="Registra solo el salario base.">➡️ Registrar salario</button>`}
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              ${nominasRegistradas.has(n.nombre.toUpperCase())
+                ? `<span class="badge badge-green" style="font-size:11px;padding:4px 10px;">✓ Registrado en gastos</span>
+                   <button class="btn btn-sm btn-ghost" style="font-size:11px;color:#d97706;border:1px solid #d97706;" onclick="actualizarNominaEnGastos('${n.nombre}',${n.salario},'${mesActual}')" title="Recalcular si cambio el salario">🔄 Actualizar</button>`
+                : `<button class="btn btn-sm btn-ghost" style="font-size:11px;" onclick="descontarNominaDeGastos('${n.nombre}',${n.salario},'${mesActual}')" title="Registra solo el salario base.">➡️ Registrar salario</button>`}
+            </div>
           </td>
         </tr>`;
       }).join('')}
@@ -6097,6 +6100,62 @@ async function renderResumenGastosConsolidado(mes) {
       ${cajasHtml}
     </div>
   `;
+}
+
+async function actualizarNominaEnGastos(nombre, salarioNuevo, mes) {
+  if(!confirm('Actualizar el salario de ' + nombre + ' a ' + fmt(salarioNuevo) + '?\n\nEsto eliminara el registro anterior y creara uno nuevo.')) return;
+
+  showLoader('Actualizando...');
+  try {
+    const yaReg = await sbFetch('registros_gastos?tipo=eq.nomina&asesor=eq.' + encodeURIComponent(nombre) + '&mes=eq.' + mes);
+    if(!Array.isArray(yaReg) || yaReg.length === 0) {
+      hideLoader();
+      toast('No hay registro previo','error');
+      return;
+    }
+
+    const reg = yaReg[0];
+    const gastoIdAnterior = reg.gasto_id;
+    const montoAnterior   = parseFloat(reg.monto) || 0;
+
+    if(gastoIdAnterior) {
+      await sbFetch('gastos?id=eq.' + gastoIdAnterior, { method:'DELETE' });
+    }
+    await sbFetch('registros_gastos?id=eq.' + reg.id, { method:'DELETE' });
+
+    const gastoCreado = await sbFetch('gastos', {
+      method:'POST',
+      body:{
+        categoria: 'Gasto',
+        descripcion: 'NOMINA ' + nombre.toUpperCase() + ' - ' + mes + ' (ACTUALIZADA)',
+        valor: salarioNuevo,
+        metodo_pago: 'Efectivo',
+        sede_id: sesionActiva?.sede_id || 1,
+        fecha_gasto: fechaColombia()
+      }
+    });
+    const gastoIdNuevo = gastoCreado && gastoCreado[0] ? gastoCreado[0].id : null;
+
+    await sbFetch('registros_gastos', {
+      method:'POST',
+      body:{
+        tipo:'nomina', asesor:nombre, mes, monto:salarioNuevo,
+        gasto_id: gastoIdNuevo,
+        registrado_por: sesionActiva?.nombre?.toUpperCase()||'SISTEMA'
+      }
+    });
+
+    await cargarDatosPorSede(sesionActiva);
+    hideLoader();
+    renderContabilidad();
+
+    const diff = salarioNuevo - montoAnterior;
+    const diffStr = diff >= 0 ? ('+' + fmt(diff)) : ('-' + fmt(Math.abs(diff)));
+    toast('Salario actualizado. Diferencia: ' + diffStr);
+  } catch(e) {
+    hideLoader();
+    toast('Error: '+e.message,'error');
+  }
 }
 
 async function descontarNominaDeGastos(nombre, salarioBase, mes) {
@@ -11980,9 +12039,12 @@ async function renderComisiones() {
       <td style="color:${f.totalBonosAsesor>=0?'#16a34a':'#dc2626'};">${fmt(f.totalBonosAsesor)}</td>
       <td style="font-weight:700;color:#6B2D8B;">${fmt(f.totalPagar)}</td>
       <td>
-        ${(window._comisRegistradas && window._comisRegistradas.has(f.asesor.toUpperCase()))
-          ? `<span class="badge badge-green" style="font-size:11px;padding:4px 10px;">✓ Registrado en gastos</span>`
-          : `<button class="btn btn-sm btn-ghost" style="font-size:11px;" onclick="descontarDeGastos('${f.asesor}',${f.totalPagar},'${mesActual}')">➡️ A Gastos</button>`}
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          ${(window._comisRegistradas && window._comisRegistradas.has(f.asesor.toUpperCase()))
+            ? `<span class="badge badge-green" style="font-size:11px;padding:4px 10px;">✓ Registrado en gastos</span>
+               <button class="btn btn-sm btn-ghost" style="font-size:11px;color:#d97706;border:1px solid #d97706;" onclick="actualizarComisionEnGastos('${f.asesor}',${f.totalPagar},'${mesActual}')" title="Recalcular y actualizar el gasto si hubo nuevas ventas">🔄 Actualizar</button>`
+            : `<button class="btn btn-sm btn-ghost" style="font-size:11px;" onclick="descontarDeGastos('${f.asesor}',${f.totalPagar},'${mesActual}')">➡️ A Gastos</button>`}
+        </div>
       </td>
     </tr>`).join('');
 }
@@ -12042,6 +12104,70 @@ async function eliminarBono(id) {
     renderComisiones();
     toast('Eliminado');
   } catch(e) { toast('Error: '+e.message,'error'); }
+}
+
+async function actualizarComisionEnGastos(asesor, montoNuevo, mes) {
+  if(!confirm('Actualizar la comision de ' + asesor + ' a ' + fmt(montoNuevo) + '?\n\nEsto eliminara el registro anterior y creara uno nuevo con el valor actual considerando las nuevas ventas, bonos y descuentos.')) return;
+
+  showLoader('Actualizando...');
+  try {
+    // 1. Buscar el registro previo de gastos
+    const yaReg = await sbFetch('registros_gastos?tipo=eq.comision&asesor=eq.' + encodeURIComponent(asesor) + '&mes=eq.' + mes);
+    if(!Array.isArray(yaReg) || yaReg.length === 0) {
+      hideLoader();
+      toast('No hay registro previo. Usa el boton A Gastos','error');
+      return;
+    }
+
+    const reg = yaReg[0];
+    const gastoIdAnterior = reg.gasto_id;
+    const montoAnterior   = parseFloat(reg.monto) || 0;
+
+    // 2. Eliminar el gasto anterior si existe
+    if(gastoIdAnterior) {
+      await sbFetch('gastos?id=eq.' + gastoIdAnterior, { method:'DELETE' });
+    }
+
+    // 3. Eliminar el registro de tracking
+    await sbFetch('registros_gastos?id=eq.' + reg.id, { method:'DELETE' });
+
+    // 4. Crear el nuevo gasto con el monto actualizado
+    const gastoCreado = await sbFetch('gastos', {
+      method:'POST',
+      body:{
+        categoria: 'Gasto',
+        descripcion: 'COMISION ' + asesor.toUpperCase() + ' - ' + mes + ' (ACTUALIZADA)',
+        valor: montoNuevo,
+        metodo_pago: 'Efectivo',
+        sede_id: sesionActiva?.sede_id || 1,
+        fecha_gasto: fechaColombia()
+      }
+    });
+    const gastoIdNuevo = gastoCreado && gastoCreado[0] ? gastoCreado[0].id : null;
+
+    // 5. Crear nuevo registro en tracking
+    await sbFetch('registros_gastos', {
+      method:'POST',
+      body:{
+        tipo:'comision', asesor, mes, monto:montoNuevo,
+        gasto_id: gastoIdNuevo,
+        registrado_por: sesionActiva?.nombre?.toUpperCase()||'SISTEMA'
+      }
+    });
+
+    // 6. Recargar todo
+    await cargarDatosPorSede(sesionActiva);
+    hideLoader();
+    renderComisiones();
+    renderContabilidad();
+
+    const diff = montoNuevo - montoAnterior;
+    const diffStr = diff >= 0 ? ('+' + fmt(diff)) : ('-' + fmt(Math.abs(diff)));
+    toast('Comision actualizada. Diferencia: ' + diffStr);
+  } catch(e) {
+    hideLoader();
+    toast('Error: '+e.message,'error');
+  }
 }
 
 async function descontarDeGastos(asesor, monto, mes) {
