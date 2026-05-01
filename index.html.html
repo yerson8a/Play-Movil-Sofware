@@ -6009,9 +6009,9 @@ async function renderResumenGastosConsolidado(mes) {
   const div = document.getElementById('resumenGastosConsolidado');
   if(!div) return;
 
-  // 1. Gastos del mes (todos los registros de la tabla gastos del mes)
-  const gastosMes = (db.gastos||[]).filter(g => (g.fecha||'').startsWith(mes) && (g.tipo === 'gasto' || g.categoria === 'Gasto'));
-  const totalGastosMes = gastosMes.reduce((s,g) => s + (parseFloat(g.valor)||parseFloat(g.pago)||0), 0);
+  // 1. Gastos del mes (filtrar por mes y pago > 0)
+  const gastosMes = (db.gastos||[]).filter(g => (g.fecha||'').startsWith(mes) && (parseFloat(g.pago)||0) > 0);
+  const totalGastosMes = gastosMes.reduce((s,g) => s + (parseFloat(g.pago)||0), 0);
 
   // 2. Gastos fijos del mes (de la tabla configuracion_contabilidad)
   let totalGastosFijos = 0;
@@ -6039,9 +6039,15 @@ async function renderResumenGastosConsolidado(mes) {
     const movs = await resMov.json();
     if(Array.isArray(cajas) && Array.isArray(movs)) {
       cajas.forEach(c => {
-        const movsC = movs.filter(m => m.caja_id === c.id && (m.tipo === 'salida' || m.tipo === 'gasto' || m.tipo === 'retiro'));
+        // Filtrar movimientos negativos (salidas) o tipo salida/gasto/retiro
+        const movsC = movs.filter(m => {
+          if(m.caja_id !== c.id) return false;
+          const monto = parseFloat(m.monto) || 0;
+          const tipo = (m.tipo||'').toLowerCase();
+          return monto < 0 || ['salida','gasto','retiro','pago'].includes(tipo);
+        });
         const total = movsC.reduce((s,m) => s + Math.abs(parseFloat(m.monto)||0), 0);
-        gastosPorCaja[c.nombre] = total;
+        if(total > 0) gastosPorCaja[c.nombre] = total;
       });
     }
   } catch(e) { console.error('Error cargando cajas:', e); }
