@@ -555,6 +555,9 @@
       <span class="icon">🤝</span> Créditos
       <span class="nav-badge" id="creditoBadge" style="display:none;">0</span>
     </div>
+    <div class="nav-item" onclick="showModule('genfactura')">
+      <span class="icon">🧾</span> Generador Factura
+    </div>
     <div class="nav-item" onclick="showModule('simulador')">
       <span class="icon">🧮</span> Simulador
     </div>
@@ -1537,6 +1540,151 @@
     </div>
 
     <!-- ==================== TAREAS ==================== -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- MODULO GENERADOR DE FACTURAS (independiente, solo imprimir) -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <div id="mod-genfactura" class="module">
+      <div class="section-header">
+        <div>
+          <div class="section-title">🧾 Generador de Facturas</div>
+          <div class="section-sub">Crea facturas para imprimir sin afectar el sistema (solo lectura)</div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <!-- Formulario -->
+        <div class="card">
+          <div class="card-title">📝 Datos de la Factura</div>
+
+          <!-- Tipo de factura -->
+          <div class="form-group">
+            <label class="form-label">Tipo de Factura</label>
+            <select class="form-control" id="gfTipo" onchange="gfActualizarUI()">
+              <option value="contado">Contado</option>
+              <option value="credito">Crédito</option>
+            </select>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Sede</label>
+              <select class="form-control" id="gfSede">
+                <option value="LOCAL PEREIRA">Pereira</option>
+                <option value="LOCAL ARMENIA LA 15">Armenia La 15</option>
+                <option value="LOCAL ARMENIA LA 19">Armenia La 19</option>
+                <option value="LOCAL MANIZALES">Manizales</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">N° Factura</label>
+              <input type="text" class="form-control" id="gfNumero" placeholder="Auto" style="text-transform:uppercase;">
+            </div>
+          </div>
+
+          <!-- Cliente -->
+          <div style="background:#f7f5fb;border-radius:10px;padding:12px;margin-bottom:12px;">
+            <div style="font-size:12px;font-weight:700;color:#6B2D8B;margin-bottom:8px;">👤 Cliente</div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Nombre</label>
+                <input type="text" class="form-control" id="gfCliente" style="text-transform:uppercase;">
+              </div>
+              <div class="form-group">
+                <label class="form-label">CC / NIT</label>
+                <input type="text" class="form-control" id="gfCedula">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Teléfono</label>
+                <input type="text" class="form-control" id="gfTelefono">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Correo</label>
+                <input type="email" class="form-control" id="gfCorreo">
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Asesor</label>
+              <input type="text" class="form-control" id="gfAsesor" style="text-transform:uppercase;">
+            </div>
+          </div>
+
+          <!-- Productos -->
+          <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:12px;margin-bottom:12px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+              <div style="font-size:12px;font-weight:700;color:#d97706;">📦 Productos</div>
+              <button type="button" class="btn btn-sm" style="background:#d97706;color:#fff;font-size:11px;" onclick="gfAgregarProducto()">+ Agregar Producto</button>
+            </div>
+            <div id="gfProductosList">
+              <div style="text-align:center;padding:14px;color:#888;font-size:12px;">No has agregado productos. Haz clic en "+ Agregar Producto".</div>
+            </div>
+          </div>
+
+          <!-- Modificadores -->
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Descuento</label>
+              <div class="input-money-wrap"><input type="text" class="form-control" id="gfDescuento" placeholder="0" oninput="fmtMoneyInput(this);gfActualizarTotales()" inputmode="numeric"></div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">IVA (%)</label>
+              <input type="number" class="form-control" id="gfIVAPct" placeholder="0" min="0" max="100" step="0.1" value="0" oninput="gfActualizarTotales()">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Comisión Financiera</label>
+              <div class="input-money-wrap"><input type="text" class="form-control" id="gfComision" placeholder="0" oninput="fmtMoneyInput(this);gfActualizarTotales()" inputmode="numeric"></div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Financiera</label>
+              <input type="text" class="form-control" id="gfFinanciera" placeholder="CONTADO" style="text-transform:uppercase;">
+            </div>
+          </div>
+
+          <!-- Datos de credito (solo si es credito) -->
+          <div id="gfCreditoFields" style="display:none;background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:12px;margin-bottom:12px;">
+            <div style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:8px;">💳 Datos del Crédito</div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Inicial pagada</label>
+                <div class="input-money-wrap"><input type="text" class="form-control" id="gfInicial" placeholder="0" oninput="fmtMoneyInput(this);gfActualizarTotales()" inputmode="numeric"></div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Cuotas (quincenas)</label>
+                <input type="number" class="form-control" id="gfCuotas" placeholder="12" min="1" max="72">
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Valor cuota quincenal</label>
+              <div class="input-money-wrap"><input type="text" class="form-control" id="gfValorCuota" placeholder="0" oninput="fmtMoneyInput(this)" inputmode="numeric"></div>
+            </div>
+          </div>
+
+          <button class="btn btn-primary" style="width:100%;" onclick="gfGenerarVistaPrevia()">
+            👁️ Generar Vista Previa
+          </button>
+        </div>
+
+        <!-- Vista previa -->
+        <div class="card">
+          <div class="card-title">📄 Vista Previa</div>
+          <div id="gfVistaPrevia">
+            <div class="empty-state">
+              <div class="empty-icon">📄</div>
+              <div class="empty-text">Llena los datos y haz clic en "Generar Vista Previa"</div>
+            </div>
+          </div>
+          <div id="gfBotonesAccion" style="display:none;margin-top:14px;">
+            <button class="btn btn-primary" style="width:100%;" onclick="gfImprimir()">
+              🖨️ Imprimir Factura
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div id="mod-tareas" class="module">
       <div class="section-header">
         <div>
@@ -5195,7 +5343,7 @@ function showModule(name) {
   document.querySelector('.topbar-title').textContent = {
     'dashboard':'Dashboard','compras':'Compras y Proveedores',
     'inventario':'Inventario de Equipos','ventas':'Registro de Ventas',
-    'creditos':'Gestión de Créditos','simulador':'Simulador de Ventas',
+    'creditos':'Gestión de Créditos','simulador':'Simulador de Ventas','genfactura':'Generador de Facturas',
     'contabilidad':'Contabilidad','asesores':'Asesores Comerciales','garantias':'Garantías'
   }[name]||name;
   if(name==='dashboard') renderDashboard();
@@ -5216,6 +5364,7 @@ function showModule(name) {
   else if(name==='usuarios') { cargarUsuarios(); poblarSelectSedes(); }
   else if(name==='financieras') cargarFinancieras();
   else if(name==='cajas') { cargarCajas(); poblarSelectSedes(); }
+  else if(name==='genfactura') { gfInicializar(); }
 }
 
 // ============================================================
@@ -7252,6 +7401,173 @@ async function guardarBitacoraTarea() {
 
 // Restaurar onclick al cerrar bitácora de tarea
 const _origCloseModal = typeof closeModal === 'function' ? closeModal : null;
+
+// ============================================================
+// GENERADOR DE FACTURAS (módulo independiente para imprimir)
+// ============================================================
+let gfProductos = [];
+
+function gfInicializar() {
+  // Resetear campos solo la primera vez
+  if(gfProductos.length === 0) {
+    const elNumero = document.getElementById('gfNumero');
+    if(elNumero && !elNumero.value) elNumero.value = 'PM-' + Date.now().toString().slice(-6);
+  }
+  gfActualizarUI();
+}
+
+function gfActualizarUI() {
+  const tipo = document.getElementById('gfTipo')?.value || 'contado';
+  const credFields = document.getElementById('gfCreditoFields');
+  if(credFields) credFields.style.display = tipo === 'credito' ? 'block' : 'none';
+}
+
+function gfAgregarProducto() {
+  gfProductos.push({ producto:'', imei:'', precio:0 });
+  gfRenderProductos();
+}
+
+function gfEliminarProducto(idx) {
+  gfProductos.splice(idx, 1);
+  gfRenderProductos();
+  gfActualizarTotales();
+}
+
+function gfActualizarProducto(idx, campo, valor) {
+  if(!gfProductos[idx]) return;
+  if(campo === 'precio') {
+    gfProductos[idx][campo] = parseInt((valor||'').toString().replace(/[^0-9]/g,'')) || 0;
+  } else {
+    gfProductos[idx][campo] = (valor||'').toUpperCase();
+  }
+  gfActualizarTotales();
+}
+
+function gfRenderProductos() {
+  const div = document.getElementById('gfProductosList');
+  if(!div) return;
+  if(gfProductos.length === 0) {
+    div.innerHTML = '<div style="text-align:center;padding:14px;color:#888;font-size:12px;">No has agregado productos. Haz clic en "+ Agregar Producto".</div>';
+    return;
+  }
+  div.innerHTML = gfProductos.map((p,i) => `
+    <div style="background:#fff;border:1px solid #fed7aa;border-radius:8px;padding:10px;margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <div style="font-size:11px;font-weight:700;color:#d97706;">📱 Producto #${i+1}</div>
+        <button type="button" class="btn btn-sm btn-ghost" style="color:#dc2626;font-size:10px;padding:2px 8px;" onclick="gfEliminarProducto(${i})">🗑️ Quitar</button>
+      </div>
+      <div class="form-group" style="margin-bottom:6px;">
+        <input type="text" class="form-control" placeholder="Nombre del equipo" value="${p.producto||''}" style="text-transform:uppercase;font-size:13px;" oninput="gfActualizarProducto(${i},'producto',this.value)">
+      </div>
+      <div class="form-row" style="margin-bottom:0;">
+        <div class="form-group" style="margin-bottom:0;">
+          <input type="text" class="form-control" placeholder="IMEI / Serial" value="${p.imei||''}" style="font-size:12px;text-transform:uppercase;" oninput="gfActualizarProducto(${i},'imei',this.value)">
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <div class="input-money-wrap"><input type="text" class="form-control" placeholder="Precio" value="${p.precio?fmt(p.precio).replace('$ ',''):''}" inputmode="numeric" oninput="fmtMoneyInput(this);gfActualizarProducto(${i},'precio',this.value)"></div>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function gfActualizarTotales() {
+  // Solo recalcula visual, el total se ve en la vista previa
+}
+
+function gfGenerarVistaPrevia() {
+  if(gfProductos.length === 0) {
+    toast('Agrega al menos un producto','error');
+    return;
+  }
+
+  // Recopilar datos
+  const tipo       = document.getElementById('gfTipo')?.value || 'contado';
+  const sede       = document.getElementById('gfSede')?.value || 'PLAY MOVIL';
+  const numero     = document.getElementById('gfNumero')?.value || ('PM-' + Date.now().toString().slice(-6));
+  const cliente    = (document.getElementById('gfCliente')?.value || '').toUpperCase();
+  const cedula     = document.getElementById('gfCedula')?.value || '';
+  const telefono   = document.getElementById('gfTelefono')?.value || '';
+  const correo     = (document.getElementById('gfCorreo')?.value || '').toUpperCase();
+  const asesor     = (document.getElementById('gfAsesor')?.value || '').toUpperCase();
+  const descuento  = getMoneyValue('gfDescuento');
+  const ivaPct     = parseFloat(document.getElementById('gfIVAPct')?.value) || 0;
+  const comision   = getMoneyValue('gfComision');
+  const financiera = (document.getElementById('gfFinanciera')?.value || 'CONTADO').toUpperCase();
+  const inicial    = getMoneyValue('gfInicial');
+  const cuotas     = parseInt(document.getElementById('gfCuotas')?.value) || 0;
+  const valorCuota = getMoneyValue('gfValorCuota');
+
+  if(!cliente) { toast('Falta el nombre del cliente','error'); return; }
+
+  // Calcular totales
+  const subtotal = gfProductos.reduce((s,p) => s+(p.precio||0), 0);
+  const ivaVal   = ivaPct > 0 ? Math.round(subtotal * ivaPct / 100) : 0;
+  const total    = subtotal - descuento;
+  const saldoFinanciar = tipo === 'credito' ? Math.max(0, total - inicial) : 0;
+
+  const datosFactura = {
+    tipo, cliente, cedula, telefono, correo,
+    equipo: gfProductos[0]?.producto || '',
+    imei:   gfProductos[0]?.imei || '',
+    asesor, sede, financiera,
+    precioBase: subtotal,
+    precioFinal: total,
+    descuento,
+    iva: ivaVal,
+    ivaPct,
+    comision,
+    comisionAsesor: 0,
+    productosList: gfProductos.map(p => ({
+      producto: p.producto || '—',
+      imei:     p.imei || '',
+      precio:   p.precio || 0
+    })),
+    inicial,
+    saldoFinanciar,
+    cuotas,
+    valorCuota,
+    intereses: 0,
+    tasaInteres: 0,
+    fecha: new Date().toLocaleDateString('es-CO',{timeZone:'America/Bogota'}),
+    numero
+  };
+
+  // Generar HTML de la factura
+  const html = generarHTMLFactura(datosFactura);
+
+  // Mostrar en vista previa
+  const div = document.getElementById('gfVistaPrevia');
+  if(div) div.innerHTML = html;
+
+  const botones = document.getElementById('gfBotonesAccion');
+  if(botones) botones.style.display = 'block';
+
+  // Guardar en window para imprimir luego
+  window._gfHTML = html;
+  window._gfDatos = datosFactura;
+}
+
+function gfImprimir() {
+  if(!window._gfHTML) {
+    toast('Primero genera la vista previa','error');
+    return;
+  }
+  // Abrir ventana de impresión
+  const ventana = window.open('', '', 'width=800,height=900');
+  if(!ventana) { toast('Bloqueado por el navegador. Permite ventanas emergentes.','error'); return; }
+
+  const datos = window._gfDatos || {};
+  ventana.document.write('<!DOCTYPE html><html><head><title>Factura ' + (datos.numero||'') + '</title>');
+  ventana.document.write('<meta charset="UTF-8">');
+  ventana.document.write('<style>body{font-family:Arial,sans-serif;margin:20px;color:#333;}');
+  ventana.document.write('@media print{body{margin:0;}}');
+  ventana.document.write('</style></head><body>');
+  ventana.document.write(window._gfHTML);
+  ventana.document.write('</body></html>');
+  ventana.document.close();
+  // Imprimir despues de cargar
+  setTimeout(()=>{ ventana.focus(); ventana.print(); }, 300);
+}
 
 // ============================================================
 // CÁLCULO DE MORA POR FECHAS DE CUOTA
