@@ -10854,9 +10854,9 @@ function generarHTMLFactura(d) {
         <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;border-bottom:1px solid #f0ecf8;"><span style="color:#555;">Subtotal</span><span>${fmt(subtotalReal + (d.prodAdicVal||0))}</span></div>
         ${d.descuento > 0 ? `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;"><span style="color:#555;">Descuento</span><span style="color:#dc2626;">-${fmt(d.descuento)}</span></div>` : ''}
         ${d.prodAdicVal > 0 ? `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;"><span style="color:#555;">${d.prodAdicDesc||'Adicional'}</span><span>+${fmt(d.prodAdicVal)}</span></div>` : ''}
-        ${(d.iva > 0 || d.ivaPct > 0) ? `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;"><span style="color:#d97706;">IVA${d.ivaPct>0?' ('+d.ivaPct+'%)':''}</span><span style="color:#d97706;">+${fmt(d.iva||0)}</span></div>` : ''}
+        ${(d.iva > 0 || d.ivaPct > 0) ? `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;"><span style="color:#555;">📊 IVA${d.ivaPct>0?' ('+d.ivaPct+'%)':''}</span><span style="font-weight:600;color:#dc2626;">-${fmt(d.iva||0)}</span></div>` : ''}
         ${d.comision > 0 ? `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;border-top:1px dashed #ece8f5;margin-top:4px;"><span style="color:#555;">📊 Comisión financiera<br><span style="font-size:10px;color:#aaa;">${d.financiera||''}</span></span><span style="font-weight:600;color:#dc2626;">-${fmt(d.comision)}</span></div>` : ''}
-        ${d.comisionAsesor > 0 ? `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;"><span style="color:#555;">💎 Comisión asesor</span><span style="font-weight:600;color:#6B2D8B;">-${fmt(d.comisionAsesor)}</span></div>` : ''}
+
         <div style="display:flex;justify-content:space-between;padding:10px 0;font-size:16px;font-weight:700;border-top:2px solid #6B2D8B;margin-top:6px;">
           <span>TOTAL</span><span style="color:#6B2D8B;">${fmt(d.precioFinal)}</span>
         </div>
