@@ -3107,7 +3107,7 @@
           <input type="hidden" id="crdCorreo">
           <div class="form-row">
             <div class="form-group">
-              <label class="form-label">N° Contrato</label>
+              <label class="form-label" id="crdNumContratoLabel">N° Contrato</label>
               <input type="text" class="form-control" id="crdNumContrato" placeholder="Ej: C-2024-001">
             </div>
           </div>
@@ -8531,6 +8531,13 @@ async function guardarCredito(){
     toast('Los administradores no pueden cargarse ventas. Selecciona un asesor habilitado.','error'); return;
   }
 
+  // Validar N° de Contrato obligatorio cuando la financiera es BRILLA
+  if(finSel.toUpperCase().includes('BRILLA') && !($('crdNumContrato')?.value||'').trim()) {
+    toast('El N° de Contrato es obligatorio cuando la financiera es BRILLA','error');
+    document.getElementById('crdNumContrato')?.focus();
+    return;
+  }
+
   // Validar fechas de pago quincenal
   const fPP = document.getElementById('crdPrimerPago')?.value;
   const fSP = document.getElementById('crdSegundoPago')?.value;
@@ -10164,7 +10171,23 @@ async function buscarIMEICredito(val){
 }
 
 function autoComisionFinanciera(){const sel=$('vcFinanciera').value;const pct=parseFloat(sel.split(':')[1])||0;$('vcComFinanciera').value=pct;calcVContado();}
-function autoComisionCredito(){const sel=$('crdFinanciera').value;const pct=parseFloat(sel.split(':')[1])||0;$('crdComFinanciera').value=pct;recalcCredito();}
+function autoComisionCredito(){
+  const sel=$('crdFinanciera').value;
+  const pct=parseFloat(sel.split(':')[1])||0;
+  $('crdComFinanciera').value=pct;
+  // Marcar N° Contrato como obligatorio si la financiera es BRILLA
+  const finName = (sel.split(':')[0]||'').toUpperCase();
+  const lbl = document.getElementById('crdNumContratoLabel');
+  const inp = document.getElementById('crdNumContrato');
+  if(finName.includes('BRILLA')){
+    if(lbl) lbl.innerHTML = 'N° Contrato <span style="color:#dc2626;">*</span>';
+    if(inp){ inp.placeholder = 'OBLIGATORIO para BRILLA'; inp.style.borderColor = '#dc2626'; }
+  } else {
+    if(lbl) lbl.textContent = 'N° Contrato';
+    if(inp){ inp.placeholder = 'Ej: C-2024-001'; inp.style.borderColor = ''; }
+  }
+  recalcCredito();
+}
 
 // Calcula próximas fechas de cuota basado en los 2 días del mes
 function recalcFechasCuotas() {
