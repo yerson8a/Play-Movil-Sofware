@@ -8703,7 +8703,7 @@ async function confirmarAbono() {
   try {
     await registrarAbonoDB(id, valor, metodo);
     closeModal('modalRegistrarAbono');
-    renderCreditos();
+    renderCreditos(tabCreditosActual);
     // Mostrar recibo
     mostrarReciboAbono({
       cliente:   credito.cliente,
@@ -9115,7 +9115,7 @@ async function confirmarAnularVentaContado() {
     // Recargar datos frescos
     await cargarDatosPorSede(sesionActiva);
     renderVentas();
-    renderCreditos();
+    renderCreditos(tabCreditosActual);
     renderInventario();
     renderContabilidad();
     renderComisiones();
@@ -10642,7 +10642,7 @@ async function ejecutarAnulacion() {
       closeModal('modalAnularVenta');
       // Recargar datos frescos — esto actualiza db.ventas con anulada:true
       await cargarDatosPorSede(sesionActiva);
-      renderCreditos();
+      renderCreditos(tabCreditosActual);
       renderVentas();
       renderInventario();
       // Si contabilidad/comisiones están abiertos también se actualizan
@@ -10690,7 +10690,7 @@ async function ejecutarAnulacion() {
       hideLoader();
       closeModal('modalAnularVenta');
       await cargarDatosPorSede(sesionActiva);
-      renderCreditos();
+      renderCreditos(tabCreditosActual);
       renderInventario();
       toast('Cambio de equipo realizado ✅ — ' + nuevo.producto);
     } catch(e) { hideLoader(); toast('Error: ' + e.message, 'error'); }
