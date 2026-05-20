@@ -4714,6 +4714,7 @@ function mapCredito(c) {
     docFoto:      c.doc_foto_entrega   || null,
     docContrato:  c.doc_contrato       || null,
     imei: c.imei || '',
+    fechaInicio: c.fecha_inicio || c.created_at || null,
     fechaPrimerPago:  c.fecha_primer_pago  || null,
     fechaSegundoPago: c.fecha_segundo_pago || null,
     diaPago1:         c.dia_pago_1 || null,
@@ -5756,6 +5757,7 @@ function renderCreditos(filtro='activos'){
         <div><div class="cc-name">${c.cliente}</div>
           <div class="cc-equipo">📱 ${(c.equipo||'').substring(0,25)}</div>
           <div class="cc-equipo" style="margin-top:2px;">👤 ${c.asesor}</div>
+          <div class="cc-equipo" style="margin-top:2px;">🗓️ Compra: ${fmtFechaCorta(c.fechaInicio)}</div>
         </div>
         <div class="cc-monto">
           <div class="cc-total">${fmt(c.saldo)}</div>
@@ -5876,6 +5878,7 @@ async function filtrarCreditosPorIMEI(q) {
         <div><div class="cc-name">${c.cliente}</div>
           <div class="cc-equipo">📱 ${(c.equipo||'').substring(0,25)}</div>
           <div class="cc-equipo" style="margin-top:2px;">👤 ${c.asesor}</div>
+          <div class="cc-equipo" style="margin-top:2px;">🗓️ Compra: ${fmtFechaCorta(c.fechaInicio)}</div>
         </div>
         <div class="cc-monto">
           <div class="cc-total">${fmt(c.saldo)}</div>
@@ -10892,6 +10895,14 @@ function fechaColombia() {
   const m = String(col.getUTCMonth() + 1).padStart(2, '0');
   const d = String(col.getUTCDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
+}
+
+// Formatea una fecha (YYYY-MM-DD o ISO) a DD/MM/YYYY para mostrar en tarjetas
+function fmtFechaCorta(fecha) {
+  if(!fecha) return '—';
+  const f = String(fecha).substring(0, 10).split('-');
+  if(f.length !== 3) return '—';
+  return `${f[2]}/${f[1]}/${f[0]}`;
 }
 
 function mesColombia() {
