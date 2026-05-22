@@ -459,8 +459,20 @@
   .user-menu-item:hover { background:#f7f5fb; color:#111111; }
   .user-menu-item.danger { color:#ff1744; }
   .user-menu-item.danger:hover { background:rgba(255,23,68,0.1); }
+  /* ── Visibilidad de informacion financiera por rol ── */
+  /* solo-admin: ganancias, margenes, utilidad y comisiones (unicamente rol admin) */
   .solo-admin { display:none !important; }
   body.rol-admin .solo-admin { display:block !important; }
+  body.rol-admin th.solo-admin, body.rol-admin td.solo-admin { display:table-cell !important; }
+  body.rol-admin .solo-admin.sa-flex { display:flex !important; }
+  body.rol-admin .solo-admin.sa-grid { display:grid !important; }
+  /* solo-costo: precios de compra / costo (rol admin y bodega) */
+  .solo-costo { display:none !important; }
+  body.rol-admin .solo-costo, body.rol-bodega .solo-costo { display:block !important; }
+  body.rol-admin th.solo-costo, body.rol-bodega th.solo-costo,
+  body.rol-admin td.solo-costo, body.rol-bodega td.solo-costo { display:table-cell !important; }
+  body.rol-admin .solo-costo.sa-flex, body.rol-bodega .solo-costo.sa-flex { display:flex !important; }
+  body.rol-admin .solo-costo.sa-grid, body.rol-bodega .solo-costo.sa-grid { display:grid !important; }
   body.rol-consulta .btn-primary { opacity:0.5; pointer-events:none; cursor:not-allowed; }
 </style>
 </head>
@@ -932,7 +944,7 @@
                 <th>Fecha</th><th>Producto / Modelo</th><th>Marca</th>
                 <th>IMEI 1</th><th>IMEI 2 / Serial</th>
                 <th>Color</th><th>Almacenamiento</th>
-                <th>V. Compra</th><th>Proveedor</th>
+                <th class="solo-costo">V. Compra</th><th>Proveedor</th>
                 <th>Sede</th><th>Estado</th><th>Acciones</th>
               </tr>
             </thead>
@@ -952,7 +964,7 @@
           <button class="btn btn-outline btn-sm" onclick="exportarInventario()">↓ Exportar</button>
           <button class="btn btn-ghost btn-sm" style="color:#dc2626;border-color:#dc2626;" onclick="openModal('modalSalidaInventario')">📤 Salida sin Venta</button>
           <button class="btn btn-ghost btn-sm" id="btnTrasladoEquipo" style="color:#6B2D8B;border:1px solid #6B2D8B;display:none;" onclick="openModal('modalTrasladoEquipo')">🔄 Trasladar Equipo</button>
-          <button class="btn btn-primary btn-sm" onclick="openModal('modalNuevoEquipo')">+ Agregar Equipo</button>
+          <button class="btn btn-primary btn-sm" id="btnAgregarEquipo" style="display:none;" onclick="openModal('modalNuevoEquipo')">+ Agregar Equipo</button>
         </div>
       </div>
 
@@ -998,7 +1010,7 @@
             <thead>
               <tr>
                 <th>Fecha</th><th>Producto</th><th>IMEI / Serial</th><th>Proveedor</th>
-                <th>V. Compra</th><th>Sede</th><th>Estado</th><th>Acciones</th>
+                <th class="solo-costo">V. Compra</th><th>Sede</th><th>Estado</th><th>Acciones</th>
               </tr>
             </thead>
             <tbody id="tbodyInventario"></tbody>
@@ -1062,7 +1074,7 @@
             <thead>
               <tr>
                 <th>Fecha</th><th>Equipo</th><th>IMEI</th><th>Cliente</th><th>Asesor</th>
-                <th>V.Compra</th><th>V.Venta</th><th>Ganancia</th><th>Comisión</th><th>Financiera</th><th>Estado</th><th></th>
+                <th class="solo-costo">V.Compra</th><th>V.Venta</th><th class="solo-admin">Ganancia</th><th class="solo-admin">Comisión</th><th>Financiera</th><th>Estado</th><th></th>
               </tr>
             </thead>
             <tbody id="tbodyVentas"></tbody>
@@ -1358,12 +1370,12 @@
             <div class="stat-value pink" id="contGastos">$0</div>
             <div class="stat-delta">Gastos registrados</div>
           </div>
-          <div class="stat-card blue">
+          <div class="stat-card blue solo-admin">
             <div class="stat-label">Utilidad Mes</div>
             <div class="stat-value blue" id="contUtilidad">$0</div>
             <div class="stat-delta" id="contMargen">Margen del mes</div>
           </div>
-          <div class="stat-card green">
+          <div class="stat-card green solo-admin">
             <div class="stat-label">Ganancia Neta</div>
             <div class="stat-value green" id="contGanancia">$0</div>
             <div class="stat-delta" id="contGananciaDelta">Este mes</div>
@@ -1522,13 +1534,13 @@
           <button class="btn btn-primary btn-sm" onclick="openModal('modalNuevoBonoComision')">+ Bono / Descuento</button>
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px;">
+      <div class="solo-admin sa-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px;">
         <div class="stat-card green"><div class="stat-label">Total Comisiones</div><div class="stat-value green" id="comTotalComisiones">$0</div></div>
         <div class="stat-card blue"><div class="stat-label">Total Bonos</div><div class="stat-value blue" id="comTotalBonos">$0</div></div>
         <div class="stat-card pink"><div class="stat-label">Total a Pagar</div><div class="stat-value" style="color:#6B2D8B;" id="comTotalPagar">$0</div></div>
       </div>
-      <div id="comisionesGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;"></div>
-      <div class="card" style="margin-top:16px;">
+      <div id="comisionesGrid" class="solo-admin sa-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;"></div>
+      <div class="card solo-admin" style="margin-top:16px;">
         <div class="card-title">📋 Detalle de Ventas por Asesor</div>
         <div class="table-wrap">
           <table>
@@ -2197,7 +2209,7 @@
       </div>
     </div>
     <div class="form-row">
-      <div class="form-group">
+      <div class="form-group solo-costo">
         <label class="form-label">Costo (P.L) *</label>
         <div class="input-money-wrap">
           <input type="text" class="form-control" id="mpCosto" placeholder="0" oninput="fmtMoneyInput(this)" inputmode="numeric">
@@ -3012,7 +3024,7 @@
       <div id="crdProductosList"></div>
       <!-- Totales consolidados -->
       <div id="crdTotalesMulti" style="display:none;background:#f7f5fb;border-radius:8px;padding:10px;margin-top:8px;font-size:13px;">
-        <div style="display:flex;justify-content:space-between;"><span style="color:#888899;">Total Costo:</span><strong id="crdTotalCosto">$0</strong></div>
+        <div class="solo-costo sa-flex" style="display:flex;justify-content:space-between;"><span style="color:#888899;">Total Costo:</span><strong id="crdTotalCosto">$0</strong></div>
         <div style="display:flex;justify-content:space-between;"><span style="color:#888899;">Total Venta:</span><strong style="color:#6B2D8B;" id="crdTotalVenta">$0</strong></div>
       </div>
     </div>
@@ -3036,7 +3048,7 @@
         <div class="card">
           <div class="card-title" style="font-size:13px;margin-bottom:10px;">💰 Precio y Condiciones</div>
           <div class="form-row">
-            <div class="form-group">
+            <div class="form-group solo-costo">
               <label class="form-label">Costo Total *</label>
               <div class="input-money-wrap"><input type="text" class="form-control" id="crdCosto" placeholder="0" oninput="fmtMoneyInput(this);recalcCredito()" inputmode="numeric"></div>
             </div>
@@ -3245,7 +3257,7 @@
                 <span style="color:#888899;">Comisión (solo financiera):</span>
                 <strong style="color:#dc2626;" id="crdMixtoComision">$0</strong>
               </div>
-              <div style="display:flex;justify-content:space-between;border-top:1px solid #f0ecf8;padding-top:4px;margin-top:4px;">
+              <div class="solo-admin sa-flex" style="display:flex;justify-content:space-between;border-top:1px solid #f0ecf8;padding-top:4px;margin-top:4px;">
                 <span style="color:#888899;">Ganancia real:</span>
                 <strong style="color:#16a34a;" id="crdMixtoGanancia">$0</strong>
               </div>
@@ -3313,11 +3325,11 @@
           </div>
           <!-- Ganancia y margen (solo admin) -->
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:12px;">
-            <div style="background:#f0fdf4;border-radius:8px;padding:8px;text-align:center;">
+            <div class="solo-admin" style="background:#f0fdf4;border-radius:8px;padding:8px;text-align:center;">
               <div style="font-size:9px;color:#888899;">GANANCIA</div>
               <div style="font-weight:700;font-size:13px;color:#16a34a;" id="crdGananciaNet">$0</div>
             </div>
-            <div style="background:#f7f5fb;border-radius:8px;padding:8px;text-align:center;">
+            <div class="solo-admin" style="background:#f7f5fb;border-radius:8px;padding:8px;text-align:center;">
               <div style="font-size:9px;color:#888899;">MARGEN</div>
               <div style="font-weight:700;font-size:13px;" id="crdMargenReal">0%</div>
             </div>
@@ -3511,7 +3523,7 @@
       </div>
       <div id="vcProductosList"></div>
       <div id="vcTotalesMulti" style="display:none;background:#f7f5fb;border-radius:8px;padding:10px;margin-top:8px;font-size:13px;">
-        <div style="display:flex;justify-content:space-between;"><span style="color:#888899;">Total Costo:</span><strong id="vcTotalCosto">$0</strong></div>
+        <div class="solo-costo sa-flex" style="display:flex;justify-content:space-between;"><span style="color:#888899;">Total Costo:</span><strong id="vcTotalCosto">$0</strong></div>
         <div style="display:flex;justify-content:space-between;"><span style="color:#888899;">Total Venta:</span><strong style="color:#6B2D8B;" id="vcTotalVenta">$0</strong></div>
       </div>
     </div>
@@ -3528,7 +3540,7 @@
     <div id="vcInfoIMEI" style="display:none;"></div>
 
     <!-- Precio consolidado -->
-    <div class="card" style="margin-bottom:16px;">
+    <div class="card solo-costo" style="margin-bottom:16px;">
       <div class="card-title" style="font-size:13px;margin-bottom:12px;">💰 Costo Total</div>
       <div class="form-row">
         <div class="form-group">
@@ -3592,11 +3604,11 @@
           <div style="font-size:11px;color:var(--text2);margin-bottom:6px;">PRECIO FINAL AL CLIENTE</div>
           <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:20px;color:var(--pink);" id="vcPrecioFinal">$0</div>
         </div>
-        <div style="background:var(--bg3);border-radius:10px;padding:14px;text-align:center;">
+        <div class="solo-admin" style="background:var(--bg3);border-radius:10px;padding:14px;text-align:center;">
           <div style="font-size:11px;color:var(--text2);margin-bottom:6px;">GANANCIA NETA</div>
           <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:20px;color:var(--green);" id="vcGananciaNet">$0</div>
         </div>
-        <div style="background:var(--bg3);border-radius:10px;padding:14px;text-align:center;">
+        <div class="solo-admin" style="background:var(--bg3);border-radius:10px;padding:14px;text-align:center;">
           <div style="font-size:11px;color:var(--text2);margin-bottom:6px;">MARGEN REAL</div>
           <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:20px;" id="vcMargenReal">0%</div>
         </div>
@@ -5486,6 +5498,10 @@ function renderInventario() {
   const btnTraslado = document.getElementById('btnTrasladoEquipo');
   if(btnTraslado) btnTraslado.style.display = (esUsuarioAdmin()) ? '' : 'none';
 
+  // Botón agregar equipo: solo el administrador registra equipos (los asesores no)
+  const btnAgregar = document.getElementById('btnAgregarEquipo');
+  if(btnAgregar) btnAgregar.style.display = (esUsuarioAdmin()) ? '' : 'none';
+
   // Stats
   const dataVisible = getInvDataFiltrada();
   const setN = (id,v) => { const e=$(id); if(e) e.textContent=v; };
@@ -5530,7 +5546,7 @@ function renderTablaInventario(data) {
       <td style="font-weight:500;">${e.producto}</td>
       <td style="font-family:monospace;font-size:11px;color:var(--text2);">${e.imei}</td>
       <td style="font-size:12px;">${e.proveedor}</td>
-      <td style="color:var(--pink);font-weight:600;">${fmt(e.costo)}</td>
+      <td class="solo-costo" style="color:var(--pink);font-weight:600;">${fmt(e.costo)}</td>
       <td><span style="font-size:11px;padding:2px 8px;border-radius:8px;background:rgba(107,45,139,0.1);color:#6B2D8B;">${(()=>{const s=dbAdmin.sedes.find(x=>x.id===e.sede_id||(e.sede||'').toUpperCase().includes((x.nombre||'').toUpperCase()));return s?s.nombre:e.sede||'—';})()}</span></td>
       <td><span class="badge ${e.estado==='DISPONIBLE'?'badge-green':e.estado==='VENDIDO'?'badge-pink':e.estado==='GARANTIA'?'badge-orange':'badge-red'}">${e.estado}</span></td>
       <td style="display:flex;gap:4px;">
@@ -5572,10 +5588,10 @@ function filaVenta(v) {
     <td style="font-family:monospace;font-size:11px;color:#0066cc;">${v.imei&&v.imei.length>3?v.imei:'—'}</td>
     <td>${v.cliente}</td>
     <td>${v.asesor}</td>
-    <td style="color:var(--text2);">${fmt(v.costo)}</td>
+    <td class="solo-costo" style="color:var(--text2);">${fmt(v.costo)}</td>
     <td style="font-weight:600;color:${v.anulada?'#dc2626':'inherit'};">${v.anulada?'ANULADA':fmt(v.venta)}</td>
-    <td style="color:${v.anulada?'#dc2626':'var(--green)'};font-weight:600;">${v.anulada?'$0':fmt(v.ganancia)}</td>
-    <td style="color:#6B2D8B;font-weight:600;">${comisionHtml}</td>
+    <td class="solo-admin" style="color:${v.anulada?'#dc2626':'var(--green)'};font-weight:600;">${v.anulada?'$0':fmt(v.ganancia)}</td>
+    <td class="solo-admin" style="color:#6B2D8B;font-weight:600;">${comisionHtml}</td>
     <td><span class="badge badge-blue" style="font-size:10px;">${v.financiera}</span></td>
     <td><span class="badge ${v.anulada?'badge-red':v.tipo==='contado'?'badge-green':'badge-pink'}">${v.anulada?'❌ ANULADA':v.tipo}</span></td>
     <td><button class="btn btn-sm btn-ghost" style="font-size:11px;padding:3px 8px;" onclick="verDetalleVenta(${v.id})">🔍</button></td>
@@ -5637,7 +5653,7 @@ async function aplicarFiltrosVentas() {
   if(resumen) {
     const totalVenta    = data.filter(v=>!v.anulada).reduce((s,v)=>s+(v.venta||0),0);
     const totalGanancia = data.filter(v=>!v.anulada).reduce((s,v)=>s+(v.ganancia||0),0);
-    resumen.innerHTML = `${data.length} ventas · Total: <span style="color:#16a34a;">${fmt(totalVenta)}</span> · Ganancia: <span style="color:#6B2D8B;">${fmt(totalGanancia)}</span>`;
+    resumen.innerHTML = `${data.length} ventas · Total: <span style="color:#16a34a;">${fmt(totalVenta)}</span>${puedeVerGanancias() ? ` · Ganancia: <span style="color:#6B2D8B;">${fmt(totalGanancia)}</span>` : ''}`;
   }
 
   renderVentas_data(data);
@@ -6021,7 +6037,7 @@ async function renderContabilidad(){
       <button class="btn btn-sm btn-ghost" style="font-size:11px;" onclick="editarTodasNominas('${mesActual}')">✏️ Editar salarios</button>
     </div>
     <div class="table-wrap"><table>
-      <thead><tr><th>Asesor</th><th>Salario Base</th><th>Comisión</th><th>Total a Pagar</th><th></th></tr></thead>
+      <thead><tr><th>Asesor</th><th>Salario Base</th><th class="solo-admin">Comisión</th><th>Total a Pagar</th><th></th></tr></thead>
       <tbody>${nominasMes.map((n,i)=>{
         const com = comisionesMes[n.nombre.toUpperCase()]||0;
         const total = n.salario + com;
@@ -6033,7 +6049,7 @@ async function renderContabilidad(){
               <button class="btn btn-sm btn-ghost" style="padding:2px 7px;font-size:11px;" onclick="editarUnaSalario('${mesActual}',${i})">✏️</button>
             </div>
           </td>
-          <td style="color:#16a34a;">${fmt(com)}</td>
+          <td class="solo-admin" style="color:#16a34a;">${fmt(com)}</td>
           <td style="font-weight:700;color:#6B2D8B;">${fmt(total)}</td>
           <td>
             <div style="display:flex;gap:6px;flex-wrap:wrap;">
@@ -6399,10 +6415,10 @@ function renderAsesores(){
             <div style="font-size:11px;color:#888899;">${a.ventas} venta${a.ventas!==1?'s':''} · Ingresos: ${fmt(a.ingresos)}</div>
           </div>
         </div>
-        <div style="text-align:right;">
+        ${puedeVerGanancias() ? `<div style="text-align:right;">
           <div style="font-size:13px;font-weight:700;color:#16a34a;">Ganancia: ${fmt(a.ganancia)}</div>
           ${a.comision>0?`<div style="font-size:11px;color:#6B2D8B;">Comisión: ${fmt(a.comision)}</div>`:''}
-        </div>
+        </div>` : ''}
       </div>`).join('') || '<div style="text-align:center;padding:20px;color:#888899;font-size:13px;">Sin ventas este mes</div>';
   }
 
@@ -6438,11 +6454,11 @@ function renderAsesores(){
           <div style="font-size:10px;color:#888899;">INGRESO MES</div>
           <div style="font-weight:700;font-size:13px;color:#16a34a;">${fmt(ventaMes)}</div>
         </div>
-        <div style="background:#fff7ed;border-radius:8px;padding:10px;text-align:center;">
+        <div class="solo-admin" style="background:#fff7ed;border-radius:8px;padding:10px;text-align:center;">
           <div style="font-size:10px;color:#888899;">GANANCIA MES</div>
           <div style="font-weight:700;font-size:13px;color:#d97706;">${fmt(ganMes)}</div>
         </div>
-        <div style="background:#f7f5fb;border-radius:8px;padding:10px;text-align:center;">
+        <div class="solo-admin" style="background:#f7f5fb;border-radius:8px;padding:10px;text-align:center;">
           <div style="font-size:10px;color:#888899;">COMISIÓN MES</div>
           <div style="font-weight:700;font-size:13px;color:#6B2D8B;">${fmt(comision)}</div>
         </div>
@@ -8264,7 +8280,7 @@ function renderProductosMod(data) {
       <td style="font-family:monospace;font-size:11px;">${p.imei2||p.serial||'—'}</td>
       <td style="font-size:12px;">${p.color||'—'}</td>
       <td style="font-size:12px;">${p.almacenamiento||'—'}</td>
-      <td style="color:#6B2D8B;font-weight:600;">${fmt(p.costo)}</td>
+      <td class="solo-costo" style="color:#6B2D8B;font-weight:600;">${fmt(p.costo)}</td>
       <td style="font-size:12px;">${prov?prov.nombre:'—'}</td>
       <td><span style="font-size:11px;padding:2px 8px;border-radius:8px;background:rgba(107,45,139,0.1);color:#6B2D8B;">${sedeObj?sedeObj.nombre:p.sede||'—'}</span></td>
       <td><span class="badge ${estadoColor[p.estado]||'badge-blue'}">${p.estado}</span></td>
@@ -8464,7 +8480,8 @@ async function guardarVentaContado(){
     closeModal('modalVentaContado');
 
     // Mostrar modal comisión y factura
-    if(ventaPrincipal) abrirModalComision(ventaPrincipal.id, asesor, productosVentaVC.map(p=>p.producto).join(', '), ganancia);
+    // El modal de comisión solo se muestra a admin (gestiona comisiones)
+    if(ventaPrincipal && puedeVerGanancias()) abrirModalComision(ventaPrincipal.id, asesor, productosVentaVC.map(p=>p.producto).join(', '), ganancia);
 
     // Factura con todos los productos
     const datosFactura = {
@@ -8781,7 +8798,7 @@ function verDetalleProducto(id) {
       <div style="font-size:11px;font-weight:700;color:#6B2D8B;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">💰 Datos de Compra</div>
       ${fila('Fecha ingreso', p.fecha||'—')}
       ${fila('Proveedor', prov ? prov.nombre : (p.proveedor||'—'))}
-      ${fila('Valor de compra', fmt(p.costo||p.valorCompra||0), '#6B2D8B')}
+      ${puedeVerCostos() ? fila('Valor de compra', fmt(p.costo||p.valorCompra||0), '#6B2D8B') : ''}
       ${fila('Condición', p.condicion||'—')}
       ${fila('Garantía proveedor', p.garantiaMeses ? p.garantiaMeses+' meses' : 'Sin garantía')}
       ${fila('Forma de pago', p.formaPago||'—')}
@@ -8821,10 +8838,12 @@ async function verDetalleVenta(id) {
   const contenido = document.getElementById('detalleVentaContenido');
   if(!contenido) return;
 
+  const esAdmin = puedeVerGanancias();
+  const veCosto = puedeVerCostos();
+
   // Mostrar botón anular solo para admin y si no está ya anulada
   const btnAnular = document.getElementById('btnAnularVentaDetalle');
   if(btnAnular) {
-    const esAdmin = sesionActiva && sesionActiva.rol === 'admin';
     btnAnular.style.display = (!v.anulada && esAdmin) ? 'inline-flex' : 'none';
   }
 
@@ -8852,7 +8871,7 @@ async function verDetalleVenta(id) {
             ${d.imei?`<div style="font-family:monospace;font-size:11px;color:#0066cc;margin-top:2px;">📡 ${d.imei}</div>`:''}
             <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:12px;">
               <span style="color:#888;">Venta: ${fmt(d.valor_venta||0)}</span>
-              <span style="color:#16a34a;">Ganancia: ${fmt(d.ganancia||0)}</span>
+              ${esAdmin ? `<span style="color:#16a34a;">Ganancia: ${fmt(d.ganancia||0)}</span>` : ''}
             </div>
           </div>
         `).join('')}
@@ -8878,10 +8897,10 @@ async function verDetalleVenta(id) {
     </div>
     <div style="background:#f7f5fb;border-radius:12px;padding:14px;margin-top:12px;">
       <div style="font-size:11px;color:#888899;margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:1px;">Resumen Financiero</div>
-      ${fila('Costo del equipo', fmt(v.costo), '#888899')}
+      ${veCosto ? fila('Costo del equipo', fmt(v.costo), '#888899') : ''}
       ${fila('Precio de venta', fmt(v.venta), '#111')}
-      ${fila('Ganancia neta', fmt(v.ganancia), '#16a34a')}
-      ${fila('Comisión asesor', v.comisionAsesor>0 ? fmt(v.comisionAsesor) : '—', '#6B2D8B')}
+      ${esAdmin ? fila('Ganancia neta', fmt(v.ganancia), '#16a34a') : ''}
+      ${esAdmin ? fila('Comisión asesor', v.comisionAsesor>0 ? fmt(v.comisionAsesor) : '—', '#6B2D8B') : ''}
     </div>
     ${v.anulada ? '<div style="background:#fee2e2;border-radius:10px;padding:12px;margin-top:12px;text-align:center;font-weight:700;color:#dc2626;">❌ VENTA ANULADA</div>' : ''}`;
 
@@ -9538,7 +9557,12 @@ function exportarInventario(){
     if(!data.length) { toast('No hay productos para exportar','error'); return; }
 
     // Preparar datos para CSV/Excel
-    const headers = ['ID','Producto','Marca','Modelo','IMEI 1','IMEI 2','Serial','V.Compra','V.Venta','Margen','Estado','Sede','Proveedor','Fecha'];
+    // V.Compra: visible para admin y bodega · Margen: solo admin
+    const verCosto = puedeVerCostos();
+    const verGan   = puedeVerGanancias();
+    const headers = ['ID','Producto','Marca','Modelo','IMEI 1','IMEI 2','Serial',
+      ...(verCosto ? ['V.Compra'] : []), 'V.Venta', ...(verGan ? ['Margen'] : []),
+      'Estado','Sede','Proveedor','Fecha'];
     const rows = data.map(p => [
       p.id||'',
       p.producto||'',
@@ -9547,9 +9571,9 @@ function exportarInventario(){
       p.imei1||'',
       p.imei2||'',
       p.serial||'',
-      p.costo||0,
+      ...(verCosto ? [p.costo||0] : []),
       p.precio||0,
-      (p.precio||0) - (p.costo||0),
+      ...(verGan ? [(p.precio||0) - (p.costo||0)] : []),
       p.estado||'',
       p.sede||'',
       p.proveedor||'',
@@ -9591,7 +9615,7 @@ function exportarInventario(){
     rows.forEach(r => {
       xml += '<Row>';
       r.forEach((val, i) => {
-        const isMoney = i === 7 || i === 8 || i === 9;
+        const isMoney = i !== 0 && typeof val === 'number';
         const isNum = isMoney || i === 0;
         if(isNum && typeof val === 'number') {
           xml += `<Cell${isMoney ? ' ss:StyleID="Money"' : ''}><Data ss:Type="Number">${val}</Data></Cell>`;
@@ -9661,7 +9685,7 @@ function buildTrazabilidadCard(c){
       <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px;">
         <div><span style="color:var(--text2);">Nombre:</span> <strong>${prov.nombre}</strong></div>
         <div><span style="color:var(--text2);">Tel:</span> <strong>${prov.tel1}</strong></div>
-        <div><span style="color:var(--text2);">Valor compra:</span> <strong style="color:var(--pink);">${fmt(c.valorCompra)}</strong></div>
+        ${puedeVerCostos() ? `<div><span style="color:var(--text2);">Valor compra:</span> <strong style="color:var(--pink);">${fmt(c.valorCompra)}</strong></div>` : ''}
         <div><span style="color:var(--text2);">Fecha:</span> <strong>${c.fecha}</strong></div>
         <div><span style="color:var(--text2);">Sede:</span> <strong>${c.sede}</strong></div>
       </div>
@@ -9675,7 +9699,7 @@ function buildTrazabilidadCard(c){
       <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px;">
         <div><span style="color:var(--text2);">Cliente:</span> <strong>${venta.cliente}</strong></div>
         <div><span style="color:var(--text2);">V.Venta:</span> <strong style="color:var(--green);">${fmt(venta.venta)}</strong></div>
-        <div><span style="color:var(--text2);">Ganancia:</span> <strong style="color:var(--pink);">${fmt(venta.ganancia)}</strong></div>
+        ${puedeVerGanancias() ? `<div><span style="color:var(--text2);">Ganancia:</span> <strong style="color:var(--pink);">${fmt(venta.ganancia)}</strong></div>` : ''}
       </div>
     </div>`:''}
   </div>`;
@@ -9909,10 +9933,10 @@ function renderFilaProducto(p, tipo) {
         <div style="color:#888899;margin-bottom:2px;">IMEI / Serial</div>
         <div style="font-family:monospace;color:#0066cc;">${p.imei||'—'}</div>
       </div>
-      <div>
+      ${puedeVerCostos() ? `<div>
         <div style="color:#888899;margin-bottom:2px;">Costo</div>
         <div style="font-weight:600;color:#6B2D8B;">${fmt(p.costo||0)}</div>
-      </div>
+      </div>` : ''}
       <div>
         <div style="color:#888899;margin-bottom:2px;">Precio Venta</div>
         <div style="font-weight:600;color:#16a34a;">${fmt(p.precio||0)}</div>
@@ -10006,7 +10030,7 @@ async function buscarIMEIModalProd(val) {
       const infoEl  = document.getElementById('mpIMEIInfo');
       if(infoEl) {
         infoEl.innerHTML = `<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:8px;font-size:12px;">
-          ✅ <strong>${p.producto}</strong> — IMEI: ${p.imei1||'—'} — Sede: ${sedeNom} — Costo: ${fmt(costo)}
+          ✅ <strong>${p.producto}</strong> — IMEI: ${p.imei1||'—'} — Sede: ${sedeNom}${puedeVerCostos() ? ' — Costo: '+fmt(costo) : ''}
           ${prov?'— Proveedor: '+prov.nombre:''}
         </div>`;
         infoEl.style.display='block';
@@ -10091,7 +10115,7 @@ async function buscarIMEIVenta(val){
     setMoneyValue('vcCompra', found.valorCompra);
     setMoneyValue('vcVenta',  Math.round(found.valorCompra/0.55));
     calcVContado();
-    toast('✅ '+found.producto+' — Costo: '+fmt(found.valorCompra));
+    toast('✅ '+found.producto+(puedeVerCostos() ? ' — Costo: '+fmt(found.valorCompra) : ''));
   } else {
     if(infoEl) infoEl.style.display='none';
   }
@@ -10162,7 +10186,7 @@ async function buscarIMEICredito(val){
       setTimeout(()=>recalcCredito(), 50);
 
       setTimeout(()=>recalcCredito(), 50);
-      toast('✅ ' + p.producto + ' — Costo: ' + fmt(costo));
+      toast('✅ ' + p.producto + (puedeVerCostos() ? ' — Costo: ' + fmt(costo) : ''));
 
     } else {
       $('crdIMEIInfo').style.display = 'none';
@@ -10526,7 +10550,7 @@ async function buscarNuevoEquipoCambio(val) {
     const p = rows[0];
     document.getElementById('cambioNuevoProductoId').value = p.id;
     infoEl.style.display = 'block';
-    infoEl.innerHTML = `✅ <strong>${p.producto}</strong> — Costo: ${fmt(parseFloat(p.valor_compra))}`;
+    infoEl.innerHTML = `✅ <strong>${p.producto}</strong>${puedeVerCostos() ? ' — Costo: '+fmt(parseFloat(p.valor_compra)) : ''}`;
   } else {
     infoEl.style.display = 'none';
   }
@@ -10965,6 +10989,16 @@ function getMoneyValue(id) {
 // Solo el usuario "admin" puede cambiar estados en inventario/ventas
 function esUsuarioAdmin() {
   return sesionActiva?.usuario?.toLowerCase() === 'admin';
+}
+
+// Visibilidad de informacion financiera por rol
+// Ganancias, margenes, utilidad y comisiones: solo rol admin
+function puedeVerGanancias() {
+  return sesionActiva?.rol === 'admin';
+}
+// Precios de compra / costo: rol admin y bodega (bodega los necesita para registrar)
+function puedeVerCostos() {
+  return sesionActiva?.rol === 'admin' || sesionActiva?.rol === 'bodega';
 }
 
 // Leer valor de campo en MAYÚSCULAS
