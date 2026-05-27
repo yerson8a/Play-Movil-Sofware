@@ -1594,6 +1594,11 @@
             </div>
           </div>
 
+          <div class="form-group">
+            <label class="form-label">Fecha de la Factura</label>
+            <input type="date" class="form-control" id="gfFecha">
+          </div>
+
           <!-- Cliente -->
           <div style="background:#f7f5fb;border-radius:10px;padding:12px;margin-bottom:12px;">
             <div style="font-size:12px;font-weight:700;color:#6B2D8B;margin-bottom:8px;">👤 Cliente</div>
@@ -7430,6 +7435,8 @@ function gfInicializar() {
   if(gfProductos.length === 0) {
     const elNumero = document.getElementById('gfNumero');
     if(elNumero && !elNumero.value) elNumero.value = 'PM-' + Date.now().toString().slice(-6);
+    const elFecha = document.getElementById('gfFecha');
+    if(elFecha && !elFecha.value) elFecha.value = fechaColombia();
   }
   gfActualizarUI();
 }
@@ -7548,7 +7555,14 @@ function gfGenerarVistaPrevia() {
     valorCuota,
     intereses: 0,
     tasaInteres: 0,
-    fecha: new Date().toLocaleDateString('es-CO',{timeZone:'America/Bogota'}),
+    fecha: (() => {
+      const v = document.getElementById('gfFecha')?.value;
+      if(v) {
+        const [a,m,d] = v.split('-');
+        return `${d}/${m}/${a}`;
+      }
+      return new Date().toLocaleDateString('es-CO',{timeZone:'America/Bogota'});
+    })(),
     numero
   };
 
