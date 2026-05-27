@@ -1647,8 +1647,8 @@
           </div>
           <div class="form-row">
             <div class="form-group">
-              <label class="form-label">Comisión Financiera</label>
-              <div class="input-money-wrap"><input type="text" class="form-control" id="gfComision" placeholder="0" oninput="fmtMoneyInput(this);gfActualizarTotales()" inputmode="numeric"></div>
+              <label class="form-label">Comisión Financiera (%)</label>
+              <input type="number" class="form-control" id="gfComision" placeholder="Ej: 8.5" min="0" max="100" step="0.1" value="0" oninput="gfActualizarTotales()">
             </div>
             <div class="form-group">
               <label class="form-label">Financiera</label>
@@ -7509,7 +7509,7 @@ function gfGenerarVistaPrevia() {
   const asesor     = (document.getElementById('gfAsesor')?.value || '').toUpperCase();
   const descuento  = getMoneyValue('gfDescuento');
   const ivaPct     = parseFloat(document.getElementById('gfIVAPct')?.value) || 0;
-  const comision   = getMoneyValue('gfComision');
+  const comisionPct= parseFloat(document.getElementById('gfComision')?.value) || 0;
   const financiera = (document.getElementById('gfFinanciera')?.value || 'CONTADO').toUpperCase();
   const inicial    = getMoneyValue('gfInicial');
   const cuotas     = parseInt(document.getElementById('gfCuotas')?.value) || 0;
@@ -7521,6 +7521,7 @@ function gfGenerarVistaPrevia() {
   const subtotal = gfProductos.reduce((s,p) => s+(p.precio||0), 0);
   const ivaVal   = ivaPct > 0 ? Math.round(subtotal * ivaPct / 100) : 0;
   const total    = subtotal - descuento;
+  const comision = comisionPct > 0 ? Math.round(total * comisionPct / 100) : 0;
   const saldoFinanciar = tipo === 'credito' ? Math.max(0, total - inicial) : 0;
 
   const datosFactura = {
@@ -7534,6 +7535,7 @@ function gfGenerarVistaPrevia() {
     iva: ivaVal,
     ivaPct,
     comision,
+    comisionPct,
     comisionAsesor: 0,
     productosList: gfProductos.map(p => ({
       producto: p.producto || '—',
@@ -11238,7 +11240,7 @@ function generarHTMLFactura(d) {
         ${d.descuento > 0 ? `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;"><span style="color:#555;">Descuento</span><span style="color:#dc2626;">-${fmt(d.descuento)}</span></div>` : ''}
         ${d.prodAdicVal > 0 ? `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;"><span style="color:#555;">${d.prodAdicDesc||'Adicional'}</span><span>+${fmt(d.prodAdicVal)}</span></div>` : ''}
         ${(d.iva > 0 || d.ivaPct > 0) ? `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;"><span style="color:#555;">📊 IVA${d.ivaPct>0?' ('+d.ivaPct+'%)':''}</span><span style="font-weight:600;color:#dc2626;">-${fmt(d.iva||0)}</span></div>` : ''}
-        ${d.comision > 0 ? `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;border-top:1px dashed #ece8f5;margin-top:4px;"><span style="color:#555;">📊 Comisión financiera<br><span style="font-size:10px;color:#aaa;">${d.financiera||''}</span></span><span style="font-weight:600;color:#dc2626;">-${fmt(d.comision)}</span></div>` : ''}
+        ${d.comision > 0 ? `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;border-top:1px dashed #ece8f5;margin-top:4px;"><span style="color:#555;">📊 Comisión financiera${d.comisionPct>0?' ('+d.comisionPct+'%)':''}<br><span style="font-size:10px;color:#aaa;">${d.financiera||''}</span></span><span style="font-weight:600;color:#dc2626;">-${fmt(d.comision)}</span></div>` : ''}
 
         <div style="display:flex;justify-content:space-between;padding:10px 0;font-size:16px;font-weight:700;border-top:2px solid #6B2D8B;margin-top:6px;">
           <span>TOTAL</span><span style="color:#6B2D8B;">${fmt(d.precioFinal)}</span>
