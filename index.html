@@ -2193,7 +2193,7 @@
 
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
       <button class="btn btn-ghost" onclick="closeModal('modalNuevoProveedor')">Cancelar</button>
-      <button class="btn btn-primary" onclick="guardarProveedor()">💾 Guardar Proveedor</button>
+      <button class="btn btn-primary" id="btnGuardarProveedor" onclick="protegerBoton('btnGuardarProveedor', guardarProveedor)">💾 Guardar Proveedor</button>
     </div>
   </div>
 </div>
@@ -2236,7 +2236,7 @@
           placeholder="Ej: El cliente indicó que pagará el viernes 18, dijo que estaba en Medellín..."></textarea>
       </div>
       <div style="display:flex;justify-content:flex-end;margin-top:8px;">
-        <button class="btn btn-primary btn-sm" onclick="guardarBitacora()">💾 Registrar Gestión</button>
+        <button class="btn btn-primary btn-sm" id="btnGuardarBitacora" onclick="protegerBoton('btnGuardarBitacora', guardarBitacora)">💾 Registrar Gestión</button>
       </div>
     </div>
 
@@ -2327,7 +2327,7 @@
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
       <button class="btn btn-ghost" onclick="closeModal('modalNuevaTarea')">Cancelar</button>
-      <button class="btn btn-primary" onclick="guardarTarea()">💾 Crear Tarea</button>
+      <button class="btn btn-primary" id="btnGuardarTarea" onclick="protegerBoton('btnGuardarTarea', guardarTarea)">💾 Crear Tarea</button>
     </div>
   </div>
 </div>
@@ -2398,7 +2398,7 @@
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
       <button class="btn btn-ghost" onclick="closeModal('modalAgregarProductoVenta')">Cancelar</button>
-      <button class="btn btn-primary" onclick="confirmarAgregarProducto()">➕ Agregar a la Venta</button>
+      <button class="btn btn-primary" id="btnAgregarProductoVenta" onclick="protegerBoton('btnAgregarProductoVenta', confirmarAgregarProducto)">➕ Agregar a la Venta</button>
     </div>
   </div>
 </div>
@@ -2464,7 +2464,7 @@
       <div style="font-size:11px;color:#888899;">* Obligatorios</div>
       <div style="display:flex;gap:10px;">
         <button class="btn btn-ghost" onclick="closeModal('modalNuevoCliente')">Cancelar</button>
-        <button class="btn btn-primary" onclick="guardarCliente()">💾 Guardar Cliente</button>
+        <button class="btn btn-primary" id="btnGuardarCliente" onclick="protegerBoton('btnGuardarCliente', guardarCliente)">💾 Guardar Cliente</button>
       </div>
     </div>
   </div>
@@ -2517,7 +2517,7 @@
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
       <button class="btn btn-ghost" onclick="closeModal('modalEditarCliente')">Cancelar</button>
-      <button class="btn btn-primary" onclick="actualizarCliente()">💾 Guardar</button>
+      <button class="btn btn-primary" id="btnActualizarCliente" onclick="protegerBoton('btnActualizarCliente', actualizarCliente)">💾 Guardar</button>
     </div>
   </div>
 </div>
@@ -2600,7 +2600,7 @@
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
       <button class="btn btn-ghost" onclick="closeModal('modalEditarProveedor')">Cancelar</button>
-      <button class="btn btn-primary" onclick="actualizarProveedor()">💾 Guardar Cambios</button>
+      <button class="btn btn-primary" id="btnActualizarProveedor" onclick="protegerBoton('btnActualizarProveedor', actualizarProveedor)">💾 Guardar Cambios</button>
     </div>
   </div>
 </div>
@@ -2860,7 +2860,7 @@
       <div style="font-size:12px;color:var(--text2);">* Campos obligatorios</div>
       <div style="display:flex;gap:10px;">
         <button class="btn btn-ghost" onclick="closeModal('modalNuevaCompra')">Cancelar</button>
-        <button class="btn btn-primary" onclick="guardarCompra()">💾 Registrar Compra</button>
+        <button class="btn btn-primary" id="btnGuardarCompra" onclick="protegerBoton('btnGuardarCompra', guardarCompra)">💾 Registrar Compra</button>
       </div>
     </div>
   </div>
@@ -3075,7 +3075,7 @@
       <div style="font-size:12px;color:#888899;">* Campos obligatorios</div>
       <div style="display:flex;gap:10px;">
         <button class="btn btn-ghost" onclick="closeModal('modalNuevoProducto')">Cancelar</button>
-        <button class="btn btn-primary" onclick="guardarProductoNuevo()">💾 Guardar Producto</button>
+        <button class="btn btn-primary" id="btnGuardarProductoNuevo" onclick="protegerBoton('btnGuardarProductoNuevo', guardarProductoNuevo)">💾 Guardar Producto</button>
       </div>
     </div>
   </div>
@@ -3140,7 +3140,7 @@
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
       <button class="btn btn-ghost" onclick="closeModal('modalEditarProducto')">Cancelar</button>
-      <button class="btn btn-primary" onclick="actualizarProducto()">💾 Guardar</button>
+      <button class="btn btn-primary" id="btnActualizarProducto" onclick="protegerBoton('btnActualizarProducto', actualizarProducto)">💾 Guardar</button>
     </div>
   </div>
 </div>
@@ -3616,7 +3616,7 @@
       <div style="display:flex;gap:10px;">
         <button class="btn btn-ghost" onclick="closeModal('modalNuevoCredito')">Cancelar</button>
         <button class="btn btn-outline" onclick="previsualizarFactura()">👁️ Ver Factura</button>
-        <button class="btn btn-primary" id="btnGuardarCredito" onclick="guardarCredito()">💾 Guardar Crédito</button>
+        <button class="btn btn-primary" id="btnGuardarCredito" onclick="protegerBoton('btnGuardarCredito', guardarCredito)">💾 Guardar Crédito</button>
       </div>
     </div>
   </div>
@@ -3863,7 +3863,7 @@
       <div style="font-size:12px;color:var(--text2);">* Campos obligatorios</div>
       <div style="display:flex;gap:10px;">
         <button class="btn btn-ghost" onclick="closeModal('modalVentaContado')">Cancelar</button>
-        <button class="btn btn-primary" id="btnGuardarVentaContado" onclick="guardarVentaContado()">💾 Guardar Venta</button>
+        <button class="btn btn-primary" id="btnGuardarVentaContado" onclick="protegerBoton('btnGuardarVentaContado', guardarVentaContado)">💾 Guardar Venta</button>
       </div>
     </div>
   </div>
@@ -3893,7 +3893,7 @@
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
       <button class="btn btn-ghost" onclick="closeModal('modalNuevoGasto')">Cancelar</button>
-      <button class="btn btn-primary" onclick="guardarGasto()">Guardar</button>
+      <button class="btn btn-primary" id="btnGuardarGasto" onclick="protegerBoton('btnGuardarGasto', guardarGasto)">Guardar</button>
     </div>
   </div>
 </div>
@@ -3926,7 +3926,7 @@
     <div class="form-group"><label class="form-label">Observaciones</label><textarea class="form-control" id="sedeObs" rows="2" placeholder="Notas adicionales..."></textarea></div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
       <button class="btn btn-ghost" onclick="closeModal('modalNuevaSede')">Cancelar</button>
-      <button class="btn btn-primary" onclick="guardarSede()">💾 Guardar Sede</button>
+      <button class="btn btn-primary" id="btnGuardarSede" onclick="protegerBoton('btnGuardarSede', guardarSede)">💾 Guardar Sede</button>
     </div>
   </div>
 </div>
@@ -3956,7 +3956,7 @@
     <div class="form-group"><label class="form-label">Dirección</label><input type="text" class="form-control" id="editSedeDireccion"></div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
       <button class="btn btn-ghost" onclick="closeModal('modalEditarSede')">Cancelar</button>
-      <button class="btn btn-primary" onclick="actualizarSede()">💾 Actualizar</button>
+      <button class="btn btn-primary" id="btnActualizarSede" onclick="protegerBoton('btnActualizarSede', actualizarSede)">💾 Actualizar</button>
     </div>
   </div>
 </div>
@@ -3993,7 +3993,7 @@
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
       <button class="btn btn-ghost" onclick="closeModal('modalNuevoUsuario')">Cancelar</button>
-      <button class="btn btn-primary" onclick="crearUsuario()">💾 Crear Usuario</button>
+      <button class="btn btn-primary" id="btnCrearUsuario" onclick="protegerBoton('btnCrearUsuario', crearUsuario)">💾 Crear Usuario</button>
     </div>
   </div>
 </div>
@@ -4086,7 +4086,7 @@
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
       <button class="btn btn-ghost" onclick="closeModal('modalEditarUsuario')">Cancelar</button>
-      <button class="btn btn-primary" onclick="actualizarUsuario()">💾 Actualizar</button>
+      <button class="btn btn-primary" id="btnActualizarUsuario" onclick="protegerBoton('btnActualizarUsuario', actualizarUsuario)">💾 Actualizar</button>
     </div>
   </div>
 </div>
@@ -4111,7 +4111,7 @@
     <div class="form-group"><label class="form-label">Observaciones</label><textarea class="form-control" id="finObs" rows="2" placeholder="Condiciones, requisitos, notas..."></textarea></div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
       <button class="btn btn-ghost" onclick="closeModal('modalNuevaFinanciera')">Cancelar</button>
-      <button class="btn btn-primary" onclick="guardarFinanciera()">💾 Guardar</button>
+      <button class="btn btn-primary" id="btnGuardarFinanciera" onclick="protegerBoton('btnGuardarFinanciera', guardarFinanciera)">💾 Guardar</button>
     </div>
   </div>
 </div>
@@ -4137,7 +4137,7 @@
     <div class="form-group"><label class="form-label">Observaciones</label><textarea class="form-control" id="editFinObs" rows="2"></textarea></div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
       <button class="btn btn-ghost" onclick="closeModal('modalEditarFinanciera')">Cancelar</button>
-      <button class="btn btn-primary" onclick="actualizarFinanciera()">💾 Actualizar</button>
+      <button class="btn btn-primary" id="btnActualizarFinanciera" onclick="protegerBoton('btnActualizarFinanciera', actualizarFinanciera)">💾 Actualizar</button>
     </div>
   </div>
 </div>
@@ -4164,7 +4164,7 @@
     <div class="form-group"><label class="form-label">Descripción</label><textarea class="form-control" id="cajaDesc" rows="2" placeholder="Descripción o notas de la caja..."></textarea></div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
       <button class="btn btn-ghost" onclick="closeModal('modalNuevaCaja')">Cancelar</button>
-      <button class="btn btn-primary" onclick="guardarCaja()">💾 Guardar Caja</button>
+      <button class="btn btn-primary" id="btnGuardarCaja" onclick="protegerBoton('btnGuardarCaja', guardarCaja)">💾 Guardar Caja</button>
     </div>
   </div>
 </div>
@@ -4187,7 +4187,7 @@
     <div class="form-group"><label class="form-label">Concepto *</label><input type="text" class="form-control" id="movConcepto" placeholder="Describe el movimiento"></div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
       <button class="btn btn-ghost" onclick="closeModal('modalMovimientoCaja')">Cancelar</button>
-      <button class="btn btn-primary" onclick="registrarMovimientoCaja()">Registrar</button>
+      <button class="btn btn-primary" id="btnRegistrarMovimientoCaja" onclick="protegerBoton('btnRegistrarMovimientoCaja', registrarMovimientoCaja)">Registrar</button>
     </div>
   </div>
 </div>
@@ -4306,7 +4306,7 @@
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
       <button class="btn btn-ghost" onclick="closeModal('modalNuevaGarantia')">Cancelar</button>
-      <button class="btn btn-primary" onclick="guardarGarantia()">Registrar Garantía</button>
+      <button class="btn btn-primary" id="btnGuardarGarantia" onclick="protegerBoton('btnGuardarGarantia', guardarGarantia)">Registrar Garantía</button>
     </div>
   </div>
 </div>
@@ -4377,7 +4377,7 @@
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
       <button class="btn btn-ghost" onclick="closeModal('modalNuevoServicio')">Cancelar</button>
-      <button class="btn btn-primary" onclick="guardarServicio()">Registrar Orden</button>
+      <button class="btn btn-primary" id="btnGuardarServicio" onclick="protegerBoton('btnGuardarServicio', guardarServicio)">Registrar Orden</button>
     </div>
   </div>
 </div>
@@ -4417,7 +4417,7 @@
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
       <button class="btn btn-ghost" onclick="closeModal('modalNuevoBonoComision')">Cancelar</button>
-      <button class="btn btn-primary" onclick="guardarBonoComision()">Guardar</button>
+      <button class="btn btn-primary" id="btnGuardarBonoComision" onclick="protegerBoton('btnGuardarBonoComision', guardarBonoComision)">Guardar</button>
     </div>
   </div>
 </div>
@@ -4477,7 +4477,7 @@
       <button class="btn btn-outline" style="color:#16a34a;border-color:#16a34a;" onclick="pagarTotalCredito()">✅ Pago Total</button>
       <div style="display:flex;gap:10px;">
         <button class="btn btn-ghost" onclick="closeModal('modalRegistrarAbono')">Cancelar</button>
-        <button class="btn btn-primary" onclick="confirmarAbono()">💳 Registrar Abono</button>
+        <button class="btn btn-primary" id="btnConfirmarAbono" onclick="protegerBoton('btnConfirmarAbono', confirmarAbono)">💳 Registrar Abono</button>
       </div>
     </div>
   </div>
@@ -4518,7 +4518,7 @@
     <div id="asignarAsesorPreview" style="display:none;background:#f7f5fb;border-radius:10px;padding:12px;margin-top:12px;font-size:13px;"></div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
       <button class="btn btn-ghost" onclick="closeModal('modalAsignarAsesor')">Cancelar</button>
-      <button class="btn btn-primary" onclick="confirmarAsignarAsesor()">✅ Asignar como Asesor</button>
+      <button class="btn btn-primary" id="btnConfirmarAsignarAsesor" onclick="protegerBoton('btnConfirmarAsignarAsesor', confirmarAsignarAsesor)">✅ Asignar como Asesor</button>
     </div>
   </div>
 </div>
@@ -4555,7 +4555,7 @@
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
       <button class="btn btn-ghost" onclick="cerrarModalComision()">Omitir</button>
-      <button class="btn btn-primary" onclick="guardarComisionVenta()">💎 Guardar Comisión</button>
+      <button class="btn btn-primary" id="btnGuardarComisionVenta" onclick="protegerBoton('btnGuardarComisionVenta', guardarComisionVenta)">💎 Guardar Comisión</button>
     </div>
   </div>
 </div>
@@ -4569,7 +4569,7 @@
     </div>
     <div id="detalleVentaContenido"></div>
     <div style="display:flex;gap:10px;justify-content:space-between;align-items:center;margin-top:16px;">
-      <button class="btn btn-sm btn-ghost" id="btnAnularVentaDetalle" style="color:#dc2626;border:1px solid #dc2626;" onclick="confirmarAnularVentaContado()">❌ Anular Venta</button>
+      <button class="btn btn-sm btn-ghost" id="btnAnularVentaDetalle" style="color:#dc2626;border:1px solid #dc2626;" onclick="protegerBoton('btnAnularVentaDetalle', confirmarAnularVentaContado)">❌ Anular Venta</button>
       <button class="btn btn-sm btn-outline" id="btnVerFacturaDetalle" onclick="verFacturaVenta()">🧾 Ver Factura</button>
       <!-- Visibilidad controlada por JS según rol -->
       <div style="display:flex;gap:10px;">
@@ -4650,7 +4650,7 @@
 
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
       <button class="btn btn-ghost" onclick="closeModal('modalTrasladoEquipo')">Cancelar</button>
-      <button class="btn btn-primary" onclick="confirmarTraslado()">🔄 Confirmar Traslado</button>
+      <button class="btn btn-primary" id="btnConfirmarTraslado" onclick="protegerBoton('btnConfirmarTraslado', confirmarTraslado)">🔄 Confirmar Traslado</button>
     </div>
   </div>
 </div>
@@ -5351,6 +5351,28 @@ const gastosFijosData = getGastosFijosMes(mesColombia());
 // ============================================================
 const $ = id => document.getElementById(id);
 const fmt = n => new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',minimumFractionDigits:0}).format(n||0);
+
+// Previene doble-clic en botones que guardan/modifican datos.
+// Bloquea el boton al primer clic y lo restaura cuando la accion termina (ok o error).
+function protegerBoton(btnId, accionAsync) {
+  const btn = document.getElementById(btnId);
+  if (!btn || btn.dataset.procesando === 'true') return;
+  btn.dataset.procesando = 'true';
+  btn.disabled = true;
+  const textoOriginal = btn.innerHTML;
+  btn.innerHTML = '⏳ Procesando...';
+  btn.style.opacity = '0.6';
+  btn.style.cursor = 'not-allowed';
+  Promise.resolve(accionAsync())
+    .catch(e => { console.error(e); toast('Error: ' + (e?.message || e), 'error'); })
+    .finally(() => {
+      btn.dataset.procesando = 'false';
+      btn.disabled = false;
+      btn.innerHTML = textoOriginal;
+      btn.style.opacity = '';
+      btn.style.cursor = '';
+    });
+}
 
 function toast(msg, type='success') {
   const c = $('toastContainer');
