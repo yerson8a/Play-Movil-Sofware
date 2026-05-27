@@ -474,7 +474,64 @@
   body.rol-admin .solo-costo.sa-flex, body.rol-bodega .solo-costo.sa-flex { display:flex !important; }
   body.rol-admin .solo-costo.sa-grid, body.rol-bodega .solo-costo.sa-grid { display:grid !important; }
   body.rol-consulta .btn-primary { opacity:0.5; pointer-events:none; cursor:not-allowed; }
+
+  /* ===== INFORME GERENCIAL ===== */
+  .ig-header {
+    display:flex; justify-content:space-between; align-items:flex-start;
+    background:linear-gradient(135deg, #6B2D8B 0%, #4a1f62 100%);
+    color:#fff; padding:24px 28px; border-radius:18px; margin-bottom:20px;
+    box-shadow:0 8px 24px rgba(107,45,139,0.2);
+  }
+  .ig-header .ig-logo { font-family:'Syne',sans-serif; font-weight:800; font-size:22px; display:flex; align-items:center; gap:10px; }
+  .ig-header .ig-logo-icon { background:#D4A574; color:#4a1f62; width:38px; height:38px; border-radius:10px; display:inline-flex; align-items:center; justify-content:center; font-size:20px; }
+  .ig-header .ig-titulo { font-family:'Syne',sans-serif; font-weight:700; font-size:20px; margin-top:14px; }
+  .ig-header .ig-sub { font-size:13px; opacity:0.85; margin-top:4px; }
+  .ig-header .ig-fecha-label { font-size:11px; opacity:0.7; text-transform:uppercase; letter-spacing:1px; }
+  .ig-header .ig-fecha-valor { font-family:'Syne',sans-serif; font-weight:700; font-size:18px; margin-top:4px; }
+  .ig-btn-pdf {
+    margin-top:14px; background:#D4A574; color:#4a1f62; border:none;
+    padding:10px 18px; border-radius:10px; font-weight:700; font-size:13px; cursor:pointer;
+    display:inline-flex; align-items:center; gap:8px; font-family:'DM Sans',sans-serif; transition:all .2s;
+  }
+  .ig-btn-pdf:hover { background:#c39565; transform:translateY(-1px); }
+  .ig-filtros {
+    background:#fff; border:1px solid #ece8f5; border-radius:14px; padding:14px 18px;
+    margin-bottom:20px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;
+    box-shadow:0 2px 8px rgba(0,0,0,0.04);
+  }
+  .ig-filtros label { font-size:12px; color:#555577; font-weight:600; text-transform:uppercase; letter-spacing:1px; }
+  .ig-filtro-btns { display:flex; gap:6px; margin-left:auto; flex-wrap:wrap; }
+  .ig-filtro-btn {
+    background:#f7f5fb; border:1px solid #ece8f5; border-radius:8px;
+    padding:7px 14px; font-size:12px; font-weight:600; color:#555577; cursor:pointer;
+    font-family:'DM Sans',sans-serif; transition:all .2s;
+  }
+  .ig-filtro-btn:hover, .ig-filtro-btn.active { background:#6B2D8B; color:#fff; border-color:#6B2D8B; }
+  .stat-card.green::before { background:#16a34a; }
+  .stat-card.red::before { background:#dc2626; }
+  .stat-card.purple::before { background:#6B2D8B; }
+  .stat-value.red { color:#dc2626; }
+  .stat-value.purple { color:#6B2D8B; }
+  .ig-chart-container { position:relative; height:260px; }
+  tr.row-rojo { background:#fee2e2 !important; }
+  tr.row-rojo td { color:#7f1d1d; font-weight:600; }
+  tr.row-naranja { background:#fed7aa !important; }
+  tr.row-naranja td { color:#7c2d12; }
+  .badge-dias { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; }
+  .badge-dias.rojo { background:#dc2626; color:#fff; }
+  .badge-dias.naranja { background:#d97706; color:#fff; }
+  .badge-dias.normal { background:#dcfce7; color:#16a34a; }
+
+  @media print {
+    .sidebar, .topbar, .ig-filtros, .ig-btn-pdf { display:none !important; }
+    body { background:#fff; }
+    .main { margin-left:0 !important; padding:0 !important; }
+    .card, .stat-card { box-shadow:none !important; break-inside:avoid; }
+    .ig-header { background:#6B2D8B !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    .ig-header * { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
@@ -543,6 +600,9 @@
     <div class="nav-section">Principal</div>
     <div class="nav-item active" onclick="showModule('dashboard')">
       <span class="icon">📊</span> Dashboard
+    </div>
+    <div class="nav-item solo-admin sa-flex" onclick="showModule('informe-gerencial')">
+      <span class="icon">📈</span> Informe Gerencial
     </div>
     <div class="nav-section">Módulos</div>
     <div class="nav-item" onclick="showModule('compras')">
@@ -789,6 +849,114 @@
               </tr>
             </thead>
             <tbody id="tbodyProveedoresMod"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== INFORME GERENCIAL ==================== -->
+    <div id="mod-informe-gerencial" class="module">
+      <div class="ig-header">
+        <div>
+          <div class="ig-logo"><span class="ig-logo-icon">📈</span><span>Play Móvil</span></div>
+          <div class="ig-titulo">📊 Informe Gerencial</div>
+          <div class="ig-sub">Vista general del negocio · Solo administradores</div>
+        </div>
+        <div style="text-align:right;">
+          <div class="ig-fecha-label">Informe del</div>
+          <div class="ig-fecha-valor" id="igFechaTitulo">—</div>
+          <button class="ig-btn-pdf" onclick="igExportarPDF()">🖨️ Exportar PDF</button>
+        </div>
+      </div>
+
+      <div class="ig-filtros">
+        <label>📅 Fecha:</label>
+        <input type="date" class="form-control" id="igFecha" style="width:170px;" onchange="renderInformeGerencial()">
+        <div class="ig-filtro-btns">
+          <button class="ig-filtro-btn" id="igBtnHoy" onclick="igSetRango('hoy')">Hoy</button>
+          <button class="ig-filtro-btn" id="igBtnAyer" onclick="igSetRango('ayer')">Ayer</button>
+          <button class="ig-filtro-btn" id="igBtn7" onclick="igSetRango('7dias')">Últimos 7 días</button>
+          <button class="ig-filtro-btn" id="igBtnMes" onclick="igSetRango('mes')">Este mes</button>
+        </div>
+      </div>
+
+      <div class="grid-4">
+        <div class="stat-card green">
+          <div class="stat-label">💰 Ventas</div>
+          <div class="stat-value green" id="igKpiVentas">$ 0</div>
+          <div class="stat-sub" id="igKpiVentasSub">0 equipos</div>
+        </div>
+        <div class="stat-card red">
+          <div class="stat-label">💸 Gastos</div>
+          <div class="stat-value red" id="igKpiGastos">$ 0</div>
+          <div class="stat-sub" id="igKpiGastosSub">0 movimientos</div>
+        </div>
+        <div class="stat-card purple">
+          <div class="stat-label">📊 Utilidad neta</div>
+          <div class="stat-value purple" id="igKpiUtilidad">$ 0</div>
+          <div class="stat-sub" id="igKpiUtilidadSub">Margen: 0%</div>
+        </div>
+        <div class="stat-card blue">
+          <div class="stat-label">🎯 Ticket promedio</div>
+          <div class="stat-value blue" id="igKpiTicket">$ 0</div>
+          <div class="stat-sub">por venta</div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">📈 Ventas últimos 7 días</div>
+          <div class="ig-chart-container"><canvas id="igChartLinea"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">🏪 Ventas por sede</div>
+          <div class="ig-chart-container"><canvas id="igChartSede"></canvas></div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">👤 Ventas por asesor</div>
+          <div class="ig-chart-container"><canvas id="igChartAsesor"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">🥇 Top 5 productos vendidos</div>
+          <div class="ig-chart-container"><canvas id="igChartProductos"></canvas></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">📦 Inventario antiguo <span style="font-size:11px;color:#888;font-weight:500;text-transform:none;letter-spacing:0;">(Top 20 con más días en stock)</span></div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Producto</th><th>Días en stock</th><th>Costo</th><th>Sede</th></tr>
+            </thead>
+            <tbody id="igTbodyInvAntiguo"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">💰 Ventas del período <span id="igVentasCount" style="margin-left:8px;background:#f3e8f9;color:#6B2D8B;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:700;">0</span></div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Hora</th><th>Cliente</th><th>Equipo</th><th>Valor</th><th>Asesor</th><th>Sede</th></tr>
+            </thead>
+            <tbody id="igTbodyVentas"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">💸 Gastos del período <span id="igGastosCount" style="margin-left:8px;background:#f3e8f9;color:#6B2D8B;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:700;">0</span></div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Hora</th><th>Descripción</th><th>Valor</th><th>Categoría</th></tr>
+            </thead>
+            <tbody id="igTbodyGastos"></tbody>
           </table>
         </div>
       </div>
@@ -4691,6 +4859,7 @@ function mapVenta(v) {
   return {
     id: v.id,
     fecha: v.fecha_venta,
+    createdAt: v.created_at || null,
     equipo: v.producto || '—',
     cliente: v.cliente,
     asesor: v.asesor || '',
@@ -4703,6 +4872,7 @@ function mapVenta(v) {
     imei: v.imei || '',
     cedula: v.cedula_cliente || '',
     telefono: v.telefono_cliente || '',
+    sedeId: v.sede_id || null,
     anulada: anulada,
     observaciones: v.observaciones || ''
   };
@@ -4757,6 +4927,8 @@ function mapGasto(g) {
   return {
     id: g.id,
     fecha: g.fecha_gasto,
+    createdAt: g.created_at || null,
+    categoria: g.categoria || '—',
     detalle: g.descripcion || g.categoria,
     entrada: 0,
     pago: parseFloat(g.valor) || 0,
@@ -5339,6 +5511,10 @@ function closeSidebarMobile() {
 }
 
 function showModule(name) {
+  // Informe Gerencial: solo admin
+  if(name === 'informe-gerencial' && (!sesionActiva || sesionActiva.rol !== 'admin')) {
+    toast('Solo administradores pueden ver el Informe Gerencial','error'); return;
+  }
   // Bloquear acceso a módulos sin permiso
   if(sesionActiva && sesionActiva.rol !== 'admin' && name !== 'dashboard') {
     let permisos = [];
@@ -5353,7 +5529,7 @@ function showModule(name) {
   if(mod) mod.classList.add('active');
   event?.currentTarget?.classList.add('active');
   document.querySelector('.topbar-title').textContent = {
-    'dashboard':'Dashboard','compras':'Compras y Proveedores',
+    'dashboard':'Dashboard','informe-gerencial':'Informe Gerencial','compras':'Compras y Proveedores',
     'inventario':'Inventario de Equipos','ventas':'Registro de Ventas',
     'creditos':'Gestión de Créditos','simulador':'Simulador de Ventas','genfactura':'Generador de Facturas',
     'contabilidad':'Contabilidad','asesores':'Asesores Comerciales','garantias':'Garantías'
@@ -5377,6 +5553,7 @@ function showModule(name) {
   else if(name==='financieras') cargarFinancieras();
   else if(name==='cajas') { cargarCajas(); poblarSelectSedes(); }
   else if(name==='genfactura') { gfInicializar(); }
+  else if(name==='informe-gerencial') { igInicializar(); }
 }
 
 // ============================================================
@@ -7601,6 +7778,311 @@ function gfImprimir() {
   ventana.document.close();
   // Imprimir despues de cargar
   setTimeout(()=>{ ventana.focus(); ventana.print(); }, 300);
+}
+
+// ============================================================
+// INFORME GERENCIAL (solo admin)
+// ============================================================
+let igRangoActivo = 'hoy';
+let igCharts = { linea:null, sede:null, asesor:null, productos:null };
+
+function igInicializar() {
+  const elFecha = document.getElementById('igFecha');
+  if(elFecha && !elFecha.value) elFecha.value = fechaColombia();
+  igRangoActivo = 'hoy';
+  igActualizarBotones();
+  renderInformeGerencial();
+}
+
+function igActualizarBotones() {
+  ['hoy','ayer','7dias','mes'].forEach(r => {
+    const map = { hoy:'igBtnHoy', ayer:'igBtnAyer', '7dias':'igBtn7', mes:'igBtnMes' };
+    const btn = document.getElementById(map[r]);
+    if(btn) btn.classList.toggle('active', r === igRangoActivo);
+  });
+}
+
+function igSetRango(tipo) {
+  igRangoActivo = tipo;
+  const elFecha = document.getElementById('igFecha');
+  if(tipo === 'hoy') elFecha.value = fechaColombia();
+  else if(tipo === 'ayer') {
+    const d = new Date(fechaColombia());
+    d.setUTCDate(d.getUTCDate() - 1);
+    elFecha.value = d.toISOString().slice(0,10);
+  }
+  igActualizarBotones();
+  renderInformeGerencial();
+}
+
+function igDiasEnStock(fechaCompra) {
+  if(!fechaCompra) return 0;
+  const f = new Date(String(fechaCompra).substring(0,10));
+  const hoy = new Date(fechaColombia());
+  return Math.max(0, Math.floor((hoy - f) / (1000*60*60*24)));
+}
+
+function igFiltrarVentas() {
+  const fechaSel = document.getElementById('igFecha')?.value || fechaColombia();
+  const ventas = (db.ventas || []).filter(v => !v.anulada);
+  if(igRangoActivo === '7dias') {
+    const desde = new Date(fechaColombia());
+    desde.setUTCDate(desde.getUTCDate() - 6);
+    const desdeStr = desde.toISOString().slice(0,10);
+    return ventas.filter(v => v.fecha >= desdeStr && v.fecha <= fechaColombia());
+  }
+  if(igRangoActivo === 'mes') {
+    const mesPrefix = fechaColombia().substring(0,7);
+    return ventas.filter(v => (v.fecha||'').startsWith(mesPrefix));
+  }
+  return ventas.filter(v => v.fecha === fechaSel);
+}
+
+function igFiltrarGastos() {
+  const fechaSel = document.getElementById('igFecha')?.value || fechaColombia();
+  const gastos = (db.gastos || []);
+  if(igRangoActivo === '7dias') {
+    const desde = new Date(fechaColombia());
+    desde.setUTCDate(desde.getUTCDate() - 6);
+    const desdeStr = desde.toISOString().slice(0,10);
+    return gastos.filter(g => g.fecha >= desdeStr && g.fecha <= fechaColombia());
+  }
+  if(igRangoActivo === 'mes') {
+    const mesPrefix = fechaColombia().substring(0,7);
+    return gastos.filter(g => (g.fecha||'').startsWith(mesPrefix));
+  }
+  return gastos.filter(g => g.fecha === fechaSel);
+}
+
+function igFmtHora(createdAt) {
+  if(!createdAt) return '—';
+  try {
+    const d = new Date(createdAt);
+    return d.toLocaleTimeString('es-CO', { hour:'2-digit', minute:'2-digit', timeZone:'America/Bogota' });
+  } catch(e) { return '—'; }
+}
+
+function igFmtSede(sedeId) {
+  if(sedeId === 1) return 'LOCAL PEREIRA';
+  if(sedeId === 2) return 'LOCAL ARMENIA';
+  if(sedeId === 3) return 'LOCAL MANIZALES';
+  return '—';
+}
+
+function renderInformeGerencial() {
+  if(!sesionActiva || sesionActiva.rol !== 'admin') return;
+
+  // Header fecha
+  const fechaSel = document.getElementById('igFecha')?.value || fechaColombia();
+  const elTitulo = document.getElementById('igFechaTitulo');
+  if(elTitulo) {
+    if(igRangoActivo === '7dias') elTitulo.textContent = 'Últimos 7 días';
+    else if(igRangoActivo === 'mes') elTitulo.textContent = 'Este mes';
+    else {
+      const [a,m,d] = fechaSel.split('-');
+      const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+      elTitulo.textContent = `${d} / ${meses[parseInt(m)-1]||m} / ${a}`;
+    }
+  }
+
+  const ventasFiltradas = igFiltrarVentas();
+  const gastosFiltrados = igFiltrarGastos();
+
+  // KPIs
+  const totalVentas = ventasFiltradas.reduce((s,v)=>s+(v.venta||0), 0);
+  const totalGastos = gastosFiltrados.reduce((s,g)=>s+(g.pago||0), 0);
+  const utilidad = totalVentas - totalGastos;
+  const ticket = ventasFiltradas.length > 0 ? Math.round(totalVentas / ventasFiltradas.length) : 0;
+  const margen = totalVentas > 0 ? ((utilidad / totalVentas) * 100).toFixed(1) : '0';
+
+  const setText = (id, txt) => { const el = document.getElementById(id); if(el) el.textContent = txt; };
+  setText('igKpiVentas', fmt(totalVentas));
+  setText('igKpiVentasSub', `${ventasFiltradas.length} equipo${ventasFiltradas.length===1?'':'s'}`);
+  setText('igKpiGastos', fmt(totalGastos));
+  setText('igKpiGastosSub', `${gastosFiltrados.length} movimiento${gastosFiltrados.length===1?'':'s'}`);
+  setText('igKpiUtilidad', fmt(utilidad));
+  setText('igKpiUtilidadSub', `Margen: ${margen}%`);
+  const elUtil = document.getElementById('igKpiUtilidad');
+  if(elUtil) {
+    elUtil.classList.remove('purple','red');
+    elUtil.classList.add(utilidad < 0 ? 'red' : 'purple');
+  }
+  setText('igKpiTicket', fmt(ticket));
+
+  // ── Gráfico línea: ventas últimos 7 días (siempre, no depende del filtro) ──
+  const ultimos7 = [];
+  const hoyDate = new Date(fechaColombia());
+  for(let i = 6; i >= 0; i--) {
+    const d = new Date(hoyDate);
+    d.setUTCDate(d.getUTCDate() - i);
+    const isoStr = d.toISOString().slice(0,10);
+    const labelStr = `${String(d.getUTCDate()).padStart(2,'0')}/${String(d.getUTCMonth()+1).padStart(2,'0')}`;
+    const totalDia = (db.ventas||[])
+      .filter(v => !v.anulada && v.fecha === isoStr)
+      .reduce((s,v)=>s+(v.venta||0), 0);
+    ultimos7.push({ label:labelStr, total:totalDia });
+  }
+  if(igCharts.linea) igCharts.linea.destroy();
+  igCharts.linea = new Chart(document.getElementById('igChartLinea'), {
+    type:'line',
+    data:{
+      labels:ultimos7.map(x=>x.label),
+      datasets:[{
+        label:'Ventas', data:ultimos7.map(x=>x.total),
+        borderColor:'#6B2D8B', backgroundColor:'rgba(107,45,139,0.1)',
+        fill:true, tension:0.35, borderWidth:3,
+        pointBackgroundColor:'#6B2D8B', pointRadius:5, pointHoverRadius:7
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:ctx => fmt(ctx.parsed.y) } } },
+      scales:{ y:{ beginAtZero:true, ticks:{ callback:v => fmt(v) } } }
+    }
+  });
+
+  // ── Gráfico barras: ventas por sede ──
+  const porSede = {};
+  ventasFiltradas.forEach(v => {
+    const nombre = igFmtSede(v.sedeId);
+    porSede[nombre] = (porSede[nombre]||0) + (v.venta||0);
+  });
+  const sedeLabels = Object.keys(porSede);
+  const sedeValores = sedeLabels.map(k => porSede[k]);
+  if(igCharts.sede) igCharts.sede.destroy();
+  igCharts.sede = new Chart(document.getElementById('igChartSede'), {
+    type:'bar',
+    data:{
+      labels:sedeLabels.length ? sedeLabels : ['Sin datos'],
+      datasets:[{
+        label:'Ventas',
+        data:sedeValores.length ? sedeValores : [0],
+        backgroundColor:['#6B2D8B','#D4A574','#16a34a','#0066cc'],
+        borderRadius:10
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:ctx => fmt(ctx.parsed.y) } } },
+      scales:{ y:{ beginAtZero:true, ticks:{ callback:v => fmt(v) } } }
+    }
+  });
+
+  // ── Donut: ventas por asesor ──
+  const porAsesor = {};
+  ventasFiltradas.forEach(v => {
+    const k = (v.asesor||'SIN ASESOR').trim() || 'SIN ASESOR';
+    porAsesor[k] = (porAsesor[k]||0) + (v.venta||0);
+  });
+  const asesorLabels = Object.keys(porAsesor);
+  const asesorVals = asesorLabels.map(k => porAsesor[k]);
+  if(igCharts.asesor) igCharts.asesor.destroy();
+  igCharts.asesor = new Chart(document.getElementById('igChartAsesor'), {
+    type:'doughnut',
+    data:{
+      labels:asesorLabels.length ? asesorLabels : ['Sin datos'],
+      datasets:[{
+        data:asesorVals.length ? asesorVals : [1],
+        backgroundColor:['#6B2D8B','#D4A574','#0066cc','#16a34a','#E91E8C','#d97706'],
+        borderWidth:2, borderColor:'#fff'
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false, cutout:'62%',
+      plugins:{
+        legend:{position:'bottom'},
+        tooltip:{
+          callbacks:{
+            label: ctx => {
+              if(!asesorVals.length) return 'Sin datos';
+              const total = ctx.dataset.data.reduce((a,b)=>a+b,0);
+              const pct = total ? ((ctx.parsed / total) * 100).toFixed(1) : 0;
+              return ctx.label + ': ' + fmt(ctx.parsed) + ' (' + pct + '%)';
+            }
+          }
+        }
+      }
+    }
+  });
+
+  // ── Barras horizontales: top 5 productos ──
+  const porProducto = {};
+  ventasFiltradas.forEach(v => {
+    const k = (v.equipo||'—').trim();
+    porProducto[k] = (porProducto[k]||0) + 1;
+  });
+  const top5 = Object.entries(porProducto).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  if(igCharts.productos) igCharts.productos.destroy();
+  igCharts.productos = new Chart(document.getElementById('igChartProductos'), {
+    type:'bar',
+    data:{
+      labels:top5.length ? top5.map(x=>x[0]) : ['Sin datos'],
+      datasets:[{
+        label:'Unidades',
+        data:top5.length ? top5.map(x=>x[1]) : [0],
+        backgroundColor:'#6B2D8B', borderRadius:8
+      }]
+    },
+    options:{
+      indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false} },
+      scales:{ x:{ beginAtZero:true, ticks:{ stepSize:1 } } }
+    }
+  });
+
+  // ── Tabla inventario antiguo ──
+  const inv = (db.inventario||[])
+    .filter(p => p.estado !== 'VENDIDO' && p.estado !== 'BAJA')
+    .map(p => ({ ...p, dias: igDiasEnStock(p.fecha) }))
+    .sort((a,b) => b.dias - a.dias)
+    .slice(0, 20);
+  const tbInv = document.getElementById('igTbodyInvAntiguo');
+  if(tbInv) {
+    tbInv.innerHTML = inv.length ? inv.map(p => {
+      const cls = p.dias > 60 ? 'row-rojo' : p.dias >= 30 ? 'row-naranja' : '';
+      const badge = p.dias > 60 ? 'rojo' : p.dias >= 30 ? 'naranja' : 'normal';
+      return `<tr class="${cls}">
+        <td>${p.producto||'—'}</td>
+        <td><span class="badge-dias ${badge}">${p.dias} día${p.dias===1?'':'s'}</span></td>
+        <td>${fmt(p.costo||0)}</td>
+        <td>${p.sede||'—'}</td>
+      </tr>`;
+    }).join('') : '<tr><td colspan="4" style="text-align:center;color:#888;padding:24px;">Sin inventario antiguo</td></tr>';
+  }
+
+  // ── Tabla ventas del período ──
+  const tbV = document.getElementById('igTbodyVentas');
+  setText('igVentasCount', String(ventasFiltradas.length));
+  if(tbV) {
+    const ventasOrden = [...ventasFiltradas].sort((a,b) => (a.createdAt||'').localeCompare(b.createdAt||''));
+    tbV.innerHTML = ventasOrden.length ? ventasOrden.map(v => `
+      <tr>
+        <td>${igFmtHora(v.createdAt)}</td>
+        <td>${v.cliente||'—'}</td>
+        <td>${v.equipo||'—'}</td>
+        <td style="font-weight:700;color:#16a34a;">${fmt(v.venta||0)}</td>
+        <td>${v.asesor||'—'}</td>
+        <td>${igFmtSede(v.sedeId)}</td>
+      </tr>`).join('') : '<tr><td colspan="6" style="text-align:center;color:#888;padding:24px;">Sin ventas en el período</td></tr>';
+  }
+
+  // ── Tabla gastos del período ──
+  const tbG = document.getElementById('igTbodyGastos');
+  setText('igGastosCount', String(gastosFiltrados.length));
+  if(tbG) {
+    const gastosOrden = [...gastosFiltrados].sort((a,b) => (a.createdAt||'').localeCompare(b.createdAt||''));
+    tbG.innerHTML = gastosOrden.length ? gastosOrden.map(g => `
+      <tr>
+        <td>${igFmtHora(g.createdAt)}</td>
+        <td>${g.detalle||'—'}</td>
+        <td style="font-weight:700;color:#dc2626;">${fmt(g.pago||0)}</td>
+        <td>${(g.categoria||'—').toUpperCase()}</td>
+      </tr>`).join('') : '<tr><td colspan="4" style="text-align:center;color:#888;padding:24px;">Sin gastos en el período</td></tr>';
+  }
+}
+
+function igExportarPDF() {
+  window.print();
 }
 
 // ============================================================
