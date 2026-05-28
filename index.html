@@ -7876,6 +7876,32 @@ function igFiltrarGastos() {
   return gastos.filter(g => g.fecha === fechaSel);
 }
 
+function igRangoFechas() {
+  const fechaSel = document.getElementById('igFecha')?.value || fechaColombia();
+  if(igRangoActivo === '7dias') {
+    const desde = new Date(fechaColombia());
+    desde.setUTCDate(desde.getUTCDate() - 6);
+    return { desde: desde.toISOString().slice(0,10), hasta: fechaColombia() };
+  }
+  if(igRangoActivo === 'mes') {
+    const m = fechaColombia().substring(0,7);
+    return { desde: m + '-01', hasta: m + '-31' };
+  }
+  return { desde: fechaSel, hasta: fechaSel };
+}
+
+async function igCargarSalidasCaja() {
+  const { desde, hasta } = igRangoFechas();
+  try {
+    const filtro = `tipo=eq.salida&fecha=gte.${desde}&fecha=lte.${hasta}`;
+    const res = await sbFetch('movimientos_caja', { select:'caja_id,valor', filter:filtro });
+    return Array.isArray(res) ? res : [];
+  } catch(e) {
+    console.error('Error cargando salidas de caja:', e);
+    return [];
+  }
+}
+
 function igFmtHora(createdAt) {
   if(!createdAt) return '—';
   try {
@@ -7891,7 +7917,7 @@ function igFmtSede(sedeId) {
   return '—';
 }
 
-function renderInformeGerencial() {
+async function renderInformeGerencial() {
   if(!sesionActiva || sesionActiva.rol !== 'admin') return;
 
   // Header fecha
@@ -7909,11 +7935,14 @@ function renderInformeGerencial() {
 
   const ventasFiltradas = igFiltrarVentas();
   const gastosFiltrados = igFiltrarGastos();
+  const salidasCaja = await igCargarSalidasCaja();
 
   // KPIs
   const totalVentas = ventasFiltradas.reduce((s,v)=>s+(v.venta||0), 0);
+  const totalGanancia = ventasFiltradas.reduce((s,v)=>s+(v.ganancia||0), 0);
   const totalGastos = gastosFiltrados.reduce((s,g)=>s+(g.pago||0), 0);
-  const utilidad = totalVentas - totalGastos;
+  const totalSalidasCaja = salidasCaja.reduce((s,m)=>s+(parseFloat(m.valor)||0), 0);
+  const utilidad = totalGanancia - totalGastos - totalSalidasCaja;
   const ticket = ventasFiltradas.length > 0 ? Math.round(totalVentas / ventasFiltradas.length) : 0;
   const margen = totalVentas > 0 ? ((utilidad / totalVentas) * 100).toFixed(1) : '0';
 
@@ -7923,11 +7952,12 @@ function renderInformeGerencial() {
   setText('igKpiGastos', fmt(totalGastos));
   setText('igKpiGastosSub', `${gastosFiltrados.length} movimiento${gastosFiltrados.length===1?'':'s'}`);
   setText('igKpiUtilidad', fmt(utilidad));
-  setText('igKpiUtilidadSub', `Margen: ${margen}%`);
+  setText('igKpiUtilidadSub', `Ganancia ${fmt(totalGanancia)} − Gastos ${fmt(totalGastos)} − Cajas ${fmt(totalSalidasCaja)}`);
   const elUtil = document.getElementById('igKpiUtilidad');
   if(elUtil) {
     elUtil.classList.remove('purple','red');
     elUtil.classList.add(utilidad < 0 ? 'red' : 'purple');
+    elUtil.parentElement.title = `Margen sobre ventas: ${margen}%`;
   }
   setText('igKpiTicket', fmt(ticket));
 
