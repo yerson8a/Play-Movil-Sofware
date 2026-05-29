@@ -5291,6 +5291,18 @@ async function setGastosFijosMes(mes, data) {
   } catch(e) { console.error('Error guardando gastos fijos:', e); }
 }
 
+// Busca el registro más reciente de meses ANTERIORES al solicitado, para
+// heredar nombres y valores cuando el mes nuevo aún no tiene datos propios.
+async function cargarConfigMesAnterior(tipo, mes) {
+  try {
+    const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/configuracion_contabilidad?tipo=eq.${tipo}&mes=lt.${mes}&order=mes.desc&limit=1`, {headers});
+    const rows = await res.json();
+    if(rows && rows.length > 0) return JSON.parse(rows[0].datos);
+  } catch(e) { console.error('Error cargando config mes anterior:', e); }
+  return null;
+}
+
 async function cargarGastosFijosMes(mes) {
   try {
     const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
@@ -5298,6 +5310,14 @@ async function cargarGastosFijosMes(mes) {
     const rows = await res.json();
     if(rows && rows.length > 0) {
       _cacheGastos[mes] = JSON.parse(rows[0].datos);
+      return _cacheGastos[mes];
+    }
+    // Sin datos propios: heredar nombres y valores del último mes registrado
+    // y guardarlos como registro propio del mes nuevo.
+    const heredado = await cargarConfigMesAnterior('gastos_fijos', mes);
+    if(heredado && heredado.length) {
+      const data = heredado.map(g => ({ label: g.label, valor: g.valor }));
+      await setGastosFijosMes(mes, data);
       return _cacheGastos[mes];
     }
   } catch(e) { console.error('Error cargando gastos fijos:', e); }
@@ -5337,6 +5357,19 @@ async function cargarNominasMes(mes) {
     const rows = await res.json();
     if(rows && rows.length > 0) {
       _cacheNominas[mes] = JSON.parse(rows[0].datos);
+      return _cacheNominas[mes];
+    }
+    // Sin datos propios: heredar nombres y salarios del último mes registrado
+    // y guardarlos como registro propio del mes nuevo.
+    const heredado = await cargarConfigMesAnterior('nominas', mes);
+    if(heredado && heredado.length) {
+      const data = heredado.map(n => ({ nombre: n.nombre, salario: n.salario }));
+      // Agregar asesores activos que no estaban en la nómina heredada.
+      const presentes = new Set(data.map(n => n.nombre.toUpperCase()));
+      NOMINA_ASESORES.forEach(nombre => {
+        if(!presentes.has(nombre.toUpperCase())) data.push({ nombre, salario: 0 });
+      });
+      await setNominasMes(mes, data);
       return _cacheNominas[mes];
     }
   } catch(e) { console.error('Error cargando nóminas:', e); }
