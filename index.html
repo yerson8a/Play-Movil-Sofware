@@ -5699,9 +5699,9 @@ function renderInventario() {
   if(sub) sub.textContent = 'Gestión de stock por sede';
   aplicarFiltroInvSede();
 
-  // Botón traslado: solo visible para admin
+  // Botón traslado: visible para todos los usuarios con rol admin
   const btnTraslado = document.getElementById('btnTrasladoEquipo');
-  if(btnTraslado) btnTraslado.style.display = (esUsuarioAdmin()) ? '' : 'none';
+  if(btnTraslado) btnTraslado.style.display = (sesionActiva?.rol === 'admin') ? '' : 'none';
 
   // Botón agregar equipo: solo el administrador registra equipos (los asesores no)
   const btnAgregar = document.getElementById('btnAgregarEquipo');
@@ -5761,7 +5761,7 @@ function renderTablaInventario(data) {
       <td><span class="badge ${e.estado==='DISPONIBLE'?'badge-green':e.estado==='VENDIDO'?'badge-pink':e.estado==='GARANTIA'?'badge-orange':'badge-red'}">${e.estado}</span></td>
       <td style="display:flex;gap:4px;">
         <button class="btn btn-sm btn-ghost" onclick="verDetalleProducto(${e.id})" title="Ver detalle">🔍</button>
-        ${esUsuarioAdmin() ? `<button class="btn btn-sm btn-ghost" style="color:#6B2D8B;" onclick="abrirTrasladoEquipo(${e.id},'${e.producto?.replace(/'/g,"\'")}')" title="Trasladar">🔄</button>` : ''}
+        ${(sesionActiva?.rol === 'admin') ? `<button class="btn btn-sm btn-ghost" style="color:#6B2D8B;" onclick="abrirTrasladoEquipo(${e.id},'${e.producto?.replace(/'/g,"\'")}')" title="Trasladar">🔄</button>` : ''}
         ${esUsuarioAdmin() ? `<button class="btn btn-sm btn-ghost" onclick="eliminarEquipo(${e.id})" title="Eliminar">🗑️</button>` : ''}
       </td>
     </tr>`).join(''):'<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text2);">Sin equipos en este filtro</td></tr>';
