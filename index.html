@@ -12890,7 +12890,7 @@ async function guardarComisionVenta() {
     const v = db.ventas.find(x => x.id === ventaId);
     if(v) v.comisionAsesor = valor;
     closeModal('modalComisionVenta');
-    renderVentas();
+    aplicarFiltrosVentas();
     if(valor > 0) toast(`Comisión de ${fmt(valor)} registrada ✅`);
     else toast('Venta registrada sin comisión ✅');
   } catch(e) { toast('Error: '+e.message,'error'); }
