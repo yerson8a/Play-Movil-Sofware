@@ -1573,10 +1573,25 @@
       <div id="contab-gastos" style="display:none;">
         <div class="card">
           <div class="card-title">Registro de Gastos y Movimientos de Caja</div>
+          <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:16px;">
+            <div>
+              <label class="form-label" style="font-size:11px;">📅 Fecha de corte — Desde</label>
+              <input type="date" class="form-control" style="width:160px;" id="gastosFechaDesde" onchange="renderTablaGastos()">
+            </div>
+            <div>
+              <label class="form-label" style="font-size:11px;">Hasta</label>
+              <input type="date" class="form-control" style="width:160px;" id="gastosFechaHasta" onchange="renderTablaGastos()">
+            </div>
+            <button class="btn btn-sm btn-ghost" onclick="rangoRapidoGastos('hoy')">Hoy</button>
+            <button class="btn btn-sm btn-ghost" onclick="rangoRapidoGastos('mes')">Este mes</button>
+            <button class="btn btn-sm btn-ghost" onclick="limpiarFiltroGastos()">Limpiar</button>
+            <div style="margin-left:auto;font-size:13px;color:var(--text2);" id="gastosFiltroResumen"></div>
+          </div>
           <div class="table-wrap">
             <table>
               <thead><tr><th>Fecha</th><th>Detalle</th><th>Entradas</th><th>Pagos/Compras</th><th>Saldo</th></tr></thead>
               <tbody id="tbodyGastos"></tbody>
+              <tfoot id="tfootGastos"></tfoot>
             </table>
           </div>
         </div>
@@ -6253,14 +6268,7 @@ async function renderContabilidad(){
     </div>`).join('') || '<div style="padding:16px;color:#888899;font-size:13px;">Sin cartera activa</div>';
 
   // ── Movimientos caja ──
-  const tg = $('tbodyGastos');
-  if(tg) tg.innerHTML=db.gastos.map(g=>`
-    <tr>
-      <td>${g.fecha}</td><td>${g.detalle}</td>
-      <td style="color:#16a34a;">${g.entrada>0?fmt(g.entrada):'—'}</td>
-      <td style="color:#dc2626;">${g.pago>0?fmt(g.pago):'—'}</td>
-      <td style="font-weight:600;">${fmt(g.saldo)}</td>
-    </tr>`).join('');
+  renderTablaGastos();
 
   // ── Nómina editable por mes ──
   const nominasMes = await cargarNominasMes(mesActual);
@@ -6306,6 +6314,60 @@ async function renderContabilidad(){
       }).join('')}
       </tbody>
     </table></div>`;
+}
+
+// ── Tabla de gastos con filtro por fechas de corte ────────────
+function renderTablaGastos(){
+  const tg = $('tbodyGastos');
+  if(!tg) return;
+  const fDesde = document.getElementById('gastosFechaDesde')?.value || '';
+  const fHasta = document.getElementById('gastosFechaHasta')?.value || '';
+
+  let data = db.gastos.slice();
+  if(fDesde) data = data.filter(g => (g.fecha||'') >= fDesde);
+  if(fHasta) data = data.filter(g => (g.fecha||'') <= fHasta);
+
+  tg.innerHTML = data.length ? data.map(g=>`
+    <tr>
+      <td>${g.fecha}</td><td>${g.detalle}</td>
+      <td style="color:#16a34a;">${g.entrada>0?fmt(g.entrada):'—'}</td>
+      <td style="color:#dc2626;">${g.pago>0?fmt(g.pago):'—'}</td>
+      <td style="font-weight:600;">${fmt(g.saldo)}</td>
+    </tr>`).join('')
+    : '<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text2);">Sin gastos en el rango seleccionado</td></tr>';
+
+  const totalEntradas = data.reduce((a,g)=>a+(g.entrada||0),0);
+  const totalPagos    = data.reduce((a,g)=>a+(g.pago||0),0);
+  const tf = $('tfootGastos');
+  if(tf) tf.innerHTML = `
+    <tr style="border-top:2px solid #6B2D8B;font-weight:700;background:#faf7fd;">
+      <td colspan="2">TOTAL ${fDesde||fHasta ? '(rango seleccionado)' : ''}</td>
+      <td style="color:#16a34a;">${totalEntradas>0?fmt(totalEntradas):'—'}</td>
+      <td style="color:#dc2626;">${fmt(totalPagos)}</td>
+      <td></td>
+    </tr>`;
+
+  const resumen = document.getElementById('gastosFiltroResumen');
+  if(resumen) resumen.innerHTML = `${data.length} movimientos · Total pagos: <span style="color:#dc2626;font-weight:600;">${fmt(totalPagos)}</span>`;
+}
+
+function rangoRapidoGastos(rango){
+  const hoyStr = (typeof fechaColombia==='function') ? fechaColombia() : new Date().toISOString().slice(0,10);
+  let desde = hoyStr, hasta = hoyStr;
+  if(rango === 'mes') desde = hoyStr.slice(0,8) + '01';
+  const fD = document.getElementById('gastosFechaDesde');
+  const fH = document.getElementById('gastosFechaHasta');
+  if(fD) fD.value = desde;
+  if(fH) fH.value = hasta;
+  renderTablaGastos();
+}
+
+function limpiarFiltroGastos(){
+  const fD = document.getElementById('gastosFechaDesde');
+  const fH = document.getElementById('gastosFechaHasta');
+  if(fD) fD.value = '';
+  if(fH) fH.value = '';
+  renderTablaGastos();
 }
 
 // ── Editar gasto fijo / nómina con modal visual ───────────────
