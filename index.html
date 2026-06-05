@@ -8190,7 +8190,7 @@ async function renderInformeGerencial() {
 
   // ── Tabla inventario antiguo ──
   const inv = (db.inventario||[])
-    .filter(p => p.estado !== 'VENDIDO' && p.estado !== 'BAJA')
+    .filter(p => p.estado !== 'VENDIDO' && p.estado !== 'BAJA' && p.estado !== 'DEVUELTO')
     .map(p => ({ ...p, dias: igDiasEnStock(p.fecha) }))
     .sort((a,b) => b.dias - a.dias)
     .slice(0, 20);
