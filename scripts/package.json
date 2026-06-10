@@ -1,0 +1,12 @@
+{
+  "name": "playmovil-scripts",
+  "private": true,
+  "type": "module",
+  "description": "Scripts de mantenimiento de Play Móvil (migración a Supabase Auth). No forman parte de la app.",
+  "scripts": {
+    "migrar": "node migrar-usuarios.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2"
+  }
+}

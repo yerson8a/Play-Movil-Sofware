@@ -1,0 +1,10 @@
+# Dependencias del script de migración (no se versionan)
+node_modules/
+package-lock.json
+
+# Credenciales temporales generadas por migrar-usuarios.mjs — NUNCA subir
+credenciales-temporales.csv
+
+# Por si acaso, nunca versionar la service_role
+.env
+.env.*
