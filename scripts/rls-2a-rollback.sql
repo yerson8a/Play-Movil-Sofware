@@ -6,6 +6,16 @@
 -- igual que antes de 2a). Ejecutar en Supabase → SQL Editor.
 -- ============================================================
 
+-- Quitar triggers/función de 2b primero
+drop trigger if exists trg_forzar_sede on public.productos;
+drop trigger if exists trg_forzar_sede on public.ventas;
+drop trigger if exists trg_forzar_sede on public.creditos;
+drop trigger if exists trg_forzar_sede on public.garantias;
+drop trigger if exists trg_forzar_sede on public.gastos;
+drop trigger if exists trg_forzar_sede on public.servicio_tecnico;
+drop trigger if exists trg_forzar_sede on public.cajas;
+drop function if exists public.forzar_sede_insert();
+
 do $$
 declare t text;
 begin
