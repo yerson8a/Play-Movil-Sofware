@@ -532,6 +532,8 @@
   }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- SDK oficial de Supabase (Auth). La capa de datos sigue usando sbFetch con la anon key. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -586,6 +588,28 @@
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
       <button class="btn btn-ghost" onclick="closeModal('modalCambiarPass')">Cancelar</button>
       <button class="btn btn-primary" onclick="cambiarPassword()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL CAMBIO OBLIGATORIO (primer ingreso) ===== -->
+<!-- Sin botón cerrar ni cancelar: es bloqueante hasta que se cambie la contraseña temporal. -->
+<div class="modal-overlay" id="modalPassObligatorio" style="z-index:10000;">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-header">
+      <div class="modal-title">🔐 Crea tu nueva contraseña</div>
+    </div>
+    <p style="color:var(--text-muted,#666);font-size:13px;margin:0 0 14px;">Por seguridad debes cambiar tu contraseña temporal antes de continuar.</p>
+    <div class="form-group">
+      <label class="form-label">Nueva contraseña</label>
+      <input type="password" class="form-control" id="poblPassNueva" placeholder="Mínimo 8 caracteres">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Confirmar contraseña</label>
+      <input type="password" class="form-control" id="poblPassConfirm" placeholder="Repite la contraseña">
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-top:8px;">
+      <button class="btn btn-primary" onclick="guardarPassObligatorio()">Guardar y continuar</button>
     </div>
   </div>
 </div>
@@ -4697,6 +4721,19 @@
 
 const SUPABASE_URL = 'https://gopwheqqxxiafpdgpjrp.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdvcHdoZXFxeHhpYWZwZGdwanJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1NTc2MzMsImV4cCI6MjA5MDEzMzYzM30.Lc5Hpr_MaKWpISmSWzNy7r4bT81iVr7tu9Iizg42iww';
+
+// ── Cliente de Supabase Auth ────────────────────────────────
+// Usa la anon key (NUNCA la service_role en el frontend). Maneja el login,
+// la sesión persistente y el cierre. La tabla `perfiles` se lee/escribe con
+// este cliente (token autenticado), no con sbFetch.
+const { createClient } = window.supabase;
+const supa = createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, storageKey: 'pm_auth' }
+});
+
+// Dominio sintético interno: el usuario escribe solo su "usuario", nunca un email real.
+const EMAIL_DOMINIO = 'playmovil.store';
+const usuarioAEmail = u => `${String(u).trim().toLowerCase()}@${EMAIL_DOMINIO}`;
 
 // ── Función base para llamadas a Supabase REST API ──────────
 async function sbFetch(tabla, options = {}) {
@@ -11940,8 +11977,9 @@ function enviarFacturaCorreo() {
   // En producción aquí se conectaría con un servicio de email como EmailJS o Resend
 }
 
-// Close modal on overlay click
+// Close modal on overlay click (excepto el cambio de contraseña obligatorio: es bloqueante)
 document.querySelectorAll('.modal-overlay').forEach(o=>{
+  if(o.id === 'modalPassObligatorio') return;
   o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');});
 });
 
@@ -12191,28 +12229,11 @@ function filtrarUsuariosPorRol(r) {
 }
 
 async function crearUsuario() {
-  const nombre = document.getElementById('usuNombre').value.trim();
-  const usuario = document.getElementById('usuUsuario').value.trim().toLowerCase();
-  const pass = document.getElementById('usuPassword').value;
-  const conf = document.getElementById('usuPasswordConf').value;
-  const rol = document.getElementById('usuRol').value;
-  const sedeId = document.getElementById('usuSede').value || null;
-
-  if (!nombre || !usuario || !pass) { toast('Completa los campos obligatorios', 'error'); return; }
-  if (pass !== conf) { toast('Las contraseñas no coinciden', 'error'); return; }
-  if (pass.length < 6) { toast('La contraseña debe tener al menos 6 caracteres', 'error'); return; }
-
-  const hash = await sha256(pass);
-  try {
-    await sbFetch('sistema_usuarios', {
-      method: 'POST',
-      body: { nombre, usuario, password_hash: hash, rol, sede_id: sedeId ? parseInt(sedeId) : null, activo: true }
-    });
-    closeModal('modalNuevoUsuario');
-    ['usuNombre','usuUsuario','usuPassword','usuPasswordConf'].forEach(id => { const e = document.getElementById(id); if(e) e.value=''; });
-    await cargarUsuarios();
-    toast('Usuario creado ✅');
-  } catch(e) { toast('Error: ' + e.message, 'error'); }
+  // DESHABILITADO tras la migración a Supabase Auth.
+  // Crear un usuario solo en `sistema_usuarios` ya NO genera un login válido:
+  // las cuentas viven en auth.users + perfiles y se crean con la service_role
+  // (script scripts/migrar-usuarios.mjs o un futuro panel admin con Auth).
+  toast('La gestión de usuarios se migró a Supabase Auth. Crea las cuentas con el script de migración (pendiente: panel admin con Auth).', 'error');
 }
 
 function abrirEditarUsuario(id) {
@@ -12320,6 +12341,14 @@ function marcarTodasCajas(todas) {
 }
 
 async function actualizarUsuario() {
+  // DESHABILITADO tras la migración a Supabase Auth.
+  // El rol/sede/permisos y la contraseña ahora viven en `perfiles` + auth.users,
+  // no en `sistema_usuarios`. Editar aquí ya no afecta el login real, así que se
+  // bloquea el guardado para no dar una falsa sensación de cambio.
+  // (pendiente: panel admin que edite `perfiles` con la sesión autenticada).
+  toast('Edición deshabilitada: los usuarios se migraron a Supabase Auth. La gestión de roles/permisos se hará en el nuevo panel.', 'error');
+  return;
+  /* eslint-disable no-unreachable */
   const id   = document.getElementById('editUsuId').value;
   const pass = document.getElementById('editUsuPassword').value;
   const conf = document.getElementById('editUsuPasswordConf').value;
@@ -12355,7 +12384,7 @@ async function actualizarUsuario() {
     modulos_permitidos,
     cajas_permitidas
   };
-  if(pass) row.password_hash = await sha256(pass);
+  // (código histórico inalcanzable; la contraseña ahora se gestiona en Supabase Auth)
 
   try {
     await sbFetch(`sistema_usuarios?id=eq.${id}`, { method: 'PATCH', body: row });
@@ -13271,11 +13300,49 @@ function editarGastoFijo(idx) {
 let sesionActiva = null;
 
 // Hash SHA-256 simple (para verificar contrasena)
-async function sha256(text) {
-  const msgBuffer = new TextEncoder().encode(text);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+// Lee el perfil del usuario autenticado desde la tabla `perfiles`.
+// Usa el cliente `supa` (token autenticado) — NO sbFetch — para que la RLS
+// de perfiles (auth.uid() = id) aplique.
+async function cargarPerfil(uid) {
+  try {
+    const { data, error } = await supa.from('perfiles').select('*').eq('id', uid).maybeSingle();
+    if (error) { console.error('Error cargando perfil:', error); return null; }
+    return data;
+  } catch(e) { console.error('Error cargando perfil:', e); return null; }
+}
+
+// Muestra la pantalla de login y limpia el estado visible.
+function mostrarLogin() {
+  document.body.className = '';
+  const ls = document.getElementById('loginScreen'); if (ls) ls.classList.remove('hidden');
+  const u = document.getElementById('loginUsuario'); if (u) u.value = '';
+  const p = document.getElementById('loginPass');    if (p) p.value = '';
+}
+
+// Punto único de arranque de sesión: valida perfil, estado y cambio obligatorio.
+async function iniciarConSesion(authUser) {
+  const perfil = await cargarPerfil(authUser.id);
+  if (!perfil) {
+    toast('Tu usuario no tiene un perfil configurado. Contacta al administrador.', 'error');
+    await supa.auth.signOut();
+    mostrarLogin();
+    return false;
+  }
+  if (perfil.activo === false) {
+    toast('Tu usuario está inactivo. Contacta al administrador.', 'error');
+    await supa.auth.signOut();
+    mostrarLogin();
+    return false;
+  }
+
+  // Marcar último acceso (silencioso, no bloquea el login)
+  supa.from('perfiles').update({ ultimo_acceso: new Date().toISOString() }).eq('id', perfil.id).then(() => {}, () => {});
+
+  await activarSesion(perfil);
+
+  // Cambio de contraseña obligatorio en el primer ingreso
+  if (perfil.debe_cambiar_password) abrirCambioObligatorio();
+  return true;
 }
 
 async function hacerLogin() {
@@ -13295,14 +13362,12 @@ async function hacerLogin() {
   btn.disabled = true;
 
   try {
-    const hash = await sha256(pass);
-    // Buscar usuario en Supabase
-    const res = await sbFetch('sistema_usuarios', {
-      filter: `usuario=eq.${usuario}&password_hash=eq.${hash}&activo=eq.true`,
-      select: 'id,usuario,nombre,rol,sede_id,modulos_permitidos,cajas_permitidas'
+    const { data, error } = await supa.auth.signInWithPassword({
+      email: usuarioAEmail(usuario),
+      password: pass
     });
 
-    if (!res || res.length === 0) {
+    if (error || !data?.user) {
       errEl.textContent = 'Usuario o contraseña incorrectos';
       errEl.classList.add('show');
       btn.textContent = 'Ingresar →';
@@ -13310,19 +13375,7 @@ async function hacerLogin() {
       return;
     }
 
-    const user = res[0];
-    sesionActiva = user;
-
-    // Guardar sesion en sessionStorage
-    sessionStorage.setItem('pm_sesion', JSON.stringify(user));
-
-    // Actualizar ultimo acceso (silencioso, no bloquea el login)
-    sbFetch(`sistema_usuarios?id=eq.${user.id}`, {
-      method: 'PATCH',
-      body: { ultimo_acceso: new Date().toISOString() }
-    }).catch(() => null);
-
-    await activarSesion(user);
+    await iniciarConSesion(data.user);
 
   } catch(e) {
     errEl.textContent = 'Error de conexión. Intenta de nuevo.';
@@ -13429,16 +13482,13 @@ document.addEventListener('click', e => {
   }
 });
 
-function cerrarSesion() {
-  sessionStorage.removeItem('pm_sesion');
+async function cerrarSesion() {
+  try { await supa.auth.signOut(); } catch(e) { console.error('Error al cerrar sesión:', e); }
   sesionActiva = null;
-  document.body.className = '';
-  document.getElementById('loginScreen').classList.remove('hidden');
-  document.getElementById('loginUsuario').value = '';
-  document.getElementById('loginPass').value = '';
-  document.getElementById('userMenu').classList.remove('open');
+  const menu = document.getElementById('userMenu'); if (menu) menu.classList.remove('open');
   // Limpiar datos en memoria
   Object.keys(db).forEach(k => db[k] = []);
+  mostrarLogin();
   toast('Sesión cerrada');
 }
 
@@ -13453,54 +13503,101 @@ async function cambiarPassword() {
   const confirm = document.getElementById('passConfirm').value;
 
   if (!actual || !nueva || !confirm) { toast('Completa todos los campos','error'); return; }
-  if (nueva.length < 6)  { toast('La contraseña debe tener al menos 6 caracteres','error'); return; }
+  if (nueva.length < 8)  { toast('La contraseña debe tener al menos 8 caracteres','error'); return; }
   if (nueva !== confirm) { toast('Las contraseñas no coinciden','error'); return; }
 
-  const hashActual = await sha256(actual);
-  const hashNueva  = await sha256(nueva);
+  showLoader('Actualizando contraseña...');
+  try {
+    // Verificar contraseña actual reautenticando contra Supabase Auth
+    const { error: errVerif } = await supa.auth.signInWithPassword({
+      email: usuarioAEmail(sesionActiva.usuario),
+      password: actual
+    });
+    if (errVerif) { hideLoader(); toast('La contraseña actual es incorrecta','error'); return; }
 
-  // Verificar contrasena actual
-  const check = await sbFetch('sistema_usuarios', {
-    filter: `id=eq.${sesionActiva.id}&password_hash=eq.${hashActual}`,
-    select: 'id'
-  });
+    const { error } = await supa.auth.updateUser({ password: nueva });
+    if (error) { hideLoader(); toast('No se pudo actualizar: ' + error.message, 'error'); return; }
 
-  if (!check || check.length === 0) {
-    toast('La contraseña actual es incorrecta','error');
-    return;
+    // Si venía de cambio obligatorio, bajar el flag
+    if (sesionActiva.debe_cambiar_password) {
+      await supa.from('perfiles').update({ debe_cambiar_password: false }).eq('id', sesionActiva.id);
+      sesionActiva.debe_cambiar_password = false;
+    }
+
+    hideLoader();
+    closeModal('modalCambiarPass');
+    ['passActual','passNueva','passConfirm'].forEach(id => { const e = document.getElementById(id); if(e) e.value=''; });
+    toast('Contraseña actualizada correctamente ✅');
+  } catch(e) {
+    hideLoader();
+    console.error('Error al cambiar contraseña:', e);
+    toast('Error al actualizar la contraseña','error');
   }
+}
 
-  await sbFetch(`sistema_usuarios?id=eq.${sesionActiva.id}`, {
-    method: 'PATCH',
-    body: { password_hash: hashNueva }
-  });
+// ── Cambio obligatorio en el primer ingreso (modal bloqueante) ──
+function abrirCambioObligatorio() {
+  const n = document.getElementById('poblPassNueva');    if (n) n.value = '';
+  const c = document.getElementById('poblPassConfirm');  if (c) c.value = '';
+  openModal('modalPassObligatorio');
+}
 
-  closeModal('modalCambiarPass');
-  ['passActual','passNueva','passConfirm'].forEach(id => { const e = document.getElementById(id); if(e) e.value=''; });
-  toast('Contraseña actualizada correctamente ✅');
+async function guardarPassObligatorio() {
+  const nueva   = document.getElementById('poblPassNueva').value;
+  const confirm = document.getElementById('poblPassConfirm').value;
+
+  if (!nueva || !confirm) { toast('Completa ambos campos','error'); return; }
+  if (nueva.length < 8)   { toast('La contraseña debe tener al menos 8 caracteres','error'); return; }
+  if (nueva !== confirm)  { toast('Las contraseñas no coinciden','error'); return; }
+
+  showLoader('Actualizando contraseña...');
+  try {
+    const { error } = await supa.auth.updateUser({ password: nueva });
+    if (error) { hideLoader(); toast('No se pudo actualizar: ' + error.message, 'error'); return; }
+
+    await supa.from('perfiles').update({ debe_cambiar_password: false }).eq('id', sesionActiva.id);
+    sesionActiva.debe_cambiar_password = false;
+
+    hideLoader();
+    closeModal('modalPassObligatorio');
+    document.getElementById('poblPassNueva').value = '';
+    document.getElementById('poblPassConfirm').value = '';
+    toast('Contraseña actualizada ✅ Bienvenido');
+  } catch(e) {
+    hideLoader();
+    console.error('Error en cambio obligatorio:', e);
+    toast('Error al actualizar la contraseña','error');
+  }
 }
 
 // ============================================================
 // INIT — Verificar sesion guardada o mostrar login
 // ============================================================
 async function init() {
-  // Revisar si hay sesion activa guardada
-  const sesionGuardada = sessionStorage.getItem('pm_sesion');
-  if (sesionGuardada) {
-    try {
-      const user = JSON.parse(sesionGuardada);
-      await activarSesion(user);
-      // Cargar financieras al inicio para tenerlas disponibles
-      await cargarFinancieras();
-      await cargarSedes();
-      poblarSelectSedes();
-      return;
-    } catch(e) {
-      sessionStorage.removeItem('pm_sesion');
+  try {
+    // getUser() valida el token CONTRA el servidor de Auth (no confía en
+    // un objeto editable del navegador). Devuelve null si no hay sesión válida.
+    const { data: { user } } = await supa.auth.getUser();
+    if (user) {
+      const ok = await iniciarConSesion(user);
+      if (ok) {
+        // Cargar financieras/sedes al inicio para tenerlas disponibles
+        await cargarFinancieras();
+        await cargarSedes();
+        poblarSelectSedes();
+      }
+    } else {
+      mostrarLogin();
     }
+  } catch(e) {
+    console.error('Error restaurando sesión:', e);
+    mostrarLogin();
   }
-  // Si no hay sesion mostrar pantalla de login
-  document.getElementById('loginScreen').classList.remove('hidden');
+
+  // Si la sesión se cierra o expira en cualquier momento, volver al login.
+  supa.auth.onAuthStateChange((event) => {
+    if (event === 'SIGNED_OUT') mostrarLogin();
+  });
 }
 
 init();
