@@ -4735,6 +4735,14 @@ const supa = createClient(SUPABASE_URL, SUPABASE_KEY, {
 const EMAIL_DOMINIO = 'playmovil.store';
 const usuarioAEmail = u => `${String(u).trim().toLowerCase()}@${EMAIL_DOMINIO}`;
 
+// Bearer para las llamadas REST (PostgREST): la anon key ANTES del login y el
+// JWT del usuario autenticado DESPUÉS. Se mantiene fresco automáticamente
+// (incluye el refresco de token). El header `apikey` sigue siendo la anon key.
+let SB_AUTH = SUPABASE_KEY;
+supa.auth.onAuthStateChange((_event, session) => {
+  SB_AUTH = session?.access_token || SUPABASE_KEY;
+});
+
 // ── Función base para llamadas a Supabase REST API ──────────
 async function sbFetch(tabla, options = {}) {
   const { method='GET', filter='', body=null, select='*', order='' } = options;
@@ -4750,7 +4758,7 @@ async function sbFetch(tabla, options = {}) {
 
   const headers = {
     'apikey': SUPABASE_KEY,
-    'Authorization': `Bearer ${SUPABASE_KEY}`,
+    'Authorization': `Bearer ${SB_AUTH}`,
     'Content-Type': 'application/json',
     'Prefer': method === 'POST' ? 'return=representation' : 'return=representation'
   };
@@ -5323,7 +5331,7 @@ async function setGastosFijosMes(mes, data) {
   // Guardar en Supabase tabla configuracion_contabilidad
   try {
     const headers = {
-      'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH,
       'Content-Type': 'application/json', 'Prefer': 'return=representation'
     };
     // Buscar si ya existe registro para este mes
@@ -5347,7 +5355,7 @@ async function setGastosFijosMes(mes, data) {
 // heredar nombres y valores cuando el mes nuevo aún no tiene datos propios.
 async function cargarConfigMesAnterior(tipo, mes) {
   try {
-    const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+    const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH };
     const res = await fetch(`${SUPABASE_URL}/rest/v1/configuracion_contabilidad?tipo=eq.${tipo}&mes=lt.${mes}&order=mes.desc&limit=1`, {headers});
     const rows = await res.json();
     if(rows && rows.length > 0) return JSON.parse(rows[0].datos);
@@ -5357,7 +5365,7 @@ async function cargarConfigMesAnterior(tipo, mes) {
 
 async function cargarGastosFijosMes(mes) {
   try {
-    const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+    const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH };
     const res = await fetch(`${SUPABASE_URL}/rest/v1/configuracion_contabilidad?tipo=eq.gastos_fijos&mes=eq.${mes}`, {headers});
     const rows = await res.json();
     if(rows && rows.length > 0) {
@@ -5385,7 +5393,7 @@ async function setNominasMes(mes, data) {
   _cacheNominas[mes] = data;
   try {
     const headers = {
-      'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH,
       'Content-Type': 'application/json', 'Prefer': 'return=representation'
     };
     const res = await fetch(`${SUPABASE_URL}/rest/v1/configuracion_contabilidad?tipo=eq.nominas&mes=eq.${mes}`, {headers});
@@ -5404,7 +5412,7 @@ async function setNominasMes(mes, data) {
 
 async function cargarNominasMes(mes) {
   try {
-    const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+    const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH };
     const res = await fetch(`${SUPABASE_URL}/rest/v1/configuracion_contabilidad?tipo=eq.nominas&mes=eq.${mes}`, {headers});
     const rows = await res.json();
     if(rows && rows.length > 0) {
@@ -5941,7 +5949,7 @@ async function aplicarFiltrosVentas() {
     // Consultar ventas_detalle si hay suficientes caracteres
     if(qImei.length >= 4) {
       try {
-        const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+        const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH };
         const res = await fetch(`${SUPABASE_URL}/rest/v1/ventas_detalle?select=venta_id&imei=ilike.*${encodeURIComponent(qImei)}*`, {headers});
         const rows = await res.json();
         if(Array.isArray(rows)) rows.forEach(r => ventaIdsConIMEI.add(r.venta_id));
@@ -6161,7 +6169,7 @@ async function filtrarCreditosPorIMEI(q) {
   } else {
     // Si no hay en memoria, buscar en Supabase
     try {
-      const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+      const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH };
       const r1 = await fetch(`${SUPABASE_URL}/rest/v1/ventas?select=cedula_cliente,cliente&imei=ilike.*${encodeURIComponent(q)}*&limit=20`, {headers});
       const rows = await r1.json();
       if(Array.isArray(rows) && rows.length) {
@@ -6540,7 +6548,7 @@ async function renderResumenGastosConsolidado(mes) {
   // 3. Gastos por caja - consultar movimientos_caja del mes con tipo "salida"
   let gastosPorCaja = {};
   try {
-    const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+    const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH };
     // Cargar todas las cajas
     const resCajas = await fetch(SUPABASE_URL + '/rest/v1/cajas?select=id,nombre,sede_id', {headers});
     const cajas = await resCajas.json();
@@ -7078,7 +7086,7 @@ async function guardarProveedor(){
   // También verificar en Supabase por si hay datos más nuevos
   try {
     const nitLimpio = nit.replace(/[^0-9]/g,'');
-    const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+    const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH };
     const res = await fetch(`${SUPABASE_URL}/rest/v1/proveedores?select=id,nombre,nit&nit=eq.${nitLimpio}`, {headers});
     const rows = await res.json();
     if(rows && rows.length > 0) {
@@ -7708,7 +7716,7 @@ async function cargarBitacoraTarea(tareaId) {
   if(!lista) return;
   lista.innerHTML = '<div style="text-align:center;padding:24px;color:#888899;">Cargando...</div>';
   try {
-    const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+    const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH };
     const res = await fetch(
       `${SUPABASE_URL}/rest/v1/bitacora_creditos?credito_id=eq.${tareaId}&order=created_at.desc&limit=50`,
       {headers}
@@ -7755,7 +7763,7 @@ async function guardarBitacoraTarea() {
   };
   try {
     showLoader('Guardando...');
-    const headers = { 'apikey':SUPABASE_KEY, 'Authorization':'Bearer '+SUPABASE_KEY, 'Content-Type':'application/json', 'Prefer':'return=representation' };
+    const headers = { 'apikey':SUPABASE_KEY, 'Authorization':'Bearer '+SB_AUTH, 'Content-Type':'application/json', 'Prefer':'return=representation' };
     await fetch(`${SUPABASE_URL}/rest/v1/bitacora_creditos`, { method:'POST', headers, body:JSON.stringify(row) });
     hideLoader();
     document.getElementById('bitNota').value='';
@@ -8371,7 +8379,7 @@ async function cargarBitacora(creditoId) {
   if(!lista) return;
   lista.innerHTML = '<div style="text-align:center;padding:24px;color:#888899;">⏳ Cargando...</div>';
   try {
-    const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+    const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH };
     const res = await fetch(
       `${SUPABASE_URL}/rest/v1/bitacora_creditos?credito_id=eq.${creditoId}&order=created_at.desc&limit=50`,
       {headers}
@@ -8432,7 +8440,7 @@ async function guardarBitacora() {
   try {
     showLoader('Guardando gestión...');
     const headers = {
-      'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH,
       'Content-Type': 'application/json', 'Prefer': 'return=representation'
     };
     await fetch(`${SUPABASE_URL}/rest/v1/bitacora_creditos`, {
@@ -8695,7 +8703,7 @@ async function buscarClienteUnificado(q, prefijo) {
   // Si no hay resultados locales, buscar en Supabase directamente
   if(!resultados.length && q.length >= 3) {
     try {
-      const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+      const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH };
       const r1 = await fetch(`${SUPABASE_URL}/rest/v1/clientes?select=id,nombre,tipo_doc,documento,telefono,correo&nombre=ilike.*${encodeURIComponent(q)}*&limit=10`, {headers});
       const r2 = await fetch(`${SUPABASE_URL}/rest/v1/clientes?select=id,nombre,tipo_doc,documento,telefono,correo&documento=ilike.*${encodeURIComponent(q)}*&limit=10`, {headers});
       const d1 = await r1.json(); const d2 = await r2.json();
@@ -8850,7 +8858,7 @@ async function validarIMEIProd() {
   const imei = document.getElementById('prodIMEI1')?.value?.trim();
   const errEl = document.getElementById('prodIMEI1Error');
   if(!imei || imei.length < 8) { if(errEl) errEl.style.display='none'; return; }
-  const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+  const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH };
   const res = await fetch(`${SUPABASE_URL}/rest/v1/productos?select=id,producto&imei1=eq.${imei}&limit=1`, {headers});
   const rows = await res.json();
   if(errEl) errEl.style.display = (rows && rows.length > 0) ? 'block' : 'none';
@@ -9551,7 +9559,7 @@ async function verDetalleVenta(id) {
   // Cargar detalles de productos desde ventas_detalle
   let detalles = [];
   try {
-    const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+    const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH };
     const res = await fetch(`${SUPABASE_URL}/rest/v1/ventas_detalle?venta_id=eq.${id}&order=id.asc`, {headers});
     detalles = await res.json() || [];
   } catch(e){ console.error(e); }
@@ -9615,7 +9623,7 @@ async function verFacturaVenta() {
   // Buscar datos ampliados desde Supabase para tener todos los campos
   let ventaCompleta = v;
   try {
-    const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+    const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH };
     const res = await fetch(`${SUPABASE_URL}/rest/v1/ventas?id=eq.${v.id}&select=*`, {headers});
     const rows = await res.json();
     if(rows && rows.length) ventaCompleta = { ...v, ...rows[0] };
@@ -9629,7 +9637,7 @@ async function verFacturaVenta() {
   // Si no está en memoria, buscar en Supabase
   if(!cred && v.tipo === 'credito') {
     try {
-      const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+      const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH };
       const res = await fetch(
         `${SUPABASE_URL}/rest/v1/creditos?cedula_cliente=eq.${encodeURIComponent(v.cedula||'')}&select=*&limit=1`,
         {headers}
@@ -9653,7 +9661,7 @@ async function verFacturaVenta() {
   // Cargar productos desde ventas_detalle (una sola fuente de verdad)
   let productosList = null;
   try {
-    const headersF = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+    const headersF = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH };
     const resD = await fetch(`${SUPABASE_URL}/rest/v1/ventas_detalle?venta_id=eq.${v.id}&order=id.asc`, {headers:headersF});
     const detalles = await resD.json();
     if(Array.isArray(detalles) && detalles.length > 0) {
@@ -9741,7 +9749,7 @@ async function confirmarAnularVentaContado() {
   if(!confirm(msgConfirm)) return;
 
   showLoader('Anulando venta...');
-  const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' };
+  const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH, 'Content-Type': 'application/json' };
   const base = SUPABASE_URL + '/rest/v1';
   const resumen = { ventasAnuladas:0, creditosAnulados:0, equiposDevueltos:[] };
 
@@ -10074,7 +10082,7 @@ function abrirTrasladoEquipo(productoId, nombre) {
 
 async function buscarParaTraslado(val) {
   if(val.length < 5) { document.getElementById('trasladoBuscaInfo').style.display='none'; return; }
-  const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+  const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH };
   const base = SUPABASE_URL + '/rest/v1/productos';
   let res = await fetch(`${base}?select=id,producto,imei1,estado,sede_id&imei1=eq.${val}`, {headers});
   let rows = await res.json();
@@ -10116,7 +10124,7 @@ async function confirmarTraslado() {
     showLoader('Trasladando equipo...');
     const headers = {
       'apikey': SUPABASE_KEY,
-      'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'Authorization': 'Bearer ' + SB_AUTH,
       'Content-Type': 'application/json'
     };
     // Actualizar sede_id del producto
@@ -10710,7 +10718,7 @@ function abrirModalAgregarProducto(tipo) {
 async function buscarIMEIModalProd(val) {
   if(val.length < 5) { document.getElementById('mpIMEIInfo').style.display='none'; return; }
   try {
-    const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+    const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH };
     const base = SUPABASE_URL + '/rest/v1/productos';
     const sel  = 'select=id,producto,imei1,imei2,serial,valor_compra,sede_id,proveedor_id';
     let res = await fetch(`${base}?${sel}&imei1=eq.${val}`, {headers});
@@ -10779,7 +10787,7 @@ async function buscarIMEIVenta(val){
   // Si no está en memoria, buscar en Supabase
   if(!found) {
     try {
-      const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+      const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH };
       const base = SUPABASE_URL + '/rest/v1/productos';
       const sel  = 'select=id,producto,imei1,imei2,serial,valor_compra,sede_id,proveedor_id,estado';
       let res = await fetch(`${base}?${sel}&imei1=eq.${val}`, {headers});
@@ -10829,7 +10837,7 @@ async function buscarIMEICredito(val){
   try {
     const headers = {
       'apikey': SUPABASE_KEY,
-      'Authorization': 'Bearer ' + SUPABASE_KEY
+      'Authorization': 'Bearer ' + SB_AUTH
     };
     const base = SUPABASE_URL + '/rest/v1/productos';
     const sel = 'select=id,producto,imei1,imei2,serial,valor_compra,sede_id,proveedor_id';
@@ -11237,7 +11245,7 @@ function abrirCambioEquipo(id) {
 
 async function buscarNuevoEquipoCambio(val) {
   if(val.length < 5) { document.getElementById('cambioNuevoInfo').style.display='none'; return; }
-  const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+  const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH };
   const base = SUPABASE_URL + '/rest/v1/productos';
   const sel = 'select=id,producto,imei1,valor_compra&estado=eq.DISPONIBLE';
   let res = await fetch(`${base}?${sel}&imei1=eq.${val}`, {headers});
@@ -11259,7 +11267,7 @@ async function buscarNuevoEquipoCambio(val) {
 
 async function buscarParaSalida(val) {
   if(val.length < 5) { document.getElementById('salidaInfo').style.display='none'; return; }
-  const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+  const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH };
   const base = SUPABASE_URL + '/rest/v1/productos';
   let res = await fetch(`${base}?select=id,producto,imei1,valor_compra,estado&imei1=eq.${val}`, {headers});
   let rows = await res.json();
@@ -11292,7 +11300,7 @@ async function ejecutarAnulacion() {
 
     try {
       showLoader('Anulando venta...');
-      const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+      const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH };
       const baseUrl = SUPABASE_URL + '/rest/v1';
       const nota = 'ANULADO: ' + motivo + '. ' + obs;
 
@@ -11411,7 +11419,7 @@ async function ejecutarAnulacion() {
 
     try {
       showLoader('Procesando cambio...');
-      const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+      const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH };
       const base = SUPABASE_URL + '/rest/v1/productos';
 
       // Obtener datos del nuevo equipo
@@ -11477,7 +11485,7 @@ async function ejecutarSalidaInventario() {
 async function marcarProductoVendido(imei, nombreEquipo) {
   const headers = {
     'apikey': SUPABASE_KEY,
-    'Authorization': 'Bearer ' + SUPABASE_KEY,
+    'Authorization': 'Bearer ' + SB_AUTH,
     'Content-Type': 'application/json'
   };
   const base = SUPABASE_URL + '/rest/v1/productos';
@@ -11530,7 +11538,7 @@ async function validarDisponibilidadProducto(imei, nombreEquipo) {
   // Verificar si ya existe una venta ACTIVA (no anulada) con este IMEI
   if(imei && imei.length > 5) {
     try {
-      const headers2 = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+      const headers2 = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH };
       // Filtrar: IMEI igual, valor_venta > 0 (no anulada), y observaciones no empieza con ANULADA
       const resV = await fetch(
         `${SUPABASE_URL}/rest/v1/ventas?select=id,observaciones,valor_venta&imei=eq.${imei}&limit=5`,
@@ -11551,7 +11559,7 @@ async function validarDisponibilidadProducto(imei, nombreEquipo) {
   }
   // Si hay IMEI buscar en Supabase si ya está vendido
   if(imei && imei.length > 5) {
-    const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+    const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH };
     const base = SUPABASE_URL + '/rest/v1/productos';
 
     // Buscar por imei1
@@ -11754,7 +11762,7 @@ async function handleUpload(input, previewId) {
         method: 'POST',
         headers: {
           'apikey':        SUPABASE_KEY,
-          'Authorization': 'Bearer ' + SUPABASE_KEY,
+          'Authorization': 'Bearer ' + SB_AUTH,
           'Content-Type':  file.type || 'application/octet-stream',
           'x-upsert':      'true'
         },
@@ -13334,6 +13342,13 @@ async function iniciarConSesion(authUser) {
     mostrarLogin();
     return false;
   }
+
+  // Sembrar el bearer ANTES de cualquier carga de datos (cargarDatosPorSede, etc.)
+  // para que las llamadas REST viajen con el JWT del usuario, no con la anon key.
+  try {
+    const { data: { session } } = await supa.auth.getSession();
+    SB_AUTH = session?.access_token || SUPABASE_KEY;
+  } catch(e) { /* se mantiene el valor del listener */ }
 
   // Marcar último acceso (silencioso, no bloquea el login)
   supa.from('perfiles').update({ ultimo_acceso: new Date().toISOString() }).eq('id', perfil.id).then(() => {}, () => {});
