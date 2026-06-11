@@ -4537,6 +4537,21 @@
   </div>
 </div>
 
+<!-- ===== MODAL HISTORIAL DE PAGOS DEL CRÉDITO ===== -->
+<div class="modal-overlay" id="modalHistorialCredito">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-header">
+      <div class="modal-title">📜 Historial de pagos</div>
+      <button class="modal-close" onclick="closeModal('modalHistorialCredito')">✕</button>
+    </div>
+    <div id="historialCredContenido" style="max-height:60vh;overflow:auto;"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+      <button class="btn btn-ghost" onclick="closeModal('modalHistorialCredito')">Cerrar</button>
+      <button class="btn btn-outline" onclick="imprimirReciboHistorial()">🖨️ Imprimir recibo</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal Asignar Asesor -->
 <div class="modal-overlay" id="modalAsignarAsesor">
   <div class="modal" style="max-width:440px;">
@@ -6115,7 +6130,10 @@ function renderCreditos(filtro='activos'){
       <div class="cc-footer" style="flex-direction:column;gap:8px;align-items:stretch;">
         <div style="display:flex;justify-content:space-between;align-items:center;">
           <div class="cc-asesor">Cédula: ${c.cedula}</div>
-          <button class="btn btn-sm btn-outline" onclick="registrarPago(${c.id})">+ Pago</button>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-sm btn-ghost" style="font-size:11px;color:#6B2D8B;" onclick="abrirHistorialCredito(${c.id})" title="Historial de pagos / recibo">📜 Historial</button>
+            <button class="btn btn-sm btn-outline" onclick="registrarPago(${c.id})">+ Pago</button>
+          </div>
         </div>
         ${(c.docCedFront||c.docCedBack||c.docFoto||c.docContrato)?`
         <div style="display:flex;gap:6px;flex-wrap:wrap;padding-top:6px;border-top:1px solid #f0ecf8;">
@@ -6236,7 +6254,10 @@ async function filtrarCreditosPorIMEI(q) {
       <div class="cc-footer" style="flex-direction:column;gap:8px;align-items:stretch;">
         <div style="display:flex;justify-content:space-between;align-items:center;">
           <div class="cc-asesor">Cedula: ${c.cedula}</div>
-          <button class="btn btn-sm btn-outline" onclick="registrarPago(${c.id})">+ Pago</button>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-sm btn-ghost" style="font-size:11px;color:#6B2D8B;" onclick="abrirHistorialCredito(${c.id})" title="Historial de pagos / recibo">📜 Historial</button>
+            <button class="btn btn-sm btn-outline" onclick="registrarPago(${c.id})">+ Pago</button>
+          </div>
         </div>
         <div style="display:flex;gap:6px;border-top:1px solid #f0ecf8;padding-top:8px;">
           <button class="btn btn-sm btn-ghost" style="flex:1;font-size:11px;" onclick="abrirCambioEquipo(${c.id})">Cambio</button>
@@ -9449,9 +9470,8 @@ async function confirmarAbono() {
       transf,
       obs,
       nroCuota,
+      cuotasTotal: credito.cuotas,
       fecha:     new Date().toLocaleDateString('es-CO',{timeZone:'America/Bogota',year:'numeric',month:'long',day:'numeric'}),
-      saldoAntes: credito.saldo,
-      saldoDespues: Math.max(0, credito.saldo - valor),
       numero:    'REC-'+Date.now().toString().slice(-6)
     });
     toast('Abono registrado ✅');
@@ -10168,13 +10188,9 @@ function mostrarReciboAbono(d) {
       <div><span style="color:#888899;">Cliente:</span> <strong>${d.cliente}</strong></div>
       <div><span style="color:#888899;">Fecha:</span> <strong>${d.fecha}</strong></div>
       <div><span style="color:#888899;">Equipo:</span> <strong>${d.equipo}</strong></div>
-      <div><span style="color:#888899;">N° Cuota:</span> <strong style="color:#6B2D8B;">Cuota ${d.nroCuota}</strong></div>
+      <div><span style="color:#888899;">N° Cuota:</span> <strong style="color:#6B2D8B;">Cuota ${d.nroCuota} de ${d.cuotasTotal||'—'}</strong></div>
     </div>
     <div style="background:#f7f5fb;border-radius:12px;padding:16px;margin-bottom:16px;">
-      <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px;">
-        <span style="color:#888899;">Saldo anterior:</span>
-        <span style="font-weight:600;">${fmt(d.saldoAntes)}</span>
-      </div>
       <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px;">
         <span style="color:#888899;">Forma de pago:</span>
         <span style="font-weight:600;">${d.metodo}${d.transf?' — Ref: '+d.transf:''}</span>
@@ -10183,10 +10199,6 @@ function mostrarReciboAbono(d) {
         <span style="font-size:16px;font-weight:700;">VALOR ABONADO</span>
         <span style="font-size:22px;font-weight:800;color:#6B2D8B;">${fmt(d.valor)}</span>
       </div>
-    </div>
-    <div style="display:flex;justify-content:space-between;font-size:13px;padding:8px 0;border-top:1px solid #f0ecf8;">
-      <span style="color:#888899;">Saldo restante:</span>
-      <span style="font-weight:700;color:${d.saldoDespues<=0?'#16a34a':'#dc2626'};">${d.saldoDespues<=0?'✅ PAGADO':fmt(d.saldoDespues)}</span>
     </div>
     ${d.obs?`<div style="margin-top:10px;font-size:12px;color:#888899;">Obs: ${d.obs}</div>`:''}
     <div style="margin-top:20px;font-size:10px;color:#aaa;text-align:center;">
@@ -10205,6 +10217,150 @@ function imprimirReciboAbono() {
     <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;600&display=swap" rel="stylesheet">
     <style>body{margin:24px;font-family:'DM Sans',sans-serif;}@media print{body{margin:0;}}</style>
     </head><body>${contenido}<script>window.onload=()=>window.print();<\/script></body></html>`);
+  win.document.close();
+}
+
+// ── Historial de pagos + recibo (el recibo NO muestra valor del crédito ni saldo) ──
+let _histCredito = null;
+let _histAbonos = [];
+
+function _fmtFechaAbono(f) {
+  if(!f) return '—';
+  const s = String(f).split('T')[0];            // YYYY-MM-DD
+  const p = s.split('-');
+  return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : s;
+}
+
+async function abrirHistorialCredito(id) {
+  const credito = db.creditos.find(c => c.id === id);
+  if(!credito) { toast('Crédito no encontrado','error'); return; }
+  showLoader('Cargando historial...');
+  try {
+    const abonos = await sbFetch('abonos', { filter:`credito_id=eq.${id}`, order:'fecha_abono.asc,id.asc' });
+    _histCredito = credito;
+    _histAbonos  = Array.isArray(abonos) ? abonos : [];
+    hideLoader();
+  } catch(e) {
+    hideLoader();
+    toast('Error cargando historial: '+e.message,'error');
+    return;
+  }
+
+  const totalAbonado = _histAbonos.reduce((s,a)=> s + (parseFloat(a.valor)||0), 0);
+  const restantes = Math.max(0, (credito.cuotas||0) - (credito.pagadas||0));
+
+  const filas = _histAbonos.length
+    ? _histAbonos.map((a,i) => `
+        <tr>
+          <td style="padding:6px 8px;border-bottom:1px solid #f0ecf8;">${i+1}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #f0ecf8;">${_fmtFechaAbono(a.fecha_abono)}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #f0ecf8;">${a.metodo_pago||'—'}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #f0ecf8;text-align:right;font-weight:600;">${fmt(parseFloat(a.valor)||0)}</td>
+        </tr>`).join('')
+    : `<tr><td colspan="4" style="padding:14px;text-align:center;color:#888899;">Sin abonos registrados</td></tr>`;
+
+  document.getElementById('historialCredContenido').innerHTML = `
+    <div style="font-size:13px;margin-bottom:12px;">
+      <div><span style="color:#888899;">Cliente:</span> <strong>${credito.cliente}</strong></div>
+      <div><span style="color:#888899;">Equipo:</span> <strong>${credito.equipo||'—'}</strong></div>
+      <div><span style="color:#888899;">Cédula:</span> <strong>${credito.cedula||'—'}</strong></div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead>
+        <tr style="background:#f7f5fb;color:#6B2D8B;">
+          <th style="padding:8px;text-align:left;">#</th>
+          <th style="padding:8px;text-align:left;">Fecha</th>
+          <th style="padding:8px;text-align:left;">Método</th>
+          <th style="padding:8px;text-align:right;">Abono</th>
+        </tr>
+      </thead>
+      <tbody>${filas}</tbody>
+    </table>
+    <div style="display:flex;justify-content:space-between;margin-top:12px;padding-top:10px;border-top:2px solid #6B2D8B;font-size:14px;">
+      <strong>Total abonado</strong>
+      <strong style="color:#6B2D8B;">${fmt(totalAbonado)}</strong>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:10px;">
+      <div style="flex:1;background:#f0fdf4;border-radius:8px;padding:8px;text-align:center;">
+        <div style="font-size:11px;color:#888899;">Cuotas pagadas</div>
+        <div style="font-size:18px;font-weight:800;color:#16a34a;">${credito.pagadas||0} / ${credito.cuotas||0}</div>
+      </div>
+      <div style="flex:1;background:#fff7ed;border-radius:8px;padding:8px;text-align:center;">
+        <div style="font-size:11px;color:#888899;">Cuotas restantes</div>
+        <div style="font-size:18px;font-weight:800;color:#d97706;">${restantes}</div>
+      </div>
+    </div>`;
+  openModal('modalHistorialCredito');
+}
+
+// Recibo para el cliente: abonos realizados + cuotas restantes.
+// Deliberadamente NO incluye el valor del crédito ni el saldo pendiente.
+function imprimirReciboHistorial() {
+  if(!_histCredito) return;
+  const c = _histCredito;
+  const totalAbonado = _histAbonos.reduce((s,a)=> s + (parseFloat(a.valor)||0), 0);
+  const restantes = Math.max(0, (c.cuotas||0) - (c.pagadas||0));
+  const hoy = new Date().toLocaleDateString('es-CO',{timeZone:'America/Bogota',year:'numeric',month:'long',day:'numeric'});
+
+  const filas = _histAbonos.length
+    ? _histAbonos.map((a,i) => `
+        <tr>
+          <td style="padding:6px 8px;border-bottom:1px solid #eee;">${i+1}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #eee;">${_fmtFechaAbono(a.fecha_abono)}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #eee;">${a.metodo_pago||'—'}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right;font-weight:600;">${fmt(parseFloat(a.valor)||0)}</td>
+        </tr>`).join('')
+    : `<tr><td colspan="4" style="padding:14px;text-align:center;color:#888;">Sin abonos registrados</td></tr>`;
+
+  const html = `
+  <div style="font-family:'DM Sans',sans-serif;color:#111;max-width:520px;margin:0 auto;">
+    <div style="text-align:center;margin-bottom:20px;padding-bottom:16px;border-bottom:2px solid #6B2D8B;">
+      <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:24px;color:#6B2D8B;">Play Móvil</div>
+      <div style="font-size:13px;color:#888899;">Recibo de pagos</div>
+      <div style="font-size:12px;color:#6B2D8B;font-weight:600;margin-top:4px;">REC-${c.id}-${_histAbonos.length}</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;font-size:13px;">
+      <div><span style="color:#888899;">Cliente:</span> <strong>${c.cliente}</strong></div>
+      <div><span style="color:#888899;">Fecha:</span> <strong>${hoy}</strong></div>
+      <div><span style="color:#888899;">Equipo:</span> <strong>${c.equipo||'—'}</strong></div>
+      <div><span style="color:#888899;">Cédula:</span> <strong>${c.cedula||'—'}</strong></div>
+    </div>
+    <div style="font-size:13px;font-weight:700;color:#6B2D8B;margin-bottom:6px;">Abonos realizados</div>
+    <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:14px;">
+      <thead>
+        <tr style="background:#f7f5fb;color:#6B2D8B;">
+          <th style="padding:8px;text-align:left;">#</th>
+          <th style="padding:8px;text-align:left;">Fecha</th>
+          <th style="padding:8px;text-align:left;">Método</th>
+          <th style="padding:8px;text-align:right;">Abono</th>
+        </tr>
+      </thead>
+      <tbody>${filas}</tbody>
+    </table>
+    <div style="display:flex;justify-content:space-between;padding:8px 0;border-top:2px solid #6B2D8B;font-size:15px;font-weight:700;">
+      <span>Total abonado</span>
+      <span style="color:#6B2D8B;">${fmt(totalAbonado)}</span>
+    </div>
+    <div style="display:flex;gap:12px;margin-top:14px;">
+      <div style="flex:1;border:1px solid #ece8f5;border-radius:10px;padding:10px;text-align:center;">
+        <div style="font-size:11px;color:#888899;">Cuotas pagadas</div>
+        <div style="font-size:20px;font-weight:800;color:#16a34a;">${c.pagadas||0} de ${c.cuotas||0}</div>
+      </div>
+      <div style="flex:1;border:1px solid #ece8f5;border-radius:10px;padding:10px;text-align:center;">
+        <div style="font-size:11px;color:#888899;">Cuotas restantes</div>
+        <div style="font-size:20px;font-weight:800;color:#d97706;">${restantes}</div>
+      </div>
+    </div>
+    <div style="margin-top:20px;font-size:10px;color:#aaa;text-align:center;">
+      Documento generado por Play Móvil Sistema de Gestión · ${hoy}
+    </div>
+  </div>`;
+
+  const win = window.open('','_blank');
+  win.document.write(`<!DOCTYPE html><html><head><title>Recibo de pagos Play Móvil</title>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;600&display=swap" rel="stylesheet">
+    <style>body{margin:24px;font-family:'DM Sans',sans-serif;}@media print{body{margin:0;}}</style>
+    </head><body>${html}<script>window.onload=()=>window.print();<\/script></body></html>`);
   win.document.close();
 }
 
