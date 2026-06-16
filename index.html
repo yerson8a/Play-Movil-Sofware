@@ -5178,22 +5178,26 @@ async function guardarCreditoDB(datos) {
 }
 
 // ── REGISTRAR ABONO A CRÉDITO ───────────────────────────────
-async function registrarAbonoDB(creditoId, valor, metodo = 'Efectivo') {
+async function registrarAbonoDB(creditoId, valor, metodo = 'Efectivo', extra = {}) {
   showLoader('Registrando abono...');
   try {
     const credito = db.creditos.find(c => c.id === creditoId);
     if (!credito) throw new Error('Crédito no encontrado');
 
-    // Guardar abono
-    await sbFetch('abonos', {
+    // Guardar abono (con datos para reimprimir el recibo: ref, obs, asesor)
+    const insRes = await sbFetch('abonos', {
       method: 'POST',
       body: {
         credito_id: creditoId,
         valor: valor,
         metodo_pago: metodo,
+        nro_transferencia: extra.transf || null,
+        notas: extra.obs || null,
+        asesor: extra.asesor || (typeof sesionActiva !== 'undefined' && sesionActiva ? sesionActiva.nombre : null),
         fecha_abono: fechaColombia()
       }
     });
+    const abonoRow = Array.isArray(insRes) ? insRes[0] : insRes;
 
     // Actualizar saldo y cuotas
     const nuevoSaldo = Math.max(0, credito.saldo - valor);
@@ -5214,7 +5218,7 @@ async function registrarAbonoDB(creditoId, valor, metodo = 'Efectivo') {
     credito.estado = nuevoEstado;
 
     hideLoader();
-    return credito;
+    return { credito, abono: abonoRow };
   } catch(e) {
     hideLoader();
     toast('Error registrando abono: ' + e.message, 'error');
@@ -9458,7 +9462,7 @@ async function confirmarAbono() {
   if(!credito) return;
   const nroCuota = credito.pagadas + 1;
   try {
-    await registrarAbonoDB(id, valor, metodo);
+    const { abono } = await registrarAbonoDB(id, valor, metodo, { transf, obs });
     closeModal('modalRegistrarAbono');
     renderCreditos(tabCreditosActual);
     // Mostrar recibo
@@ -9472,7 +9476,7 @@ async function confirmarAbono() {
       nroCuota,
       cuotasTotal: credito.cuotas,
       fecha:     new Date().toLocaleDateString('es-CO',{timeZone:'America/Bogota',year:'numeric',month:'long',day:'numeric'}),
-      numero:    'REC-'+Date.now().toString().slice(-6)
+      numero:    numeroReciboAbono(abono ? abono.id : null)
     });
     toast('Abono registrado ✅');
   } catch(e) { toast('Error: '+e.message,'error'); }
@@ -10176,6 +10180,12 @@ function toggleTransfAbono(metodo) {
   if(row) row.style.display = (metodo === 'Transferencia' || metodo === 'Nequi' || metodo === 'Daviplata') ? 'block' : 'none';
 }
 
+// Número de recibo estable derivado del id del abono (mismo número al reimprimir)
+function numeroReciboAbono(abonoId) {
+  return abonoId ? 'REC-' + String(abonoId).padStart(6,'0')
+                 : 'REC-' + Date.now().toString().slice(-6);
+}
+
 function mostrarReciboAbono(d) {
   const html = `
   <div style="font-family:'DM Sans',sans-serif;color:#111;max-width:500px;margin:0 auto;">
@@ -10256,8 +10266,11 @@ async function abrirHistorialCredito(id) {
           <td style="padding:6px 8px;border-bottom:1px solid #f0ecf8;">${_fmtFechaAbono(a.fecha_abono)}</td>
           <td style="padding:6px 8px;border-bottom:1px solid #f0ecf8;">${a.metodo_pago||'—'}</td>
           <td style="padding:6px 8px;border-bottom:1px solid #f0ecf8;text-align:right;font-weight:600;">${fmt(parseFloat(a.valor)||0)}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #f0ecf8;text-align:center;">
+            <button class="btn btn-sm btn-ghost" style="font-size:11px;color:#6B2D8B;" onclick="verReciboAbono(${i})" title="Ver / imprimir recibo de este abono">🧾 Recibo</button>
+          </td>
         </tr>`).join('')
-    : `<tr><td colspan="4" style="padding:14px;text-align:center;color:#888899;">Sin abonos registrados</td></tr>`;
+    : `<tr><td colspan="5" style="padding:14px;text-align:center;color:#888899;">Sin abonos registrados</td></tr>`;
 
   document.getElementById('historialCredContenido').innerHTML = `
     <div style="font-size:13px;margin-bottom:12px;">
@@ -10272,6 +10285,7 @@ async function abrirHistorialCredito(id) {
           <th style="padding:8px;text-align:left;">Fecha</th>
           <th style="padding:8px;text-align:left;">Método</th>
           <th style="padding:8px;text-align:right;">Abono</th>
+          <th style="padding:8px;text-align:center;">Recibo</th>
         </tr>
       </thead>
       <tbody>${filas}</tbody>
@@ -10291,6 +10305,32 @@ async function abrirHistorialCredito(id) {
       </div>
     </div>`;
   openModal('modalHistorialCredito');
+}
+
+// Ver / reimprimir el recibo guardado de un abono individual del historial
+function verReciboAbono(i) {
+  const a = _histAbonos[i];
+  const c = _histCredito;
+  if(!a || !c) { toast('Recibo no disponible','error'); return; }
+  const fStr = a.fecha_abono ? String(a.fecha_abono).split('T')[0] : null;
+  const fecha = fStr
+    ? new Date(fStr + 'T12:00:00').toLocaleDateString('es-CO',{timeZone:'America/Bogota',year:'numeric',month:'long',day:'numeric'})
+    : _fmtFechaAbono(a.fecha_abono);
+  // Asegurar que el recibo quede por encima del modal de historial
+  const recEl = document.getElementById('modalReciboAbono');
+  if(recEl) recEl.style.zIndex = '9600';
+  mostrarReciboAbono({
+    cliente:     c.cliente,
+    equipo:      c.equipo || '—',
+    valor:       parseFloat(a.valor) || 0,
+    metodo:      a.metodo_pago || 'Efectivo',
+    transf:      a.nro_transferencia || '',
+    obs:         a.notas || '',
+    nroCuota:    i + 1,
+    cuotasTotal: c.cuotas,
+    fecha,
+    numero:      numeroReciboAbono(a.id)
+  });
 }
 
 // Recibo para el cliente: abonos realizados + cuotas restantes.
