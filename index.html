@@ -4977,6 +4977,7 @@ function mapCredito(c) {
     docFoto:      c.doc_foto_entrega   || null,
     docContrato:  c.doc_contrato       || null,
     imei: c.imei || '',
+    productoId: c.producto_id || null,
     fechaInicio: c.fecha_inicio || c.created_at || null,
     fechaPrimerPago:  c.fecha_primer_pago  || null,
     fechaSegundoPago: c.fecha_segundo_pago || null,
@@ -5159,6 +5160,8 @@ async function guardarCreditoDB(datos) {
       estado: 'al_dia',
       sede_id: sedeId,
       observaciones: datos.obs || null,
+      producto_id: datos.productoId || null,
+      imei: datos.imei || null,
       doc_cedula_frente:  datos.docCedFront  || null,
       doc_cedula_reverso: datos.docCedBack   || null,
       doc_foto_entrega:   datos.docFoto      || null,
@@ -6105,6 +6108,7 @@ function renderCreditos(filtro='activos'){
       <div class="cc-header">
         <div><div class="cc-name">${c.cliente} <span style="font-family:monospace;font-size:11px;color:var(--text2);font-weight:600;">#${c.id}</span></div>
           <div class="cc-equipo">📱 ${(c.equipo||'').substring(0,25)}</div>
+          ${c.imei?`<div class="cc-equipo" style="margin-top:2px;">🔢 IMEI: ${c.imei}</div>`:''}
           <div class="cc-equipo" style="margin-top:2px;">👤 ${c.asesor}</div>
           <div class="cc-equipo" style="margin-top:2px;">🗓️ Compra: ${fmtFechaCorta(c.fechaInicio)}</div>
         </div>
@@ -6229,6 +6233,7 @@ async function filtrarCreditosPorIMEI(q) {
       <div class="cc-header">
         <div><div class="cc-name">${c.cliente} <span style="font-family:monospace;font-size:11px;color:var(--text2);font-weight:600;">#${c.id}</span></div>
           <div class="cc-equipo">📱 ${(c.equipo||'').substring(0,25)}</div>
+          ${c.imei?`<div class="cc-equipo" style="margin-top:2px;">🔢 IMEI: ${c.imei}</div>`:''}
           <div class="cc-equipo" style="margin-top:2px;">👤 ${c.asesor}</div>
           <div class="cc-equipo" style="margin-top:2px;">🗓️ Compra: ${fmtFechaCorta(c.fechaInicio)}</div>
         </div>
@@ -9325,6 +9330,8 @@ async function guardarCredito(){
 
   const datos = {
     equipo: equipoConsolidado||productosVentaCrd[0]?.producto||'—',
+    imei: imeiPrincipal,
+    productoId: productosVentaCrd[0]?.productoId || null,
     cliente: $U('crdCliente')||'—',
     cedula: $U('crdCedula')||'',
     telefono: $U('crdTelefono')||'',
@@ -9469,6 +9476,7 @@ async function confirmarAbono() {
     mostrarReciboAbono({
       cliente:   credito.cliente,
       equipo:    credito.equipo || '—',
+      imei:      credito.imei || '',
       valor,
       metodo,
       transf,
@@ -10198,6 +10206,7 @@ function mostrarReciboAbono(d) {
       <div><span style="color:#888899;">Cliente:</span> <strong>${d.cliente}</strong></div>
       <div><span style="color:#888899;">Fecha:</span> <strong>${d.fecha}</strong></div>
       <div><span style="color:#888899;">Equipo:</span> <strong>${d.equipo}</strong></div>
+      ${d.imei?`<div><span style="color:#888899;">IMEI:</span> <strong>${d.imei}</strong></div>`:''}
       <div><span style="color:#888899;">N° Cuota:</span> <strong style="color:#6B2D8B;">Cuota ${d.nroCuota} de ${d.cuotasTotal||'—'}</strong></div>
     </div>
     <div style="background:#f7f5fb;border-radius:12px;padding:16px;margin-bottom:16px;">
@@ -10276,6 +10285,7 @@ async function abrirHistorialCredito(id) {
     <div style="font-size:13px;margin-bottom:12px;">
       <div><span style="color:#888899;">Cliente:</span> <strong>${credito.cliente}</strong></div>
       <div><span style="color:#888899;">Equipo:</span> <strong>${credito.equipo||'—'}</strong></div>
+      ${credito.imei?`<div><span style="color:#888899;">IMEI:</span> <strong>${credito.imei}</strong></div>`:''}
       <div><span style="color:#888899;">Cédula:</span> <strong>${credito.cedula||'—'}</strong></div>
     </div>
     <table style="width:100%;border-collapse:collapse;font-size:13px;">
@@ -10322,6 +10332,7 @@ function verReciboAbono(i) {
   mostrarReciboAbono({
     cliente:     c.cliente,
     equipo:      c.equipo || '—',
+    imei:        c.imei || '',
     valor:       parseFloat(a.valor) || 0,
     metodo:      a.metodo_pago || 'Efectivo',
     transf:      a.nro_transferencia || '',
@@ -10363,6 +10374,7 @@ function imprimirReciboHistorial() {
       <div><span style="color:#888899;">Cliente:</span> <strong>${c.cliente}</strong></div>
       <div><span style="color:#888899;">Fecha:</span> <strong>${hoy}</strong></div>
       <div><span style="color:#888899;">Equipo:</span> <strong>${c.equipo||'—'}</strong></div>
+      ${c.imei?`<div><span style="color:#888899;">IMEI:</span> <strong>${c.imei}</strong></div>`:''}
       <div><span style="color:#888899;">Cédula:</span> <strong>${c.cedula||'—'}</strong></div>
     </div>
     <div style="font-size:13px;font-weight:700;color:#6B2D8B;margin-bottom:6px;">Abonos realizados</div>
@@ -11412,17 +11424,21 @@ function abrirCambioEquipo(id) {
   document.getElementById('anularTipo').value = 'cambio';
   document.getElementById('anularTitulo').textContent = '🔄 Cambio de Equipo';
   document.getElementById('anularConfirmarBtn').style.background = '#6B2D8B';
+  window._cambioNuevoEquipo = null;
   document.getElementById('anularContenido').innerHTML = `
     <div style="background:#f7f5fb;border-radius:10px;padding:14px;margin-bottom:14px;font-size:13px;">
       <div>👤 Cliente: <strong>${c.cliente}</strong></div>
       <div>📱 Equipo actual: <strong>${c.equipo || '—'}</strong></div>
+      ${c.imei ? `<div>🔢 IMEI actual: <strong>${c.imei}</strong></div>` : ''}
     </div>
     <div class="form-group">
       <label class="form-label">IMEI del nuevo equipo *</label>
-      <input type="text" class="form-control" id="cambioNuevoIMEI" placeholder="Busca por IMEI del equipo a entregar" oninput="buscarNuevoEquipoCambio(this.value)">
-      <div id="cambioNuevoInfo" style="margin-top:8px;display:none;background:#f0fdf4;border-radius:8px;padding:10px;font-size:13px;"></div>
+      <input type="text" class="form-control" id="cambioNuevoIMEI" placeholder="Busca por IMEI del equipo a entregar (debe estar en inventario)" oninput="buscarNuevoEquipoCambio(this.value)">
+      <div id="cambioNuevoInfo" style="margin-top:8px;display:none;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px;font-size:13px;"></div>
     </div>
     <input type="hidden" id="cambioNuevoProductoId">
+    <input type="hidden" id="cambioNuevoImei1">
+    <input type="hidden" id="cambioNuevoImei2">
     <div class="form-group">
       <label class="form-label">Motivo del cambio</label>
       <select class="form-control" id="cambioMotivo">
@@ -11440,25 +11456,56 @@ function abrirCambioEquipo(id) {
 }
 
 async function buscarNuevoEquipoCambio(val) {
-  if(val.length < 5) { document.getElementById('cambioNuevoInfo').style.display='none'; return; }
+  val = (val||'').trim();
+  const infoEl = document.getElementById('cambioNuevoInfo');
+  const idEl   = document.getElementById('cambioNuevoProductoId');
+  // Limpiar selección previa mientras se escribe
+  window._cambioNuevoEquipo = null;
+  if(idEl) idEl.value = '';
+  if(document.getElementById('cambioNuevoImei1')) document.getElementById('cambioNuevoImei1').value = '';
+  if(document.getElementById('cambioNuevoImei2')) document.getElementById('cambioNuevoImei2').value = '';
+  if(val.length < 5) { if(infoEl) infoEl.style.display='none'; return; }
+
   const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH };
   const base = SUPABASE_URL + '/rest/v1/productos';
-  const sel = 'select=id,producto,imei1,valor_compra&estado=eq.DISPONIBLE';
-  let res = await fetch(`${base}?${sel}&imei1=eq.${val}`, {headers});
+  const sel = 'select=id,producto,marca,modelo,color,almacenamiento,ram,condicion,imei1,imei2,serial,estado,valor_compra';
+  // Buscar por imei1, luego imei2, luego serial — solo equipos en inventario
+  let res = await fetch(`${base}?${sel}&imei1=eq.${encodeURIComponent(val)}`, {headers});
   let rows = await res.json();
+  if(!rows.length) { res = await fetch(`${base}?${sel}&imei2=eq.${encodeURIComponent(val)}`, {headers}); rows = await res.json(); }
+  if(!rows.length) { res = await fetch(`${base}?${sel}&serial=eq.${encodeURIComponent(val)}`, {headers}); rows = await res.json(); }
+
+  if(!infoEl) return;
   if(!rows.length) {
-    res = await fetch(`${base}?select=id,producto,imei1,valor_compra&estado=eq.DISPONIBLE&imei2=eq.${val}`, {headers});
-    rows = await res.json();
-  }
-  const infoEl = document.getElementById('cambioNuevoInfo');
-  if(rows.length > 0) {
-    const p = rows[0];
-    document.getElementById('cambioNuevoProductoId').value = p.id;
     infoEl.style.display = 'block';
-    infoEl.innerHTML = `✅ <strong>${p.producto}</strong>${puedeVerCostos() ? ' — Costo: '+fmt(parseFloat(p.valor_compra)) : ''}`;
-  } else {
-    infoEl.style.display = 'none';
+    infoEl.style.background = '#fef2f2'; infoEl.style.borderColor = '#fecaca';
+    infoEl.innerHTML = '❌ No se encontró ningún equipo con ese IMEI/serial.';
+    return;
   }
+  const p = rows[0];
+  if(p.estado !== 'DISPONIBLE') {
+    infoEl.style.display = 'block';
+    infoEl.style.background = '#fef2f2'; infoEl.style.borderColor = '#fecaca';
+    infoEl.innerHTML = `⚠️ <strong>${p.producto}</strong> existe pero su estado es <strong>${p.estado}</strong> (no disponible). Solo se permiten equipos en inventario.`;
+    return;
+  }
+
+  // Equipo válido y disponible: traer todos los datos
+  window._cambioNuevoEquipo = p;
+  idEl.value = p.id;
+  document.getElementById('cambioNuevoImei1').value = p.imei1 || '';
+  document.getElementById('cambioNuevoImei2').value = p.imei2 || '';
+
+  const specs = [p.marca, p.modelo, p.almacenamiento, p.ram, p.color, p.condicion].filter(Boolean).join(' · ');
+  infoEl.style.display = 'block';
+  infoEl.style.background = '#f0fdf4'; infoEl.style.borderColor = '#bbf7d0';
+  infoEl.innerHTML = `
+    ✅ <strong>${p.producto}</strong>
+    ${specs ? `<div style="margin-top:4px;color:#475569;">${specs}</div>` : ''}
+    <div style="margin-top:4px;">🔢 IMEI 1: <strong>${p.imei1 || '—'}</strong></div>
+    ${p.imei2 ? `<div>🔢 IMEI 2: <strong>${p.imei2}</strong></div>` : ''}
+    ${p.serial ? `<div>🏷️ Serial: <strong>${p.serial}</strong></div>` : ''}
+    ${puedeVerCostos() ? `<div style="margin-top:4px;">💰 Costo: <strong>${fmt(parseFloat(p.valor_compra)||0)}</strong></div>` : ''}`;
 }
 
 async function buscarParaSalida(val) {
@@ -11609,41 +11656,59 @@ async function ejecutarAnulacion() {
   } else if(tipo === 'cambio') {
     const nuevoId = parseInt(document.getElementById('cambioNuevoProductoId').value);
     const obs = document.getElementById('cambioObs')?.value || '';
+    const motivoSel = document.getElementById('cambioMotivo');
+    const motivoTxt = motivoSel ? (motivoSel.options[motivoSel.selectedIndex]?.text || motivoSel.value) : '';
     const credito = db.creditos.find(c => c.id === id);
-    if(!credito) { toast('Selecciona el nuevo equipo primero', 'error'); return; }
-    if(!nuevoId) { toast('Busca y selecciona el nuevo equipo por IMEI', 'error'); return; }
+    if(!credito) { toast('Crédito no encontrado', 'error'); return; }
+    if(!nuevoId) { toast('Busca y selecciona el nuevo equipo por IMEI (debe estar en inventario)', 'error'); return; }
 
     try {
       showLoader('Procesando cambio...');
       const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH };
       const base = SUPABASE_URL + '/rest/v1/productos';
 
-      // Obtener datos del nuevo equipo
-      const resNuevo = await fetch(`${base}?select=id,producto,imei1,valor_compra&id=eq.${nuevoId}`, {headers});
+      // Obtener datos completos del nuevo equipo (revalidar que sigue DISPONIBLE)
+      const resNuevo = await fetch(`${base}?select=id,producto,imei1,imei2,estado,valor_compra&id=eq.${nuevoId}`, {headers});
       const nuevoEquipo = await resNuevo.json();
       if(!nuevoEquipo.length) { hideLoader(); toast('Equipo no encontrado', 'error'); return; }
       const nuevo = nuevoEquipo[0];
+      if(nuevo.estado !== 'DISPONIBLE') { hideLoader(); toast('El equipo ya no está disponible en inventario (estado: ' + nuevo.estado + ')', 'error'); return; }
 
-      // Devolver equipo anterior al inventario
-      if(credito.equipo) {
+      // Devolver equipo anterior al inventario: preferir id exacto; fallback por IMEI; fallback por nombre
+      let anteriorId = credito.productoId || null;
+      if(!anteriorId && credito.imei) {
+        let rA = await fetch(`${base}?select=id&imei1=eq.${encodeURIComponent(credito.imei)}&estado=eq.VENDIDO&limit=1`, {headers});
+        let aRows = await rA.json();
+        if(!aRows.length) { rA = await fetch(`${base}?select=id&imei2=eq.${encodeURIComponent(credito.imei)}&estado=eq.VENDIDO&limit=1`, {headers}); aRows = await rA.json(); }
+        if(aRows.length) anteriorId = aRows[0].id;
+      }
+      if(!anteriorId && credito.equipo) {
         const resAnterior = await fetch(`${base}?select=id&producto=eq.${encodeURIComponent(credito.equipo)}&estado=eq.VENDIDO&limit=1`, {headers});
         const anterior = await resAnterior.json();
-        if(anterior.length > 0) {
-          await sbFetch(`productos?id=eq.${anterior[0].id}`, { method: 'PATCH', body: { estado: 'DISPONIBLE' } });
-        }
+        if(anterior.length > 0) anteriorId = anterior[0].id;
+      }
+      if(anteriorId) {
+        await sbFetch(`productos?id=eq.${anteriorId}`, { method: 'PATCH', body: { estado: 'DISPONIBLE' } });
       }
 
       // Marcar nuevo equipo como vendido
       await sbFetch(`productos?id=eq.${nuevoId}`, { method: 'PATCH', body: { estado: 'VENDIDO' } });
 
-      // Actualizar crédito con el nuevo equipo
+      // Actualizar crédito con el nuevo equipo (nombre + id + imei) y registrar el cambio
+      const detalleCambio = 'CAMBIO EQUIPO (' + (motivoTxt||'sin motivo') + '): ' + (credito.equipo||'—') + ' → ' + nuevo.producto + (obs ? '. ' + obs : '');
       await sbFetch(`creditos?id=eq.${id}`, {
         method: 'PATCH',
-        body: { producto_desc: nuevo.producto, observaciones: 'CAMBIO EQUIPO: ' + (credito.equipo||'') + ' → ' + nuevo.producto + '. ' + obs }
+        body: {
+          producto_desc: nuevo.producto,
+          producto_id: nuevo.id,
+          imei: nuevo.imei1 || '',
+          observaciones: detalleCambio
+        }
       });
 
       hideLoader();
       closeModal('modalAnularVenta');
+      window._cambioNuevoEquipo = null;
       await cargarDatosPorSede(sesionActiva);
       renderCreditos(tabCreditosActual);
       renderInventario();
