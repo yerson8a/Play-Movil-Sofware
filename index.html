@@ -11661,6 +11661,10 @@ async function ejecutarAnulacion() {
     const credito = db.creditos.find(c => c.id === id);
     if(!credito) { toast('Crédito no encontrado', 'error'); return; }
     if(!nuevoId) { toast('Busca y selecciona el nuevo equipo por IMEI (debe estar en inventario)', 'error'); return; }
+    // Datos del equipo anterior (para sincronizar la venta vinculada)
+    const oldImei   = credito.imei || '';
+    const oldEquipo = credito.equipo || '';
+    const oldCedula = credito.cedula || '';
 
     try {
       showLoader('Procesando cambio...');
@@ -11705,6 +11709,37 @@ async function ejecutarAnulacion() {
           observaciones: detalleCambio
         }
       });
+
+      // Sincronizar la venta vinculada (los créditos no guardan venta_id):
+      // se ubica por el IMEI anterior y, como respaldo, por equipo + cédula.
+      try {
+        const nuevoImei = nuevo.imei1 || '';
+        let ventasVinc = [];
+        if(oldImei) {
+          ventasVinc = await sbFetch(`ventas?select=id&imei=eq.${encodeURIComponent(oldImei)}`);
+        }
+        if((!ventasVinc || !ventasVinc.length) && oldEquipo) {
+          const filtroCed = oldCedula ? `&cedula_cliente=eq.${encodeURIComponent(oldCedula)}` : '';
+          ventasVinc = await sbFetch(`ventas?select=id&producto=eq.${encodeURIComponent(oldEquipo)}${filtroCed}`);
+        }
+        for(const v of (ventasVinc || [])) {
+          // Maestro: actualizar imei si era el principal; nombre/producto_id solo si era de un solo equipo
+          const mRows = await sbFetch(`ventas?select=id,producto,imei&id=eq.${v.id}`);
+          const m = mRows && mRows[0];
+          if(m) {
+            const body = {};
+            if(oldImei && m.imei === oldImei) body.imei = nuevoImei;
+            if(m.producto === oldEquipo) { body.producto = nuevo.producto; body.producto_id = nuevo.id; }
+            if(Object.keys(body).length) await sbFetch(`ventas?id=eq.${v.id}`, { method: 'PATCH', body });
+          }
+          // Detalle: actualizar solo la línea del equipo anterior
+          if(oldImei) {
+            await sbFetch(`ventas_detalle?venta_id=eq.${v.id}&imei=eq.${encodeURIComponent(oldImei)}`, { method: 'PATCH', body: { producto: nuevo.producto, imei: nuevoImei, producto_id: nuevo.id } });
+          } else if(oldEquipo) {
+            await sbFetch(`ventas_detalle?venta_id=eq.${v.id}&producto=eq.${encodeURIComponent(oldEquipo)}`, { method: 'PATCH', body: { producto: nuevo.producto, imei: nuevoImei, producto_id: nuevo.id } });
+          }
+        }
+      } catch(eV) { console.warn('No se pudo sincronizar la venta vinculada al cambio de equipo:', eV); }
 
       hideLoader();
       closeModal('modalAnularVenta');
