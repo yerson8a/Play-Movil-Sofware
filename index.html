@@ -5045,9 +5045,45 @@ async function guardarProveedorDB(datos) {
 }
 
 // ── GUARDAR PRODUCTO / COMPRA ───────────────────────────────
+// Busca si alguno de los IMEI ya está registrado en productos, sin importar
+// si quedó como imei1 o imei2 (detecta IMEI invertidos entre sí).
+async function buscarIMEIDuplicado(imeis, excluirId) {
+  const lista = [...new Set((imeis || []).map(x => (x || '').trim()).filter(x => x.length >= 5))];
+  if (!lista.length) return null;
+  const conds = [];
+  lista.forEach(v => { conds.push(`imei1.eq.${v}`); conds.push(`imei2.eq.${v}`); });
+  const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH };
+  let url = `${SUPABASE_URL}/rest/v1/productos?select=id,producto,imei1,imei2&or=(${conds.join(',')})&limit=1`;
+  if (excluirId) url += `&id=neq.${excluirId}`;
+  try {
+    const res = await fetch(url, { headers });
+    const rows = await res.json();
+    if (!Array.isArray(rows) || !rows.length) return null;
+    const row = rows[0];
+    const coincide = lista.find(v => v === (row.imei1 || '').trim() || v === (row.imei2 || '').trim());
+    return { ...row, imeiCoincidente: coincide };
+  } catch(e) { return null; }
+}
+
 async function guardarCompraDB(datos) {
   showLoader('Guardando compra...');
   try {
+    // Validar IMEI duplicado (incluye IMEI invertidos imei1 <-> imei2)
+    if (datos.tipo === 'Celular') {
+      const im1 = (datos.imei1 || '').trim();
+      const im2 = (datos.imei2 || '').trim();
+      if (im1 && im2 && im1 === im2) {
+        hideLoader();
+        toast('⚠️ El IMEI 1 y el IMEI 2 no pueden ser iguales', 'error');
+        const err = new Error('IMEI duplicado'); err.handled = true; throw err;
+      }
+      const dup = await buscarIMEIDuplicado([im1, im2], datos.id);
+      if (dup) {
+        hideLoader();
+        toast(`⚠️ El IMEI ${dup.imeiCoincidente} ya está registrado en: ${dup.producto}`, 'error');
+        const err = new Error('IMEI duplicado'); err.handled = true; throw err;
+      }
+    }
     const sedeId = datos.sede && datos.sede.includes('ARMENIA') ? 2 : 1;
     const row = {
       tipo: datos.tipo,
@@ -5082,7 +5118,7 @@ async function guardarCompraDB(datos) {
     return compra;
   } catch(e) {
     hideLoader();
-    toast('Error guardando compra: ' + e.message, 'error');
+    if (!e.handled) toast('Error guardando compra: ' + e.message, 'error');
     throw e;
   }
 }
@@ -7348,7 +7384,7 @@ async function agregarEquipo(){
     renderProveedoresMod && renderProductosMod && renderProductosMod();
     toast('Equipo agregado ✅');
     ['invProducto','invIMEI','invValor'].forEach(id=>{const e=$(id);if(e)e.value='';});
-  }catch(e){ toast('Error: '+e.message,'error'); }
+  }catch(e){ if(!e.handled) toast('Error: '+e.message,'error'); }
 }
 
 // ============================================================
@@ -8981,7 +9017,7 @@ async function guardarProductoNuevo() {
     renderProductosMod();
     renderInventario();
     toast('Producto registrado ✅');
-  } catch(e) { hideLoader(); toast('Error: '+e.message,'error'); }
+  } catch(e) { hideLoader(); if(!e.handled) toast('Error: '+e.message,'error'); }
 }
 
 function renderProductosMod(data) {
