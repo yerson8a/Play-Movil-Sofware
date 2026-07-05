@@ -6233,10 +6233,10 @@ function renderCreditos(filtro='activos'){
         ${(c.docCedFront||c.docCedBack||c.docFoto||c.docContrato)?`
         <div style="display:flex;gap:6px;flex-wrap:wrap;padding-top:6px;border-top:1px solid #f0ecf8;">
           <span style="font-size:10px;color:#888899;width:100%;">📎 Documentos:</span>
-          ${c.docCedFront?`<a href="${c.docCedFront}" target="_blank" class="btn btn-sm btn-ghost" style="font-size:10px;padding:2px 8px;">🪪 Frente</a>`:''}
-          ${c.docCedBack?`<a href="${c.docCedBack}" target="_blank" class="btn btn-sm btn-ghost" style="font-size:10px;padding:2px 8px;">🪪 Reverso</a>`:''}
-          ${c.docFoto?`<a href="${c.docFoto}" target="_blank" class="btn btn-sm btn-ghost" style="font-size:10px;padding:2px 8px;">📸 Foto</a>`:''}
-          ${c.docContrato?`<a href="${c.docContrato}" target="_blank" class="btn btn-sm btn-ghost" style="font-size:10px;padding:2px 8px;">📝 Contrato</a>`:''}
+          ${c.docCedFront?`<button type="button" data-doc="${escapeHtml(c.docCedFront)}" onclick="abrirDocumento(this.dataset.doc)" class="btn btn-sm btn-ghost" style="font-size:10px;padding:2px 8px;">🪪 Frente</button>`:''}
+          ${c.docCedBack?`<button type="button" data-doc="${escapeHtml(c.docCedBack)}" onclick="abrirDocumento(this.dataset.doc)" class="btn btn-sm btn-ghost" style="font-size:10px;padding:2px 8px;">🪪 Reverso</button>`:''}
+          ${c.docFoto?`<button type="button" data-doc="${escapeHtml(c.docFoto)}" onclick="abrirDocumento(this.dataset.doc)" class="btn btn-sm btn-ghost" style="font-size:10px;padding:2px 8px;">📸 Foto</button>`:''}
+          ${c.docContrato?`<button type="button" data-doc="${escapeHtml(c.docContrato)}" onclick="abrirDocumento(this.dataset.doc)" class="btn btn-sm btn-ghost" style="font-size:10px;padding:2px 8px;">📝 Contrato</button>`:''}
         </div>`:''}
         <div style="display:flex;gap:6px;border-top:1px solid #f0ecf8;padding-top:8px;">
           <button class="btn btn-sm btn-ghost" style="flex:1;font-size:11px;" onclick="abrirCambioEquipo(${c.id})" title="Cambiar equipo">🔄 Cambio</button>
@@ -12113,6 +12113,34 @@ function setMoneyValue(id, num) {
 // ============================================================
 // UPLOAD DE ARCHIVOS
 // ============================================================
+// El bucket es PRIVADO (guarda cédulas y contratos): no existen URLs públicas.
+// Se guarda la RUTA del objeto y se genera una URL firmada al abrir el archivo.
+const STORAGE_BUCKET = 'playmovil';
+
+// Acepta una ruta directa o una URL antigua (pública/firmada) guardada en la BD
+// y devuelve la ruta del objeto dentro del bucket
+function rutaStorage(valor) {
+  if(!valor) return null;
+  const m = String(valor).match(/\/object\/(?:public\/|sign\/)?playmovil\/([^?]+)/);
+  return m ? decodeURIComponent(m[1]) : (String(valor).startsWith('http') ? null : String(valor));
+}
+
+async function abrirDocumento(valor) {
+  const ruta = rutaStorage(valor);
+  if(!ruta) { toast('Documento no disponible','error'); return; }
+  // Abrir la ventana ANTES del await para que el navegador no la bloquee como popup
+  const win = window.open('', '_blank');
+  try {
+    const { data, error } = await supa.storage.from(STORAGE_BUCKET).createSignedUrl(ruta, 3600);
+    if(error) throw error;
+    win.location = data.signedUrl;
+  } catch(e) {
+    if(win) win.close();
+    console.error('Error firmando URL del documento:', e);
+    toast('No se pudo abrir el documento: ' + (e.message||e), 'error');
+  }
+}
+
 function triggerUpload(inputId) {
   const el = document.getElementById(inputId);
   if(el) el.click();
@@ -12158,9 +12186,8 @@ async function handleUpload(input, previewId) {
       throw new Error(err);
     }
 
-    // URL pública del archivo
-    const url = `${SUPABASE_URL}/storage/v1/object/public/playmovil/${ruta}`;
-    archivosSubidos[input.id] = url;
+    // Bucket privado: se guarda la ruta; la URL se firma al momento de abrir
+    archivosSubidos[input.id] = ruta;
 
     // Mostrar confirmación
     const size = file.size > 1024*1024
@@ -12169,7 +12196,7 @@ async function handleUpload(input, previewId) {
     const nomCorto = file.name.length > 20 ? file.name.substring(0,20)+'...' : file.name;
 
     if(preview) {
-      preview.innerHTML = `✅ ${nomCorto} · ${size} <a href="${url}" target="_blank" style="color:#0066cc;font-size:10px;margin-left:4px;">ver</a>`;
+      preview.innerHTML = `✅ ${escapeHtml(nomCorto)} · ${size} <a href="#" data-doc="${escapeHtml(ruta)}" onclick="abrirDocumento(this.dataset.doc);return false;" style="color:#0066cc;font-size:10px;margin-left:4px;">ver</a>`;
       preview.style.color = '#16a34a';
     }
     if(zone) { zone.style.borderColor = '#16a34a'; zone.style.background = '#f0fdf4'; }
