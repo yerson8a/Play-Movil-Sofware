@@ -1234,11 +1234,11 @@
         <div class="flex items-center gap-12 mb-16" style="flex-wrap:wrap;">
           <div class="search-wrap" style="flex:1;min-width:220px;">
             <span class="search-icon">🔍</span>
-            <input type="text" class="form-control" placeholder="Buscar cliente, equipo, asesor..." oninput="aplicarFiltrosVentas()" id="searchVentas">
+            <input type="text" class="form-control" placeholder="Buscar cliente, equipo, asesor..." oninput="aplicarFiltrosVentasDebounced()" id="searchVentas">
           </div>
           <div class="search-wrap" style="width:200px;">
             <span class="search-icon">📡</span>
-            <input type="text" class="form-control" placeholder="Buscar por IMEI / Serial..." oninput="aplicarFiltrosVentas()" id="searchVentasIMEI" style="padding-left:36px;text-transform:uppercase;" inputmode="text">
+            <input type="text" class="form-control" placeholder="Buscar por IMEI / Serial..." oninput="aplicarFiltrosVentasDebounced()" id="searchVentasIMEI" style="padding-left:36px;text-transform:uppercase;" inputmode="text">
           </div>
           <select class="form-control" style="width:160px;" onchange="aplicarFiltrosVentas()" id="filtroAsesorVentas">
             <option value="">Todos los asesores</option>
@@ -1321,7 +1321,7 @@
         </div>
         <div class="search-wrap" style="width:210px;">
           <span class="search-icon">📡</span>
-          <input type="text" class="form-control" id="searchCredIMEI" placeholder="Buscar por IMEI / Serial..." oninput="filtrarCreditosPorIMEI(this.value)" style="padding-left:36px;text-transform:uppercase;" inputmode="text">
+          <input type="text" class="form-control" id="searchCredIMEI" placeholder="Buscar por IMEI / Serial..." oninput="filtrarCreditosPorIMEIDebounced(this.value)" style="padding-left:36px;text-transform:uppercase;" inputmode="text">
         </div>
         <select class="form-control" style="width:180px;" id="filtroCredFinanciera" onchange="filtrarCreditosTexto()">
           <option value="">Todas las financieras</option>
@@ -3308,7 +3308,7 @@
             <div style="position:relative;">
               <input type="text" class="form-control" id="crdClienteBusca"
                 placeholder="Escribe nombre o cédula del cliente..."
-                oninput="buscarClienteUnificado(this.value,'crd')"
+                oninput="buscarClienteUnificadoDebounced(this.value,'crd')"
                 autocomplete="off">
               <button type="button" onclick="abrirModalNuevoClienteDesdeVenta('crd')"
                 style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:#6B2D8B;color:#fff;border:none;border-radius:8px;padding:5px 12px;font-size:12px;cursor:pointer;font-weight:600;">
@@ -3851,7 +3851,7 @@
         <div style="position:relative;">
           <input type="text" class="form-control" id="vcClienteBusca"
             placeholder="Escribe nombre o cédula..."
-            oninput="buscarClienteUnificado(this.value,'vc')"
+            oninput="buscarClienteUnificadoDebounced(this.value,'vc')"
             autocomplete="off">
           <button type="button" onclick="abrirModalNuevoClienteDesdeVenta('vc')"
             style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:#6B2D8B;color:#fff;border:none;border-radius:8px;padding:5px 12px;font-size:12px;cursor:pointer;font-weight:600;">
@@ -4841,6 +4841,9 @@ async function cargarTodosLosDatos() {
     db.garantias   = garantias.map(mapGarantia);
     db.gastos      = gastos.map(mapGasto);
 
+    // Persistir estados mora/al_dia recalculados (sin bloquear la carga)
+    sincronizarEstadosCreditosDB();
+
     hideLoader();
     toast('Datos cargados desde Supabase ✅');
     return true;
@@ -5238,10 +5241,28 @@ async function registrarAbonoDB(creditoId, valor, metodo = 'Efectivo', extra = {
     });
     const abonoRow = Array.isArray(insRes) ? insRes[0] : insRes;
 
-    // Actualizar saldo y cuotas
+    // ── Cuotas pagadas por monto acumulado ──
+    // Una cuota solo se completa cuando la suma de abonos alcanza su valor: un
+    // abono menor queda como pago parcial de esa cuota, y si es mayor el
+    // excedente queda como abono parcial de la siguiente. El saldo siempre
+    // baja por el valor exacto abonado.
     const nuevoSaldo = Math.max(0, credito.saldo - valor);
-    const nuevasCuotas = Math.min(credito.pagadas + 1, credito.cuotas);
-    const nuevoEstado = nuevoSaldo <= 0 ? 'pagado' : 'al_dia';
+    let nuevasCuotas;
+    if (nuevoSaldo <= 0) {
+      nuevasCuotas = credito.cuotas;
+    } else if (credito.valorCuota > 0) {
+      const abonosRows = await sbFetch(`abonos?select=valor&credito_id=eq.${creditoId}`);
+      const totalAbonado = (Array.isArray(abonosRows) ? abonosRows : [])
+        .reduce((s, a) => s + (parseFloat(a.valor) || 0), 0); // incluye el abono recién insertado
+      nuevasCuotas = Math.min(credito.cuotas, Math.floor(totalAbonado / credito.valorCuota));
+    } else {
+      // Sin valor de cuota registrado no se puede prorratear: conservar conteo clásico
+      nuevasCuotas = Math.min(credito.pagadas + 1, credito.cuotas);
+    }
+    // Estado real tras el abono: si queda saldo, mora o al_dia según la fecha de
+    // la próxima cuota (antes se escribía al_dia siempre y ocultaba la mora)
+    const nuevoEstado = nuevoSaldo <= 0 ? 'pagado'
+      : (calcularProximaCuota({ ...credito, pagadas: nuevasCuotas }).enMora ? 'mora' : 'al_dia');
 
     await sbFetch(`creditos?id=eq.${creditoId}`, {
       method: 'PATCH',
@@ -5503,6 +5524,14 @@ const gastosFijosData = getGastosFijosMes(mesColombia());
 const $ = id => document.getElementById(id);
 const fmt = n => new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',minimumFractionDigits:0}).format(n||0);
 
+// Escapa texto libre (nombres, notas, productos) antes de interpolarlo en
+// innerHTML o en el HTML de facturas. Sin esto, un valor guardado con "<" o
+// comillas puede inyectar HTML/JS en la sesión de quien lo visualice (XSS).
+const escapeHtml = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+// Agrupa ráfagas de eventos (p.ej. teclas en un buscador) en una sola llamada
+function debounce(fn, ms=300) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
+
 // Previene doble-clic en botones que guardan/modifican datos.
 // Bloquea el boton al primer clic y lo restaura cuando la accion termina (ok o error).
 function protegerBoton(btnId, accionAsync) {
@@ -5530,7 +5559,7 @@ function toast(msg, type='success') {
   if(!c) return;
   const t = document.createElement('div');
   t.className = `toast ${type}`;
-  t.innerHTML = `<span style="font-size:16px;">${type==='error'?'❌':'✅'}</span><span>${msg}</span>`;
+  t.innerHTML = `<span style="font-size:16px;">${type==='error'?'❌':'✅'}</span><span>${escapeHtml(msg)}</span>`;
   c.appendChild(t);
   setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .3s';setTimeout(()=>t.remove(),300);},3500);
 }
@@ -5904,15 +5933,15 @@ function renderTablaInventario(data) {
   $('tbodyInventario').innerHTML=data.length?data.map(e=>`
     <tr>
       <td style="font-size:12px;">${e.fecha}</td>
-      <td style="font-weight:500;">${e.producto}</td>
-      <td style="font-family:monospace;font-size:11px;color:var(--text2);">${e.imei}</td>
-      <td style="font-size:12px;">${e.proveedor}</td>
+      <td style="font-weight:500;">${escapeHtml(e.producto)}</td>
+      <td style="font-family:monospace;font-size:11px;color:var(--text2);">${escapeHtml(e.imei)}</td>
+      <td style="font-size:12px;">${escapeHtml(e.proveedor)}</td>
       <td class="solo-costo" style="color:var(--pink);font-weight:600;">${fmt(e.costo)}</td>
       <td><span style="font-size:11px;padding:2px 8px;border-radius:8px;background:rgba(107,45,139,0.1);color:#6B2D8B;">${(()=>{const s=dbAdmin.sedes.find(x=>x.id===e.sede_id||(e.sede||'').toUpperCase().includes((x.nombre||'').toUpperCase()));return s?s.nombre:e.sede||'—';})()}</span></td>
       <td><span class="badge ${e.estado==='DISPONIBLE'?'badge-green':e.estado==='VENDIDO'?'badge-pink':e.estado==='GARANTIA'?'badge-orange':'badge-red'}">${e.estado}</span></td>
       <td style="display:flex;gap:4px;">
         <button class="btn btn-sm btn-ghost" onclick="verDetalleProducto(${e.id})" title="Ver detalle">🔍</button>
-        ${(sesionActiva?.rol === 'admin') ? `<button class="btn btn-sm btn-ghost" style="color:#6B2D8B;" onclick="abrirTrasladoEquipo(${e.id},'${e.producto?.replace(/'/g,"\'")}')" title="Trasladar">🔄</button>` : ''}
+        ${(sesionActiva?.rol === 'admin') ? `<button class="btn btn-sm btn-ghost" style="color:#6B2D8B;" onclick="abrirTrasladoEquipo(${e.id})" title="Trasladar">🔄</button>` : ''}
         ${esUsuarioAdmin() ? `<button class="btn btn-sm btn-ghost" onclick="eliminarEquipo(${e.id})" title="Eliminar">🗑️</button>` : ''}
       </td>
     </tr>`).join(''):'<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text2);">Sin equipos en este filtro</td></tr>';
@@ -5946,10 +5975,10 @@ function filaVenta(v) {
   return `<tr style="${v.anulada?'opacity:0.55;background:#fff5f5;':''}">
     <td style="font-family:monospace;font-size:11px;color:var(--text2);font-weight:600;">#${v.id}</td>
     <td style="font-size:12px;">${v.fecha}</td>
-    <td style="font-weight:500;">${(v.equipo||'').substring(0,22)}</td>
-    <td style="font-family:monospace;font-size:11px;color:#0066cc;">${v.imei&&v.imei.length>3?v.imei:'—'}</td>
-    <td>${v.cliente}</td>
-    <td>${v.asesor}</td>
+    <td style="font-weight:500;">${escapeHtml((v.equipo||'').substring(0,22))}</td>
+    <td style="font-family:monospace;font-size:11px;color:#0066cc;">${v.imei&&v.imei.length>3?escapeHtml(v.imei):'—'}</td>
+    <td>${escapeHtml(v.cliente)}</td>
+    <td>${escapeHtml(v.asesor)}</td>
     <td class="solo-costo" style="color:var(--text2);">${fmt(v.costo)}</td>
     <td style="font-weight:600;color:${v.anulada?'#dc2626':'inherit'};">${v.anulada?'ANULADA':fmt(v.venta)}</td>
     <td class="solo-admin" style="color:${v.anulada?'#dc2626':'var(--green)'};font-weight:600;">${v.anulada?'$0':fmt(v.ganancia)}</td>
@@ -6030,6 +6059,8 @@ async function aplicarFiltrosVentas() {
 
   renderVentas_data(data);
 }
+// Versión con debounce para los inputs de texto (evita un fetch a ventas_detalle por tecla)
+const aplicarFiltrosVentasDebounced = debounce(aplicarFiltrosVentas, 300);
 
 // Rangos rápidos
 function rangoRapidoVentas(rango) {
@@ -6078,6 +6109,26 @@ function renderVentas_data(data){
   $('tbodyVentas').innerHTML = data.length
     ? data.map(filaVenta).join('')
     : '<tr><td colspan="13" style="text-align:center;padding:40px;color:var(--text2);">Sin resultados</td></tr>';
+}
+
+// Sincroniza en Supabase los créditos cuyo estado mora/al_dia calculado por
+// fechas difiere del guardado. Se ejecuta una vez al cargar los datos (no en
+// cada render) para que los reportes y filtros sobre la BD sean confiables.
+async function sincronizarEstadosCreditosDB() {
+  const cambios = db.creditos.filter(c => {
+    if (c.estado === 'pagado' || c.estado === 'anulado') return false;
+    const estadoCalc = calcularProximaCuota(c).enMora ? 'mora' : 'al_dia';
+    if (estadoCalc === c.estado) return false;
+    c.estado = estadoCalc;
+    return true;
+  });
+  if (!cambios.length) return;
+  try {
+    await Promise.all(cambios.map(c =>
+      sbFetch(`creditos?id=eq.${c.id}`, { method: 'PATCH', body: { estado: c.estado } })
+    ));
+    console.log('Estados de crédito sincronizados con la BD:', cambios.length);
+  } catch (e) { console.error('Error sincronizando estados de créditos:', e); }
 }
 
 function renderCreditos(filtro='activos'){
@@ -6142,10 +6193,10 @@ function renderCreditos(filtro='activos'){
     const pct=Math.round((c.pagadas/c.cuotas)*100)||0;
     return `<div class="credito-card">
       <div class="cc-header">
-        <div><div class="cc-name">${c.cliente} <span style="font-family:monospace;font-size:11px;color:var(--text2);font-weight:600;">#${c.id}</span></div>
-          <div class="cc-equipo">📱 ${(c.equipo||'').substring(0,25)}</div>
-          ${c.imei?`<div class="cc-equipo" style="margin-top:2px;">🔢 IMEI: ${c.imei}</div>`:''}
-          <div class="cc-equipo" style="margin-top:2px;">👤 ${c.asesor}</div>
+        <div><div class="cc-name">${escapeHtml(c.cliente)} <span style="font-family:monospace;font-size:11px;color:var(--text2);font-weight:600;">#${c.id}</span></div>
+          <div class="cc-equipo">📱 ${escapeHtml((c.equipo||'').substring(0,25))}</div>
+          ${c.imei?`<div class="cc-equipo" style="margin-top:2px;">🔢 IMEI: ${escapeHtml(c.imei)}</div>`:''}
+          <div class="cc-equipo" style="margin-top:2px;">👤 ${escapeHtml(c.asesor)}</div>
           <div class="cc-equipo" style="margin-top:2px;">🗓️ Compra: ${fmtFechaCorta(c.fechaInicio)}</div>
         </div>
         <div class="cc-monto">
@@ -6209,6 +6260,8 @@ function filtrarCreditosTexto() {
   renderCreditos(tabCreditosActual);
 }
 
+// Versión con debounce para el input (evita un fetch a ventas por tecla)
+const filtrarCreditosPorIMEIDebounced = debounce(q => filtrarCreditosPorIMEI(q), 300);
 async function filtrarCreditosPorIMEI(q) {
   // Limpiar búsqueda general
   const txtEl = document.getElementById('searchCredCliente');
@@ -6267,10 +6320,10 @@ async function filtrarCreditosPorIMEI(q) {
     const pct = Math.round((c.pagadas/c.cuotas)*100)||0;
     return `<div class="credito-card">
       <div class="cc-header">
-        <div><div class="cc-name">${c.cliente} <span style="font-family:monospace;font-size:11px;color:var(--text2);font-weight:600;">#${c.id}</span></div>
-          <div class="cc-equipo">📱 ${(c.equipo||'').substring(0,25)}</div>
-          ${c.imei?`<div class="cc-equipo" style="margin-top:2px;">🔢 IMEI: ${c.imei}</div>`:''}
-          <div class="cc-equipo" style="margin-top:2px;">👤 ${c.asesor}</div>
+        <div><div class="cc-name">${escapeHtml(c.cliente)} <span style="font-family:monospace;font-size:11px;color:var(--text2);font-weight:600;">#${c.id}</span></div>
+          <div class="cc-equipo">📱 ${escapeHtml((c.equipo||'').substring(0,25))}</div>
+          ${c.imei?`<div class="cc-equipo" style="margin-top:2px;">🔢 IMEI: ${escapeHtml(c.imei)}</div>`:''}
+          <div class="cc-equipo" style="margin-top:2px;">👤 ${escapeHtml(c.asesor)}</div>
           <div class="cc-equipo" style="margin-top:2px;">🗓️ Compra: ${fmtFechaCorta(c.fechaInicio)}</div>
         </div>
         <div class="cc-monto">
@@ -6428,8 +6481,8 @@ async function renderContabilidad(){
             <div style="display:flex;gap:6px;flex-wrap:wrap;">
               ${nominasRegistradas.has(n.nombre.toUpperCase())
                 ? `<span class="badge badge-green" style="font-size:11px;padding:4px 10px;">✓ Registrado en gastos</span>
-                   <button class="btn btn-sm btn-ghost" style="font-size:11px;color:#d97706;border:1px solid #d97706;" onclick="actualizarNominaEnGastos('${n.nombre}',${n.salario},'${mesActual}')" title="Recalcular si cambio el salario">🔄 Actualizar</button>`
-                : `<button class="btn btn-sm btn-ghost" style="font-size:11px;" onclick="descontarNominaDeGastos('${n.nombre}',${n.salario},'${mesActual}')" title="Registra solo el salario base.">➡️ Registrar salario</button>`}
+                   <button class="btn btn-sm btn-ghost" style="font-size:11px;color:#d97706;border:1px solid #d97706;" data-nombre="${escapeHtml(n.nombre)}" onclick="actualizarNominaEnGastos(this.dataset.nombre,${n.salario},'${mesActual}')" title="Recalcular si cambio el salario">🔄 Actualizar</button>`
+                : `<button class="btn btn-sm btn-ghost" style="font-size:11px;" data-nombre="${escapeHtml(n.nombre)}" onclick="descontarNominaDeGastos(this.dataset.nombre,${n.salario},'${mesActual}')" title="Registra solo el salario base.">➡️ Registrar salario</button>`}
             </div>
           </td>
         </tr>`;
@@ -6999,9 +7052,9 @@ async function toggleAsesorActivo(userId, activo) {
 function renderGarantias(){
   $('tbodyGarantias').innerHTML=db.garantias.length?db.garantias.map(g=>`
     <tr>
-      <td>${g.fecha}</td><td style="font-weight:500;">${g.ref}</td>
+      <td>${g.fecha}</td><td style="font-weight:500;">${escapeHtml(g.ref)}</td>
       <td style="font-size:11px;color:var(--text2);">—</td>
-      <td>${g.detalle}</td><td>${g.tecnico}</td><td>—</td>
+      <td>${escapeHtml(g.detalle)}</td><td>${escapeHtml(g.tecnico)}</td><td>—</td>
       <td><span class="badge ${g.estado.includes('OK')||g.estado.includes('ENTREGADO')?'badge-green':g.estado.includes('DEVUELTO')?'badge-orange':'badge-yellow'}">${g.estado}</span></td>
     </tr>`).join(''):'<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text2);">Sin garantías registradas</td></tr>';
 }
@@ -7565,15 +7618,15 @@ async function renderTareas(data) {
         <span style="font-size:11px;">${prioIcon[t.prioridad]||''} <span style="color:${prioColor[t.prioridad]};font-weight:600;text-transform:uppercase;">${t.prioridad}</span></span>
         <span class="badge ${estadoColor[t.estado]||'badge-blue'}" style="font-size:10px;">${estadoLabel[t.estado]||t.estado}</span>
       </div>
-      <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:14px;margin-bottom:6px;line-height:1.3;">${t.titulo}</div>
-      ${t.cliente?`<div style="font-size:12px;color:#555577;">👤 ${t.cliente}${t.cedula?' · '+t.cedula:''}</div>`:''}
-      ${t.equipo?`<div style="font-size:12px;color:#555577;">📱 ${t.equipo}${t.imei?' · '+t.imei:''}</div>`:''}
+      <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:14px;margin-bottom:6px;line-height:1.3;">${escapeHtml(t.titulo)}</div>
+      ${t.cliente?`<div style="font-size:12px;color:#555577;">👤 ${escapeHtml(t.cliente)}${t.cedula?' · '+escapeHtml(t.cedula):''}</div>`:''}
+      ${t.equipo?`<div style="font-size:12px;color:#555577;">📱 ${escapeHtml(t.equipo)}${t.imei?' · '+escapeHtml(t.imei):''}</div>`:''}
       ${t.valor>0?`<div style="font-size:12px;color:#6B2D8B;font-weight:600;">💰 ${fmt(t.valor)}</div>`:''}
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:8px;border-top:1px solid #f0ecf8;">
         <div>${diasLabel}</div>
         <div style="font-size:11px;color:#888899;">📅 ${t.fechaLimite}</div>
       </div>
-      ${t.asesor?`<div style="font-size:11px;color:#888899;margin-top:4px;">👤 ${t.asesor}</div>`:''}
+      ${t.asesor?`<div style="font-size:11px;color:#888899;margin-top:4px;">👤 ${escapeHtml(t.asesor)}</div>`:''}
     </div>`;
   }).join('');
 
@@ -7802,14 +7855,14 @@ async function cargarBitacoraTarea(tareaId) {
           <span style="font-weight:700;font-size:13px;">${icono} ${label}</span>
           <div style="text-align:right;">
             <div style="font-size:11px;color:#888899;">${r.fecha||''} ${r.hora||''}</div>
-            <div style="font-size:11px;color:#6B2D8B;font-weight:600;">${(r.usuario||'').toUpperCase()}</div>
+            <div style="font-size:11px;color:#6B2D8B;font-weight:600;">${escapeHtml((r.usuario||'').toUpperCase())}</div>
           </div>
         </div>
-        ${r.nota ? `<div style="font-size:13px;color:#333;line-height:1.5;border-top:1px solid rgba(0,0,0,0.06);padding-top:6px;">${r.nota}</div>` : ''}
+        ${r.nota ? `<div style="font-size:13px;color:#333;line-height:1.5;border-top:1px solid rgba(0,0,0,0.06);padding-top:6px;">${escapeHtml(r.nota)}</div>` : ''}
       </div>`;
     }).join('');
   } catch(e) {
-    lista.innerHTML = '<div style="color:#dc2626;padding:12px;">Error: '+e.message+'</div>';
+    lista.innerHTML = '<div style="color:#dc2626;padding:12px;">Error: '+escapeHtml(e.message)+'</div>';
   }
 }
 
@@ -8466,10 +8519,10 @@ async function cargarBitacora(creditoId) {
           <span style="font-weight:700;font-size:13px;">${icono} ${label}</span>
           <div style="text-align:right;">
             <div style="font-size:11px;color:#888899;">${r.fecha||'—'} ${r.hora||''}</div>
-            <div style="font-size:11px;color:#6B2D8B;font-weight:600;">${(r.usuario||'').toUpperCase()}</div>
+            <div style="font-size:11px;color:#6B2D8B;font-weight:600;">${escapeHtml((r.usuario||'').toUpperCase())}</div>
           </div>
         </div>
-        ${r.nota ? `<div style="font-size:13px;color:#333;line-height:1.5;border-top:1px solid rgba(0,0,0,0.06);padding-top:6px;margin-top:4px;">${r.nota}</div>` : ''}
+        ${r.nota ? `<div style="font-size:13px;color:#333;line-height:1.5;border-top:1px solid rgba(0,0,0,0.06);padding-top:6px;margin-top:4px;">${escapeHtml(r.nota)}</div>` : ''}
       </div>`;
     }).join('');
 
@@ -8478,7 +8531,7 @@ async function cargarBitacora(creditoId) {
     if(cMem) cMem.bitacoraCount = rows.length;
 
   } catch(e) {
-    lista.innerHTML = `<div style="color:#dc2626;padding:12px;">Error cargando bitácora: ${e.message}</div>`;
+    lista.innerHTML = `<div style="color:#dc2626;padding:12px;">Error cargando bitácora: ${escapeHtml(e.message)}</div>`;
   }
 }
 
@@ -8746,6 +8799,8 @@ function buscarClienteVenta(q, prefijo) {
 }
 
 // Buscar cliente por cédula al escribir en campo cédula
+// Versión con debounce para los inputs (evita consultas a clientes por tecla)
+const buscarClienteUnificadoDebounced = debounce((q, prefijo) => buscarClienteUnificado(q, prefijo), 300);
 async function buscarClienteUnificado(q, prefijo) {
   const dd = document.getElementById(prefijo+'ClienteDropdown');
   if(!dd) return;
@@ -8770,8 +8825,10 @@ async function buscarClienteUnificado(q, prefijo) {
   if(!resultados.length && q.length >= 3) {
     try {
       const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH };
-      const r1 = await fetch(`${SUPABASE_URL}/rest/v1/clientes?select=id,nombre,tipo_doc,documento,telefono,correo&nombre=ilike.*${encodeURIComponent(q)}*&limit=10`, {headers});
-      const r2 = await fetch(`${SUPABASE_URL}/rest/v1/clientes?select=id,nombre,tipo_doc,documento,telefono,correo&documento=ilike.*${encodeURIComponent(q)}*&limit=10`, {headers});
+      const [r1, r2] = await Promise.all([
+        fetch(`${SUPABASE_URL}/rest/v1/clientes?select=id,nombre,tipo_doc,documento,telefono,correo&nombre=ilike.*${encodeURIComponent(q)}*&limit=10`, {headers}),
+        fetch(`${SUPABASE_URL}/rest/v1/clientes?select=id,nombre,tipo_doc,documento,telefono,correo&documento=ilike.*${encodeURIComponent(q)}*&limit=10`, {headers})
+      ]);
       const d1 = await r1.json(); const d2 = await r2.json();
       resultados = [...(Array.isArray(d1)?d1:[]), ...(Array.isArray(d2)?d2:[])];
       // Deduplicar y guardar en memoria
@@ -8799,8 +8856,8 @@ async function buscarClienteUnificado(q, prefijo) {
     return `<div onclick="seleccionarClientePorId(${cId}, '${pref}')"
       style="padding:10px 14px;cursor:pointer;border-bottom:1px solid #f7f5fb;font-size:13px;"
       onmouseover="this.style.background='#f7f5fb'" onmouseout="this.style.background=''">
-      <div style="font-weight:700;">${c.nombre}</div>
-      <div style="font-size:11px;color:#888899;">${c.tipo_doc||'CC'}: ${c.documento||'—'}${c.telefono?' · '+c.telefono:''}</div>
+      <div style="font-weight:700;">${escapeHtml(c.nombre)}</div>
+      <div style="font-size:11px;color:#888899;">${escapeHtml(c.tipo_doc||'CC')}: ${escapeHtml(c.documento||'—')}${c.telefono?' · '+escapeHtml(c.telefono):''}</div>
     </div>`;
   }).join('') +
     `<div style="padding:8px 14px;border-top:1px solid #f0ecf8;">
@@ -9153,18 +9210,20 @@ async function guardarVentaContado(){
   if(!productosVentaVC || productosVentaVC.length === 0) {
     toast('Agrega al menos un producto antes de guardar','error'); _guardandoVenta=false; if(btnG){btnG.disabled=false;btnG.textContent='💾 Guardar Venta';} return;
   }
+  // Toda salida temprana debe liberar el flag y el botón; si no, queda bloqueada la venta hasta recargar
+  const abortarVentaVC = msg => { toast(msg,'error'); _guardandoVenta=false; if(btnG){btnG.disabled=false;btnG.textContent='💾 Guardar Venta';} };
   // Validar cliente
-  if(!$U('vcCliente')) { toast('Selecciona un cliente','error'); return; }
+  if(!$U('vcCliente')) { abortarVentaVC('Selecciona un cliente'); return; }
   // Validar asesor
   const asesorSelVC = ($U('vcAsesorSelect')||$U('vcAsesor')||'').trim();
-  if(!asesorSelVC) { toast('Selecciona un asesor para la venta','error'); return; }
+  if(!asesorSelVC) { abortarVentaVC('Selecciona un asesor para la venta'); return; }
   const asesorObjVC = ASESORES_ACTIVOS.find(a => a.activo && a.nombre.toUpperCase() === asesorSelVC.toUpperCase());
   if(!asesorObjVC) {
-    toast('El asesor seleccionado no está habilitado. Escoge un asesor activo.','error'); return;
+    abortarVentaVC('El asesor seleccionado no está habilitado. Escoge un asesor activo.'); return;
   }
   // Admin no puede cargarse ventas a sí mismo — debe ser rol asesor
   if(asesorObjVC.rol === 'admin' && asesorObjVC.nombre.toUpperCase() === sesionActiva?.nombre?.toUpperCase()) {
-    toast('Los administradores no pueden cargarse ventas. Selecciona un asesor habilitado.','error'); return;
+    abortarVentaVC('Los administradores no pueden cargarse ventas. Selecciona un asesor habilitado.'); return;
   }
 
   const ivaPct    = parseFloat($('vcIVA')?.value)||0;
@@ -9185,7 +9244,7 @@ async function guardarVentaContado(){
     // Validar si es IMEI numerico (15 digitos) O serial alfanumerico (al menos 5 caracteres)
     if(imeiCheck && (imeiCheck.length === 15 || (/[A-Z]/.test(imeiCheck) && imeiCheck.length >= 5))) {
       const disp = await validarDisponibilidadProducto(imeiCheck, p.producto);
-      if(!disp) return;
+      if(!disp) { _guardandoVenta=false; if(btnG){btnG.disabled=false;btnG.textContent='💾 Guardar Venta';} return; }
     }
   }
 
@@ -9274,7 +9333,11 @@ async function guardarVentaContado(){
 
     renderVentas(); renderInventario();
     toast('Venta registrada ✅');
-  } catch(e) { hideLoader(); toast('Error: '+e.message,'error'); }
+  } catch(e) {
+    hideLoader(); toast('Error: '+e.message,'error');
+    _guardandoVenta = false;
+    if(btnG){ btnG.disabled=false; btnG.textContent='💾 Guardar Venta'; }
+  }
 }
 
 async function guardarCredito(){
@@ -9337,10 +9400,10 @@ async function guardarCredito(){
   const fPP = document.getElementById('crdPrimerPago')?.value;
   const fSP = document.getElementById('crdSegundoPago')?.value;
   if(!fPP || !fSP) {
-    toast('Debes escoger las 2 fechas de pago quincenal','error'); _guardandoVenta=false; if(btnGC){btnGC.disabled=false;btnGC.textContent='💾 Guardar Crédito';} return;
+    toast('Debes escoger las 2 fechas de pago quincenal','error'); return;
   }
   if(new Date(fSP) <= new Date(fPP)) {
-    toast('La segunda fecha debe ser posterior a la primera','error'); _guardandoVenta=false; if(btnGC){btnGC.disabled=false;btnGC.textContent='💾 Guardar Crédito';} return;
+    toast('La segunda fecha debe ser posterior a la primera','error'); return;
   }
 
   // Validar disponibilidad de cada IMEI
@@ -9494,7 +9557,11 @@ Esta acción cancelará el crédito como PAGADO.`)) return;
   setTimeout(() => confirmarAbono(), 100);
 }
 
+// Flag propio: protege también las invocaciones directas (pagarTotalCredito
+// llama confirmarAbono por setTimeout, sin pasar por protegerBoton)
+let _guardandoAbono = false;
 async function confirmarAbono() {
+  if(_guardandoAbono) { toast('Abono en proceso, espera...','error'); return; }
   const id     = parseInt(document.getElementById('abonoCredId').value);
   const valor  = getMoneyValue('abonoValor');
   const metodo = document.getElementById('abonoMetodo').value;
@@ -9504,6 +9571,7 @@ async function confirmarAbono() {
   const credito = db.creditos.find(c => c.id === id);
   if(!credito) return;
   const nroCuota = credito.pagadas + 1;
+  _guardandoAbono = true;
   try {
     const { abono } = await registrarAbonoDB(id, valor, metodo, { transf, obs });
     closeModal('modalRegistrarAbono');
@@ -9524,6 +9592,7 @@ async function confirmarAbono() {
     });
     toast('Abono registrado ✅');
   } catch(e) { toast('Error: '+e.message,'error'); }
+  finally { _guardandoAbono = false; }
 }
 
 let ventaDetalleActualId = null;
@@ -9811,15 +9880,14 @@ async function confirmarAnularVentaContado() {
   if(v.anulada) { toast('Esta venta ya esta anulada','error'); return; }
 
   const msgConfirm = 'Anular la venta de ' + (v.equipo||'este equipo') + ' - ' + v.cliente + '?' +
-    ' Se anulara la venta, el credito vinculado (si existe),' +
-    ' el equipo volvera al inventario como DISPONIBLE' +
-    ' y se actualizaran todos los modulos.';
+    ' Se anulara SOLO esta venta y el equipo volvera al inventario como DISPONIBLE.' +
+    ' Los creditos del cliente NO se tocan (si necesitas anular un credito, hazlo desde el modulo Creditos).';
   if(!confirm(msgConfirm)) return;
 
   showLoader('Anulando venta...');
   const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH, 'Content-Type': 'application/json' };
   const base = SUPABASE_URL + '/rest/v1';
-  const resumen = { ventasAnuladas:0, creditosAnulados:0, equiposDevueltos:[] };
+  const resumen = { ventasAnuladas:0, equiposDevueltos:[] };
 
   try {
     // ── PASO 1: Anular esta venta y su detalle ──
@@ -9884,36 +9952,10 @@ async function confirmarAnularVentaContado() {
       }
     }
 
-    // ── PASO 3: Anular crédito vinculado ────────────────────────
-    // Buscar por cédula del cliente (más confiable)
-    let credRows = [];
-    if(v.cedula) {
-      const rC = await fetch(
-        `${base}/creditos?select=id,estado,producto_desc&cedula_cliente=eq.${encodeURIComponent(v.cedula)}&estado=neq.anulado&limit=10`,
-        {headers}
-      );
-      credRows = await rC.json() || [];
-    }
-    // Si no hay por cédula, buscar por nombre cliente
-    if(!credRows.length) {
-      const rC = await fetch(
-        `${base}/creditos?select=id,estado,producto_desc&cliente=eq.${encodeURIComponent(v.cliente)}&estado=neq.anulado&limit=10`,
-        {headers}
-      );
-      credRows = await rC.json() || [];
-    }
-    for(const cr of credRows) {
-      await fetch(`${base}/creditos?id=eq.${cr.id}`, {
-        method:'PATCH', headers,
-        body: JSON.stringify({
-          estado: 'anulado',
-          observaciones: 'ANULADO: Desde módulo ventas — ' + fechaColombia()
-        })
-      });
-      const cMem = db.creditos.find(x=>x.id===cr.id);
-      if(cMem) cMem.estado = 'anulado';
-      resumen.creditosAnulados++;
-    }
+    // NOTA: la anulación de una venta es independiente y NO toca los créditos
+    // del cliente. Antes se anulaban hasta 10 créditos buscados por cédula/nombre,
+    // lo que cancelaba cartera legítima de otras compras. Los créditos se anulan
+    // solo desde su propio flujo en el módulo Créditos.
 
     hideLoader();
     closeModal('modalDetalleVenta');
@@ -9928,9 +9970,8 @@ async function confirmarAnularVentaContado() {
 
     // Resumen de la anulacion
     const linea1 = resumen.ventasAnuladas + ' venta(s) anulada(s)';
-    const linea2 = resumen.creditosAnulados > 0 ? resumen.creditosAnulados + ' credito(s) anulado(s)' : 'Sin credito vinculado encontrado';
-    const linea3 = resumen.equiposDevueltos.length > 0 ? 'Devuelto al inventario: ' + resumen.equiposDevueltos.join(', ') : 'Equipo no encontrado en inventario';
-    toast(linea1 + ' | ' + linea2 + ' | ' + linea3);
+    const linea2 = resumen.equiposDevueltos.length > 0 ? 'Devuelto al inventario: ' + resumen.equiposDevueltos.join(', ') : 'Equipo no encontrado en inventario';
+    toast(linea1 + ' | ' + linea2);
 
   } catch(e) {
     hideLoader();
@@ -10134,7 +10175,10 @@ function filtrarMovCaja() {
 // ============================================================
 function abrirTrasladoEquipo(productoId, nombre) {
   document.getElementById('trasladoProductoId').value = productoId;
-  document.getElementById('trasladoProductoNombre').textContent = nombre || '—';
+  // El nombre se resuelve por id (no viaja por onclick: una comilla en el
+  // nombre del producto rompería/inyectaría el atributo)
+  const equipoInv = db.inventario.find(e => e.id === productoId);
+  document.getElementById('trasladoProductoNombre').textContent = nombre || equipoInv?.producto || '—';
   document.getElementById('trasladoIMEIBusca').value = '';
   document.getElementById('trasladoBuscaInfo').style.display = 'none';
   document.getElementById('trasladoMotivo').value = '';
@@ -11847,12 +11891,19 @@ async function marcarProductoVendido(imei, nombreEquipo) {
 
   // Marcar como VENDIDO
   if(productoId) {
-    await fetch(`${base}?id=eq.${productoId}`, {
+    const resPatch = await fetch(`${base}?id=eq.${productoId}`, {
       method: 'PATCH',
       headers,
       body: JSON.stringify({ estado: 'VENDIDO' })
     });
-    // Actualizar memoria local
+    // Solo actualizar memoria si Supabase confirmó el cambio; si no, el equipo
+    // quedaría VENDIDO en la UI pero DISPONIBLE en la BD (riesgo de doble venta)
+    if(!resPatch.ok) {
+      const errTxt = await resPatch.text();
+      console.error('Fallo al marcar VENDIDO id:', productoId, errTxt);
+      toast('⚠️ El equipo no se pudo marcar como VENDIDO en inventario. Verifícalo manualmente.','error');
+      return;
+    }
     const inv = db.inventario.find(i => i.id === productoId);
     if(inv) inv.estado = 'VENDIDO';
     const comp = db.compras.find(c => c.id === productoId);
@@ -13452,8 +13503,8 @@ async function renderComisiones() {
         <div style="display:flex;gap:6px;flex-wrap:wrap;">
           ${(window._comisRegistradas && window._comisRegistradas.has(f.asesor.toUpperCase()))
             ? `<span class="badge badge-green" style="font-size:11px;padding:4px 10px;">✓ Registrado en gastos</span>
-               <button class="btn btn-sm btn-ghost" style="font-size:11px;color:#d97706;border:1px solid #d97706;" onclick="actualizarComisionEnGastos('${f.asesor}',${f.totalPagar},'${mesActual}')" title="Recalcular y actualizar el gasto si hubo nuevas ventas">🔄 Actualizar</button>`
-            : `<button class="btn btn-sm btn-ghost" style="font-size:11px;" onclick="descontarDeGastos('${f.asesor}',${f.totalPagar},'${mesActual}')">➡️ A Gastos</button>`}
+               <button class="btn btn-sm btn-ghost" style="font-size:11px;color:#d97706;border:1px solid #d97706;" data-asesor="${escapeHtml(f.asesor)}" onclick="actualizarComisionEnGastos(this.dataset.asesor,${f.totalPagar},'${mesActual}')" title="Recalcular y actualizar el gasto si hubo nuevas ventas">🔄 Actualizar</button>`
+            : `<button class="btn btn-sm btn-ghost" style="font-size:11px;" data-asesor="${escapeHtml(f.asesor)}" onclick="descontarDeGastos(this.dataset.asesor,${f.totalPagar},'${mesActual}')">➡️ A Gastos</button>`}
         </div>
       </td>
     </tr>`).join('');
@@ -13800,6 +13851,9 @@ async function cargarDatosPorSede(user) {
     db.creditos    = creditos.map(mapCredito);
     db.garantias   = garantias.map(mapGarantia);
     db.gastos      = gastos.map(mapGasto);
+
+    // Persistir estados mora/al_dia recalculados (sin bloquear el login)
+    sincronizarEstadosCreditosDB();
 
     // Aplicar sede por defecto al registrar si es asesor/bodega
     if (user.sede_id) {
