@@ -9452,7 +9452,7 @@ async function guardarCredito(){
   };
 
   try {
-    await guardarCreditoDB(datos);
+    const creditoNuevo = await guardarCreditoDB(datos);
 
     // UNA venta maestra con detalle por producto
     const nProdC = productosVentaCrd.length;
@@ -9470,6 +9470,13 @@ async function guardarCredito(){
     const resVM = await sbFetch('ventas', { method:'POST', body:rowVM });
     const ventaMaestraCred = mapVenta(resVM[0]);
     db.ventas.unshift(ventaMaestraCred);
+
+    // Vincular el crédito con su venta maestra (permite anularlos juntos)
+    if(creditoNuevo?.id && ventaMaestraCred?.id) {
+      try {
+        await sbFetch(`creditos?id=eq.${creditoNuevo.id}`, { method:'PATCH', body:{ venta_id: ventaMaestraCred.id } });
+      } catch(e){ console.error('No se pudo vincular crédito con venta:', e); }
+    }
 
     // Guardar cada producto en ventas_detalle
     const totalBaseCrd = productosVentaCrd.reduce((s,p)=>s+(p.precio||0),0);
@@ -9881,15 +9888,18 @@ async function confirmarAnularVentaContado() {
   if(!v) return;
   if(v.anulada) { toast('Esta venta ya esta anulada','error'); return; }
 
+  const esVentaCredito = v.tipo === 'credito';
   const msgConfirm = 'Anular la venta de ' + (v.equipo||'este equipo') + ' - ' + v.cliente + '?' +
-    ' Se anulara SOLO esta venta y el equipo volvera al inventario como DISPONIBLE.' +
-    ' Los creditos del cliente NO se tocan (si necesitas anular un credito, hazlo desde el modulo Creditos).';
+    ' Se anulara esta venta y el equipo volvera al inventario como DISPONIBLE.' +
+    (esVentaCredito
+      ? ' Tambien se anulara el credito vinculado a ESTA venta (los demas creditos del cliente no se tocan).'
+      : '');
   if(!confirm(msgConfirm)) return;
 
   showLoader('Anulando venta...');
   const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH, 'Content-Type': 'application/json' };
   const base = SUPABASE_URL + '/rest/v1';
-  const resumen = { ventasAnuladas:0, equiposDevueltos:[] };
+  const resumen = { ventasAnuladas:0, equiposDevueltos:[], creditosAnulados:[] };
 
   try {
     // ── PASO 1: Anular esta venta y su detalle ──
@@ -9958,10 +9968,48 @@ async function confirmarAnularVentaContado() {
       }
     }
 
-    // NOTA: la anulación de una venta es independiente y NO toca los créditos
-    // del cliente. Antes se anulaban hasta 10 créditos buscados por cédula/nombre,
-    // lo que cancelaba cartera legítima de otras compras. Los créditos se anulan
-    // solo desde su propio flujo en el módulo Créditos.
+    // ── PASO 3: Anular el crédito vinculado a ESTA venta ──
+    // Vínculo directo por venta_id; respaldo por IMEI y por cédula+equipo
+    // (máximo 1 crédito, el más reciente no anulado) para ventas antiguas
+    // sin venta_id. Nunca se anula cartera del cliente por cédula sola.
+    if(esVentaCredito) {
+      const buscarCreditos = async (q) => {
+        try {
+          const r = await fetch(`${base}/creditos?select=id,cliente,producto_desc,estado&estado=neq.anulado&${q}`, {headers});
+          return r.ok ? (await r.json() || []) : [];
+        } catch(e){ console.error(e); return []; }
+      };
+      let credRows = await buscarCreditos(`venta_id=eq.${v.id}`);
+      const imeiCred = (v.imei||'').replace(/[^0-9]/g,'');
+      if(!credRows.length && imeiCred.length >= 5) {
+        credRows = await buscarCreditos(`imei=eq.${imeiCred}&order=created_at.desc&limit=1`);
+      }
+      if(!credRows.length && v.cedula && v.equipo) {
+        const eqNombre = v.equipo.replace(/^\d+\s+PRODUCTOS:\s*/i,'').split('|')[0].trim();
+        if(eqNombre) {
+          credRows = await buscarCreditos(
+            `cedula_cliente=eq.${encodeURIComponent(v.cedula)}&producto_desc=ilike.*${encodeURIComponent(eqNombre.substring(0,25))}*&order=created_at.desc&limit=1`
+          );
+        }
+      }
+      for(const cRow of credRows) {
+        const rC = await fetch(`${base}/creditos?id=eq.${cRow.id}`, {
+          method:'PATCH', headers,
+          body: JSON.stringify({
+            estado: 'anulado',
+            observaciones: 'ANULADO: Anulación de la venta #' + v.id + ' desde módulo ventas'
+          })
+        });
+        if(rC.ok) {
+          const cMem = db.creditos.find(c=>c.id===cRow.id);
+          if(cMem) cMem.estado = 'anulado';
+          resumen.creditosAnulados.push('#' + cRow.id + ' ' + (cRow.cliente||''));
+        } else {
+          console.error('No se pudo anular el crédito', cRow.id, rC.status);
+        }
+      }
+      if(!credRows.length) console.warn('Venta a crédito sin crédito vinculado localizable:', v.id);
+    }
 
     hideLoader();
     closeModal('modalDetalleVenta');
@@ -9977,7 +10025,10 @@ async function confirmarAnularVentaContado() {
     // Resumen de la anulacion
     const linea1 = resumen.ventasAnuladas + ' venta(s) anulada(s)';
     const linea2 = resumen.equiposDevueltos.length > 0 ? 'Devuelto al inventario: ' + resumen.equiposDevueltos.join(', ') : 'Equipo no encontrado en inventario';
-    toast(linea1 + ' | ' + linea2);
+    const linea3 = esVentaCredito
+      ? (resumen.creditosAnulados.length > 0 ? 'Credito anulado: ' + resumen.creditosAnulados.join(', ') : 'ATENCION: no se encontro el credito vinculado, anulalo desde Creditos')
+      : '';
+    toast(linea1 + ' | ' + linea2 + (linea3 ? ' | ' + linea3 : ''));
 
   } catch(e) {
     hideLoader();
