@@ -9873,7 +9873,9 @@ async function verFacturaVenta() {
 }
 
 async function confirmarAnularVentaContado() {
-  if(!esUsuarioAdmin()) { toast('Solo el usuario administrador puede anular ventas','error'); return; }
+  // Por rol (no por usuario literal 'admin'): el botón se muestra a todo rol
+  // admin, así que la acción debe aceptar a los mismos usuarios.
+  if(sesionActiva?.rol !== 'admin') { toast('Solo un administrador puede anular ventas','error'); return; }
   if(!ventaDetalleActualId) return;
   const v = db.ventas.find(x => x.id === ventaDetalleActualId);
   if(!v) return;
@@ -9902,13 +9904,17 @@ async function confirmarAnularVentaContado() {
     const todasVentasGrupo = [v];
 
     for(const vx of todasVentasGrupo) {
-      await fetch(`${base}/ventas?id=eq.${vx.id}`, {
+      const rAnul = await fetch(`${base}/ventas?id=eq.${vx.id}`, {
         method:'PATCH', headers,
         body: JSON.stringify({
           observaciones: 'ANULADA: Anulación manual desde módulo ventas',
           valor_venta: 0, ganancia: 0, comision_asesor: 0
         })
       });
+      if(!rAnul.ok) {
+        const detalle = await rAnul.text().catch(()=> '');
+        throw new Error('La base de datos rechazó la anulación (' + rAnul.status + '). ' + detalle);
+      }
       // Actualizar memoria
       const vMem = db.ventas.find(x=>x.id===vx.id);
       if(vMem){ vMem.anulada=true; vMem.venta=0; vMem.ganancia=0; }
