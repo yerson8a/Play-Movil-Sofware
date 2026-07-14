@@ -473,6 +473,11 @@
   body.rol-admin td.solo-costo, body.rol-bodega td.solo-costo { display:table-cell !important; }
   body.rol-admin .solo-costo.sa-flex, body.rol-bodega .solo-costo.sa-flex { display:flex !important; }
   body.rol-admin .solo-costo.sa-grid, body.rol-bodega .solo-costo.sa-grid { display:grid !important; }
+  /* ver-costos: permiso individual (perfiles.ver_costos) que el admin asigna por usuario */
+  body.ver-costos .solo-costo { display:block !important; }
+  body.ver-costos th.solo-costo, body.ver-costos td.solo-costo { display:table-cell !important; }
+  body.ver-costos .solo-costo.sa-flex { display:flex !important; }
+  body.ver-costos .solo-costo.sa-grid { display:grid !important; }
   body.rol-consulta .btn-primary { opacity:0.5; pointer-events:none; cursor:not-allowed; }
 
   /* ===== INFORME GERENCIAL ===== */
@@ -2023,7 +2028,7 @@
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>#</th><th>Nombre</th><th>Usuario</th><th>Rol</th><th>Sede</th><th>Estado</th><th>Último acceso</th><th>Acciones</th></tr></thead>
+            <thead><tr><th>#</th><th>Nombre</th><th>Usuario</th><th>Rol</th><th>Sede</th><th>Estado</th><th>Ver costos</th><th>Último acceso</th><th>Acciones</th></tr></thead>
             <tbody id="tbodyUsuarios"></tbody>
           </table>
         </div>
@@ -12145,9 +12150,10 @@ function esUsuarioAdmin() {
 function puedeVerGanancias() {
   return sesionActiva?.rol === 'admin';
 }
-// Precios de compra / costo: rol admin y bodega (bodega los necesita para registrar)
+// Precios de compra / costo: rol admin y bodega (bodega los necesita para registrar),
+// más los usuarios con el permiso individual perfiles.ver_costos (lo asigna el admin)
 function puedeVerCostos() {
-  return sesionActiva?.rol === 'admin' || sesionActiva?.rol === 'bodega';
+  return sesionActiva?.rol === 'admin' || sesionActiva?.rol === 'bodega' || sesionActiva?.ver_costos === true;
 }
 
 // Leer valor de campo en MAYÚSCULAS
@@ -12467,6 +12473,7 @@ document.querySelectorAll('.modal-overlay').forEach(o=>{
 const dbAdmin = {
   sedes: [],
   usuarios: [],
+  perfiles: [],
   financieras: [],
   cajas: []
 };
@@ -12632,8 +12639,42 @@ async function cargarUsuarios() {
   try {
     const res = await sbFetch('sistema_usuarios', { order: 'id.asc' });
     dbAdmin.usuarios = res;
+    // Perfiles (Supabase Auth): fuente real del permiso ver_costos.
+    // La RLS solo devuelve todos los perfiles al admin; a otros roles solo el propio.
+    try {
+      const { data } = await supa.from('perfiles').select('id,usuario,rol,ver_costos');
+      dbAdmin.perfiles = data || [];
+    } catch(e) { dbAdmin.perfiles = []; }
     renderUsuarios();
   } catch(e) { console.error('Error cargando usuarios:', e); }
+}
+
+// Celda con el permiso individual "ver costos" (solo aplica a asesores;
+// admin y bodega ya ven costos por rol). El perfil se cruza por `usuario`.
+function celdaVerCostos(u) {
+  const p = (dbAdmin.perfiles || []).find(x => x.usuario === u.usuario);
+  if (!p || p.rol !== 'asesor') return '<td style="text-align:center;color:#c8c8d4;">—</td>';
+  const activo = p.ver_costos === true;
+  if (sesionActiva?.rol !== 'admin') {
+    return `<td style="text-align:center;"><span class="badge ${activo ? 'badge-green' : 'badge-red'}">${activo ? 'Sí' : 'No'}</span></td>`;
+  }
+  return `<td style="text-align:center;">
+    <button class="btn btn-sm ${activo ? 'btn-primary' : 'btn-ghost'}" onclick="toggleVerCostos('${p.id}')" title="${activo ? 'Puede ver precios de costo — clic para quitar' : 'No ve precios de costo — clic para permitir'}">${activo ? '💰 Sí' : '🚫 No'}</button>
+  </td>`;
+}
+
+async function toggleVerCostos(perfilId) {
+  if (sesionActiva?.rol !== 'admin') { toast('Solo el administrador puede cambiar este permiso', 'error'); return; }
+  const p = (dbAdmin.perfiles || []).find(x => x.id === perfilId);
+  if (!p) return;
+  const nuevo = !(p.ver_costos === true);
+  try {
+    const { error } = await supa.from('perfiles').update({ ver_costos: nuevo }).eq('id', perfilId);
+    if (error) throw error;
+    p.ver_costos = nuevo;
+    renderUsuarios();
+    toast(nuevo ? `${p.usuario} ahora puede ver precios de costo ✅` : `${p.usuario} ya no ve precios de costo`);
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
 }
 
 function renderUsuarios() {
@@ -12662,6 +12703,7 @@ function renderUsuarios() {
       <td><span class="badge ${rolColors[u.rol] || 'badge-blue'}">${u.rol.toUpperCase()}</span></td>
       <td>${sedeNombre}</td>
       <td><span class="badge ${u.activo ? 'badge-green' : 'badge-red'}">${u.activo ? 'Activo' : 'Inactivo'}</span></td>
+      ${celdaVerCostos(u)}
       <td style="font-size:11px;color:#888899;">${acceso}</td>
       <td>
         <button class="btn btn-sm btn-ghost" onclick="abrirEditarUsuario(${u.id})" title="Editar">✏️</button>
@@ -12669,7 +12711,7 @@ function renderUsuarios() {
         <button class="btn btn-sm btn-ghost" style="color:#dc2626;" onclick="eliminarUsuario(${u.id})" title="Eliminar">🗑️</button>
       </td>
     </tr>`;
-  }).join('') : '<tr><td colspan="8" style="text-align:center;padding:40px;color:#888899;">Sin usuarios</td></tr>';
+  }).join('') : '<tr><td colspan="9" style="text-align:center;padding:40px;color:#888899;">Sin usuarios</td></tr>';
 }
 
 function filtrarUsuarios(q) {
@@ -12679,6 +12721,7 @@ function filtrarUsuarios(q) {
   const sedes = { 1: 'Pereira', 2: 'Armenia' };
   const data = dbAdmin.usuarios.filter(u => u.nombre.toLowerCase().includes(q) || u.usuario.toLowerCase().includes(q));
   if (!tbody) return;
+  const sedesMap = {}; dbAdmin.sedes.forEach(s => sedesMap[s.id] = s.nombre);
   tbody.innerHTML = data.map(u => {
     const sedeNombre = u.sede_id ? (sedesMap[u.sede_id] || 'Sede ' + u.sede_id) : 'Todas';
     return `<tr>
@@ -12688,6 +12731,7 @@ function filtrarUsuarios(q) {
       <td><span class="badge ${rolColors[u.rol] || 'badge-blue'}">${u.rol.toUpperCase()}</span></td>
       <td>${sedeNombre}</td>
       <td><span class="badge ${u.activo ? 'badge-green' : 'badge-red'}">${u.activo ? 'Activo' : 'Inactivo'}</span></td>
+      ${celdaVerCostos(u)}
       <td style="font-size:11px;color:#888899;">—</td>
       <td>
         <button class="btn btn-sm btn-ghost" onclick="abrirEditarUsuario(${u.id})">✏️</button>
@@ -13888,7 +13932,8 @@ async function activarSesion(user) {
   document.getElementById('menuRolSede').textContent   = `${user.rol.toUpperCase()} · ${sedeNombre}`;
 
   // Aplicar clase de rol al body para permisos CSS
-  document.body.className = `rol-${user.rol}`;
+  // (ver-costos habilita las secciones .solo-costo para usuarios con el permiso individual)
+  document.body.className = `rol-${user.rol}${user.ver_costos ? ' ver-costos' : ''}`;
 
   // Ocultar pantalla de login
   document.getElementById('loginScreen').classList.add('hidden');
