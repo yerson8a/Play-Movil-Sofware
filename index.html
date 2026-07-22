@@ -1271,7 +1271,7 @@
           <table>
             <thead>
               <tr>
-                <th>ID</th><th>Fecha</th><th>Equipo</th><th>IMEI</th><th>Cliente</th><th>Asesor</th>
+                <th>ID</th><th>Fecha</th><th>Equipo</th><th>IMEI</th><th>Proveedor</th><th>Cliente</th><th>Asesor</th>
                 <th class="solo-costo">V.Compra</th><th>V.Venta</th><th class="solo-admin">Ganancia</th><th class="solo-admin">Comisión</th><th>Financiera</th><th>Estado</th><th></th>
               </tr>
             </thead>
@@ -5969,6 +5969,21 @@ function filtrarInventarioPorSede(s) {
   renderTablaInventario(s ? db.inventario.filter(e=>e.sede.includes(s)) : db.inventario);
 }
 
+// Proveedor del equipo vendido: la tabla ventas no guarda proveedor, así que
+// se cruza por IMEI/serial contra el inventario; si la venta no tiene IMEI se
+// intenta por nombre exacto del producto.
+function proveedorDeVenta(v){
+  const imei = (v.imei||'').trim();
+  let prod = null;
+  if(imei.length > 3){
+    prod = db.inventario.find(p => p.imei1===imei || p.imei2===imei || p.serial===imei);
+  }
+  if(!prod && v.equipo && v.equipo !== '—'){
+    prod = db.inventario.find(p => p.producto === v.equipo);
+  }
+  return prod ? prod.proveedor : '—';
+}
+
 function filaVenta(v) {
   const comisionHtml = v.anulada ? '$0' : v.comisionAsesor > 0
     ? (sesionActiva?.rol==='admin'
@@ -5982,6 +5997,7 @@ function filaVenta(v) {
     <td style="font-size:12px;">${v.fecha}</td>
     <td style="font-weight:500;">${escapeHtml((v.equipo||'').substring(0,22))}</td>
     <td style="font-family:monospace;font-size:11px;color:#0066cc;">${v.imei&&v.imei.length>3?escapeHtml(v.imei):'—'}</td>
+    <td style="font-size:11px;color:var(--text2);">${escapeHtml(proveedorDeVenta(v))}</td>
     <td>${escapeHtml(v.cliente)}</td>
     <td>${escapeHtml(v.asesor)}</td>
     <td class="solo-costo" style="color:var(--text2);">${fmt(v.costo)}</td>
@@ -6013,7 +6029,7 @@ function renderVentas(filtro){
   else if(filtro==='febrero')data=data.filter(v=>v.fecha&&v.fecha.startsWith('2026-02'));
   $('tbodyVentas').innerHTML = data.length
     ? data.map(filaVenta).join('')
-    : '<tr><td colspan="13" style="text-align:center;padding:40px;color:var(--text2);">Sin ventas registradas</td></tr>';
+    : '<tr><td colspan="14" style="text-align:center;padding:40px;color:var(--text2);">Sin ventas registradas</td></tr>';
 }
 
 function switchVentasTab(tab,el){document.querySelectorAll('#mod-ventas .tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');renderVentas(tab);}
@@ -6113,7 +6129,7 @@ function filtrarVentasPorAsesor(a) { aplicarFiltrosVentas(); }
 function renderVentas_data(data){
   $('tbodyVentas').innerHTML = data.length
     ? data.map(filaVenta).join('')
-    : '<tr><td colspan="13" style="text-align:center;padding:40px;color:var(--text2);">Sin resultados</td></tr>';
+    : '<tr><td colspan="14" style="text-align:center;padding:40px;color:var(--text2);">Sin resultados</td></tr>';
 }
 
 // Sincroniza en Supabase los créditos cuyo estado mora/al_dia calculado por
