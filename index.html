@@ -4990,7 +4990,10 @@ function mapCredito(c) {
     fechaPrimerPago:  c.fecha_primer_pago  || null,
     fechaSegundoPago: c.fecha_segundo_pago || null,
     diaPago1:         c.dia_pago_1 || null,
-    diaPago2:         c.dia_pago_2 || null
+    diaPago2:         c.dia_pago_2 || null,
+    esMixto:          c.es_mixto || false,
+    valorFinanciero:  parseFloat(c.valor_financiera) || 0,
+    valorEfectivo:    parseFloat(c.valor_efectivo)   || 0
   };
 }
 
@@ -5210,7 +5213,10 @@ async function guardarCreditoDB(datos) {
       doc_cedula_reverso: datos.docCedBack   || null,
       doc_foto_entrega:   datos.docFoto      || null,
       doc_contrato:       datos.docContrato  || null,
-      financiera:         datos.financiera   || null
+      financiera:         datos.financiera   || null,
+      es_mixto:           datos.esMixto      || false,
+      valor_financiera:   datos.valorFinanciero || 0,
+      valor_efectivo:     datos.valorEfectivo   || 0
     };
     const res = await sbFetch('creditos', { method: 'POST', body: row });
     const nuevo = mapCredito(res[0]);
@@ -9460,6 +9466,9 @@ async function guardarCredito(){
     total: precioFinal, inicial: ini,
     saldo: totalFinanciar, cuotas: quincenas, valorCuota,
     frecuencia: 'Quincenal', sede: sedeActual,
+    esMixto,
+    valorFinanciero: esMixto ? valorFinanciero : 0,
+    valorEfectivo:   esMixto ? getMoneyValue('crdValorEfectivo') : 0,
     obs: ($U('crdObservaciones') ? $U('crdObservaciones') + (prodAdicDesc?' | Prod. adicional: '+prodAdicDesc+' ('+fmt(prodAdicVal)+')':'') : (prodAdicDesc?'Prod. adicional: '+prodAdicDesc+' ('+fmt(prodAdicVal)+')':'')), 
     docCedFront:  getUrlArchivo('upCedFront'),
     docCedBack:   getUrlArchivo('upCedBack'),
@@ -9891,7 +9900,9 @@ async function verFacturaVenta() {
     valorCuota:    cred ? (cred.valorCuota||0): 0,
     intereses:     cred ? (cred.intereses||0) : 0,
     tasaInteres:   0,
-    esMixto:       false,
+    esMixto:         cred ? (cred.esMixto||false)      : false,
+    valorFinanciero: cred ? (cred.valorFinanciero||0)  : 0,
+    valorEfectivo:   cred ? (cred.valorEfectivo||0)    : 0,
     // Fecha y número
     fecha:   v.fecha || new Date().toLocaleDateString('es-CO',{timeZone:'America/Bogota'}),
     numero: 'PM-' + v.id
@@ -11506,7 +11517,12 @@ function previsualizarFactura() {
 
   if(!base) { toast('Ingresa el precio de venta primero','error'); return; }
 
+  const esMixtoPrev = document.getElementById('tipoPagoMixto')?.checked || false;
+
   const datosPreview = {
+    esMixto: esMixtoPrev,
+    valorFinanciero: esMixtoPrev ? getMoneyValue('crdValorFinanciero') : 0,
+    valorEfectivo:   esMixtoPrev ? getMoneyValue('crdValorEfectivo')   : 0,
     tipo:'credito',
     cliente: $('crdCliente')?.value||'CLIENTE',
     cedula:  $('crdCedula')?.value||'',
@@ -12405,7 +12421,7 @@ function generarHTMLFactura(d) {
         <div style="font-size:12px;font-weight:700;color:#6B2D8B;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Asesor</div>
         <div style="font-size:14px;font-weight:600;">${d.asesor}</div>
         <div style="font-size:13px;color:#555;">Modalidad: ${d.tipo === 'credito' ? 'Crédito — '+d.financiera : 'Contado'}${d.esMixto?' (Pago Mixto)':''}</div>
-        ${d.esMixto && d.valorFinanciero > 0 ? `<div style="font-size:12px;color:#888;margin-top:2px;">Financiera: ${fmt(d.valorFinanciero)} + Efectivo: ${fmt(d.valorEfectivo)}</div>` : ''}
+        ${d.esMixto && (d.valorFinanciero > 0 || d.valorEfectivo > 0) ? `<div style="font-size:12px;color:#888;margin-top:2px;">Financiera: ${fmt(d.valorFinanciero)} + Efectivo: ${fmt(d.valorEfectivo)}</div>` : ''}
         ${d.tipo === 'credito' ? `<div style="font-size:13px;color:#555;">${d.cuotas} quincenas</div>` : ''}
       </div>
     </div>
@@ -12435,6 +12451,12 @@ function generarHTMLFactura(d) {
         <div style="display:flex;justify-content:space-between;padding:10px 0;font-size:16px;font-weight:700;border-top:2px solid #6B2D8B;margin-top:6px;">
           <span>TOTAL</span><span style="color:#6B2D8B;">${fmt(d.precioFinal)}</span>
         </div>
+        ${d.esMixto ? `
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px;margin-top:8px;font-size:13px;">
+          <div style="font-size:11px;font-weight:700;color:#16a34a;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Forma de Pago Mixta</div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:#555;">💵 Pagado en efectivo:</span><span style="font-weight:700;color:#16a34a;">${fmt(d.valorEfectivo||0)}</span></div>
+          <div style="display:flex;justify-content:space-between;"><span style="color:#555;">🏦 Por financiera${d.financiera?' ('+d.financiera+')':''}:</span><span style="font-weight:600;">${fmt(d.valorFinanciero||0)}</span></div>
+        </div>` : ''}
         ${d.tipo === 'credito' ? `
         <div style="background:#f7f5fb;border-radius:8px;padding:12px;margin-top:8px;font-size:13px;">
           <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:#555;">Inicial:</span><span style="font-weight:600;color:#16a34a;">${fmt(d.inicial)}</span></div>
