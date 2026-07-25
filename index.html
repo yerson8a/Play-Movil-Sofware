@@ -4017,9 +4017,10 @@
       <div class="form-group"><label class="form-label">Usuario *</label><input type="text" class="form-control" id="usuUsuario" placeholder="nombre_usuario" style="text-transform:lowercase;"></div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label class="form-label">Contraseña *</label><input type="password" class="form-control" id="usuPassword" placeholder="Mínimo 6 caracteres"></div>
+      <div class="form-group"><label class="form-label">Contraseña temporal *</label><input type="password" class="form-control" id="usuPassword" placeholder="Mínimo 6 caracteres"></div>
       <div class="form-group"><label class="form-label">Confirmar Contraseña *</label><input type="password" class="form-control" id="usuPasswordConf" placeholder="Repite la contraseña"></div>
     </div>
+    <div style="font-size:11px;color:#888899;margin-top:-6px;margin-bottom:10px;">🔒 El usuario deberá cambiar esta contraseña en su primer ingreso.</div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">Rol *</label>
         <select class="form-control" id="usuRol">
@@ -4058,6 +4059,7 @@
       <div class="form-group"><label class="form-label">Nueva Contraseña</label><input type="password" class="form-control" id="editUsuPassword" placeholder="Dejar vacío para no cambiar"></div>
       <div class="form-group"><label class="form-label">Confirmar</label><input type="password" class="form-control" id="editUsuPasswordConf" placeholder="Confirmar nueva contraseña"></div>
     </div>
+    <div style="font-size:11px;color:#888899;margin-top:-6px;margin-bottom:10px;">🔒 Si asignas una nueva contraseña, el usuario deberá cambiarla en su próximo ingreso.</div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">Rol *</label>
         <select class="form-control" id="editUsuRol" onchange="onCambioRolUsuario(this.value)">
@@ -12671,27 +12673,49 @@ function poblarSelectSedes() {
 }
 
 // ============================================================
-// MODULO USUARIOS
+// MODULO USUARIOS (sobre `perfiles` + Supabase Auth)
 // ============================================================
+// La lista y la edición trabajan sobre `perfiles` (la RLS devuelve todos los
+// perfiles solo al admin). Crear cuentas, cambiar contraseñas y eliminar pasa
+// por la Edge Function `admin-usuarios` (service_role del lado del servidor).
+// `sistema_usuarios` se mantiene sincronizada porque el módulo de asesores
+// y sus dropdowns aún leen de ahí.
+
+async function llamarAdminUsuarios(payload) {
+  const { data: { session } } = await supa.auth.getSession();
+  if (!session) throw new Error('Sesión expirada. Vuelve a iniciar sesión.');
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/admin-usuarios`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${session.access_token}`
+    },
+    body: JSON.stringify(payload)
+  });
+  const out = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(out.error || `Error ${res.status} en admin-usuarios`);
+  return out;
+}
+
 async function cargarUsuarios() {
   try {
-    const res = await sbFetch('sistema_usuarios', { order: 'id.asc' });
-    dbAdmin.usuarios = res;
-    // Perfiles (Supabase Auth): fuente real del permiso ver_costos.
-    // La RLS solo devuelve todos los perfiles al admin; a otros roles solo el propio.
-    try {
-      const { data } = await supa.from('perfiles').select('id,usuario,rol,ver_costos');
-      dbAdmin.perfiles = data || [];
-    } catch(e) { dbAdmin.perfiles = []; }
+    const { data, error } = await supa.from('perfiles').select('*').order('created_at', { ascending: true });
+    if (error) throw error;
+    dbAdmin.perfiles = data || [];
+    // Legacy: el módulo de asesores (abrirModalAsignarAsesor) aún usa esta lista.
+    try { dbAdmin.usuarios = await sbFetch('sistema_usuarios', { order: 'id.asc' }); } catch(e) { dbAdmin.usuarios = []; }
     renderUsuarios();
-  } catch(e) { console.error('Error cargando usuarios:', e); }
+  } catch(e) {
+    console.error('Error cargando usuarios:', e);
+    toast('Error cargando usuarios: ' + e.message, 'error');
+  }
 }
 
 // Celda con el permiso individual "ver costos" (solo aplica a asesores;
-// admin y bodega ya ven costos por rol). El perfil se cruza por `usuario`.
-function celdaVerCostos(u) {
-  const p = (dbAdmin.perfiles || []).find(x => x.usuario === u.usuario);
-  if (!p || p.rol !== 'asesor') return '<td style="text-align:center;color:#c8c8d4;">—</td>';
+// admin y bodega ya ven costos por rol).
+function celdaVerCostos(p) {
+  if (p.rol !== 'asesor') return '<td style="text-align:center;color:#c8c8d4;">—</td>';
   const activo = p.ver_costos === true;
   if (sesionActiva?.rol !== 'admin') {
     return `<td style="text-align:center;"><span class="badge ${activo ? 'badge-green' : 'badge-red'}">${activo ? 'Sí' : 'No'}</span></td>`;
@@ -12716,37 +12740,41 @@ async function toggleVerCostos(perfilId) {
 }
 
 function renderUsuarios() {
-  const data = dbAdmin.usuarios;
-  const activos = data.filter(u => u.activo).length;
-  const admins = data.filter(u => u.rol === 'admin').length;
-  const asesores = data.filter(u => u.rol === 'asesor').length;
+  const data = dbAdmin.perfiles;
+  const activos = data.filter(p => p.activo !== false).length;
+  const admins = data.filter(p => p.rol === 'admin').length;
+  const asesores = data.filter(p => p.rol === 'asesor').length;
   const setEl = (id, v) => { const e = document.getElementById(id); if(e) e.textContent = v; };
   setEl('statTotalUsuarios', data.length);
   setEl('statUsuariosActivos', activos);
   setEl('statUsuariosAdmin', admins);
   setEl('statUsuariosAsesor', asesores);
+  renderTablaUsuarios(data);
+}
 
+function renderTablaUsuarios(data) {
   const tbody = document.getElementById('tbodyUsuarios');
   if (!tbody) return;
   const rolColors = { admin: 'badge-pink', asesor: 'badge-blue', bodega: 'badge-orange', consulta: 'badge-green' };
-  // Nombre de sede dinámico
   const sedesMap = {}; dbAdmin.sedes.forEach(s => sedesMap[s.id] = s.nombre);
-  tbody.innerHTML = data.length ? data.map(u => {
-    const acceso = u.ultimo_acceso ? new Date(u.ultimo_acceso).toLocaleDateString('es-CO') : 'Nunca';
-    const sedeNombre = u.sede_id ? (sedesMap[u.sede_id] || 'Sede ' + u.sede_id) : 'Todas';
+  tbody.innerHTML = data.length ? data.map((p, i) => {
+    const acceso = p.ultimo_acceso ? new Date(p.ultimo_acceso).toLocaleDateString('es-CO') : 'Nunca';
+    const sedeNombre = p.sede_id ? (sedesMap[p.sede_id] || 'Sede ' + p.sede_id) : 'Todas';
+    const activo = p.activo !== false;
+    const pendiente = p.debe_cambiar_password ? ' <span title="Debe cambiar su contraseña en el próximo ingreso" style="cursor:help;">🔑</span>' : '';
     return `<tr>
-      <td style="font-weight:700;color:#6B2D8B;">${u.id}</td>
-      <td style="font-weight:600;">${u.nombre}</td>
-      <td style="font-family:monospace;font-size:12px;">${u.usuario}</td>
-      <td><span class="badge ${rolColors[u.rol] || 'badge-blue'}">${u.rol.toUpperCase()}</span></td>
+      <td style="font-weight:700;color:#6B2D8B;">${i + 1}</td>
+      <td style="font-weight:600;">${p.nombre}</td>
+      <td style="font-family:monospace;font-size:12px;">${p.usuario}</td>
+      <td><span class="badge ${rolColors[p.rol] || 'badge-blue'}">${p.rol.toUpperCase()}</span></td>
       <td>${sedeNombre}</td>
-      <td><span class="badge ${u.activo ? 'badge-green' : 'badge-red'}">${u.activo ? 'Activo' : 'Inactivo'}</span></td>
-      ${celdaVerCostos(u)}
+      <td><span class="badge ${activo ? 'badge-green' : 'badge-red'}">${activo ? 'Activo' : 'Inactivo'}</span>${pendiente}</td>
+      ${celdaVerCostos(p)}
       <td style="font-size:11px;color:#888899;">${acceso}</td>
       <td>
-        <button class="btn btn-sm btn-ghost" onclick="abrirEditarUsuario(${u.id})" title="Editar">✏️</button>
-        <button class="btn btn-sm btn-ghost" onclick="toggleEstadoUsuario(${u.id})" title="${u.activo ? 'Desactivar' : 'Activar'}">${u.activo ? '⏸️' : '▶️'}</button>
-        <button class="btn btn-sm btn-ghost" style="color:#dc2626;" onclick="eliminarUsuario(${u.id})" title="Eliminar">🗑️</button>
+        <button class="btn btn-sm btn-ghost" onclick="abrirEditarUsuario('${p.id}')" title="Editar">✏️</button>
+        <button class="btn btn-sm btn-ghost" onclick="toggleEstadoUsuario('${p.id}')" title="${activo ? 'Desactivar' : 'Activar'}">${activo ? '⏸️' : '▶️'}</button>
+        <button class="btn btn-sm btn-ghost" style="color:#dc2626;" onclick="eliminarUsuario('${p.id}')" title="Eliminar">🗑️</button>
       </td>
     </tr>`;
   }).join('') : '<tr><td colspan="9" style="text-align:center;padding:40px;color:#888899;">Sin usuarios</td></tr>';
@@ -12754,53 +12782,48 @@ function renderUsuarios() {
 
 function filtrarUsuarios(q) {
   q = q.toLowerCase();
-  const tbody = document.getElementById('tbodyUsuarios');
-  const rolColors = { admin: 'badge-pink', asesor: 'badge-blue', bodega: 'badge-orange', consulta: 'badge-green' };
-  const sedes = { 1: 'Pereira', 2: 'Armenia' };
-  const data = dbAdmin.usuarios.filter(u => u.nombre.toLowerCase().includes(q) || u.usuario.toLowerCase().includes(q));
-  if (!tbody) return;
-  const sedesMap = {}; dbAdmin.sedes.forEach(s => sedesMap[s.id] = s.nombre);
-  tbody.innerHTML = data.map(u => {
-    const sedeNombre = u.sede_id ? (sedesMap[u.sede_id] || 'Sede ' + u.sede_id) : 'Todas';
-    return `<tr>
-      <td style="font-weight:700;color:#6B2D8B;">${u.id}</td>
-      <td style="font-weight:600;">${u.nombre}</td>
-      <td style="font-family:monospace;font-size:12px;">${u.usuario}</td>
-      <td><span class="badge ${rolColors[u.rol] || 'badge-blue'}">${u.rol.toUpperCase()}</span></td>
-      <td>${sedeNombre}</td>
-      <td><span class="badge ${u.activo ? 'badge-green' : 'badge-red'}">${u.activo ? 'Activo' : 'Inactivo'}</span></td>
-      ${celdaVerCostos(u)}
-      <td style="font-size:11px;color:#888899;">—</td>
-      <td>
-        <button class="btn btn-sm btn-ghost" onclick="abrirEditarUsuario(${u.id})">✏️</button>
-        <button class="btn btn-sm btn-ghost" onclick="toggleEstadoUsuario(${u.id})">${u.activo ? '⏸️' : '▶️'}</button>
-        <button class="btn btn-sm btn-ghost" style="color:#dc2626;" onclick="eliminarUsuario(${u.id})">🗑️</button>
-      </td>
-    </tr>`;
-  }).join('');
+  renderTablaUsuarios(dbAdmin.perfiles.filter(p =>
+    p.nombre.toLowerCase().includes(q) || p.usuario.toLowerCase().includes(q)
+  ));
 }
 function filtrarUsuariosPorRol(r) {
-  const orig = dbAdmin.usuarios;
-  if (r) { dbAdmin.usuarios = orig.filter(u => u.rol === r); renderUsuarios(); dbAdmin.usuarios = orig; }
-  else renderUsuarios();
+  renderTablaUsuarios(r ? dbAdmin.perfiles.filter(p => p.rol === r) : dbAdmin.perfiles);
 }
 
 async function crearUsuario() {
-  // DESHABILITADO tras la migración a Supabase Auth.
-  // Crear un usuario solo en `sistema_usuarios` ya NO genera un login válido:
-  // las cuentas viven en auth.users + perfiles y se crean con la service_role
-  // (script scripts/migrar-usuarios.mjs o un futuro panel admin con Auth).
-  toast('La gestión de usuarios se migró a Supabase Auth. Crea las cuentas con el script de migración (pendiente: panel admin con Auth).', 'error');
+  const nombre  = document.getElementById('usuNombre').value.trim();
+  const usuario = document.getElementById('usuUsuario').value.trim().toLowerCase();
+  const pass    = document.getElementById('usuPassword').value;
+  const conf    = document.getElementById('usuPasswordConf').value;
+  const rol     = document.getElementById('usuRol').value;
+  const sede    = document.getElementById('usuSede').value;
+
+  if (!nombre || !usuario) { toast('Nombre y usuario son obligatorios', 'error'); return; }
+  if (!/^[a-z0-9._-]{3,30}$/.test(usuario)) { toast('Usuario inválido: solo minúsculas, números, punto, guion o guion bajo (3-30 caracteres)', 'error'); return; }
+  if (pass.length < 6) { toast('La contraseña debe tener mínimo 6 caracteres', 'error'); return; }
+  if (pass !== conf) { toast('Las contraseñas no coinciden', 'error'); return; }
+  if (rol !== 'admin' && !sede) { toast('Selecciona la sede del usuario', 'error'); return; }
+
+  try {
+    showLoader('Creando usuario...');
+    await llamarAdminUsuarios({ action: 'crear', usuario, nombre, password: pass, rol, sede_id: sede ? parseInt(sede) : null });
+    closeModal('modalNuevoUsuario');
+    ['usuNombre','usuUsuario','usuPassword','usuPasswordConf'].forEach(id => { const e = document.getElementById(id); if(e) e.value = ''; });
+    await cargarUsuarios();
+    cargarAsesoresActivos();
+    toast(`Usuario "${usuario}" creado ✅ Deberá cambiar su contraseña al primer ingreso`);
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+  finally { hideLoader(); }
 }
 
 function abrirEditarUsuario(id) {
-  const u = dbAdmin.usuarios.find(x => x.id === id);
+  const u = dbAdmin.perfiles.find(x => x.id === id);
   if (!u) return;
   document.getElementById('editUsuId').value     = id;
   document.getElementById('editUsuNombre').value = u.nombre;
   document.getElementById('editUsuUsuario').value= u.usuario;
   document.getElementById('editUsuRol').value    = u.rol;
-  document.getElementById('editUsuActivo').value = u.activo ? 'true' : 'false';
+  document.getElementById('editUsuActivo').value = u.activo !== false ? 'true' : 'false';
   poblarSelectSedes();
   document.getElementById('editUsuSede').value   = u.sede_id || '';
   document.getElementById('editUsuPassword').value = '';
@@ -12898,19 +12921,15 @@ function marcarTodasCajas(todas) {
 }
 
 async function actualizarUsuario() {
-  // DESHABILITADO tras la migración a Supabase Auth.
-  // El rol/sede/permisos y la contraseña ahora viven en `perfiles` + auth.users,
-  // no en `sistema_usuarios`. Editar aquí ya no afecta el login real, así que se
-  // bloquea el guardado para no dar una falsa sensación de cambio.
-  // (pendiente: panel admin que edite `perfiles` con la sesión autenticada).
-  toast('Edición deshabilitada: los usuarios se migraron a Supabase Auth. La gestión de roles/permisos se hará en el nuevo panel.', 'error');
-  return;
-  /* eslint-disable no-unreachable */
   const id   = document.getElementById('editUsuId').value;
+  const p    = dbAdmin.perfiles.find(x => x.id === id);
+  if (!p) return;
   const pass = document.getElementById('editUsuPassword').value;
   const conf = document.getElementById('editUsuPasswordConf').value;
   const rol  = document.getElementById('editUsuRol').value;
   if(pass && pass !== conf) { toast('Las contraseñas no coinciden', 'error'); return; }
+  if(pass && pass.length < 6) { toast('La contraseña debe tener mínimo 6 caracteres', 'error'); return; }
+  if(!document.getElementById('editUsuNombre').value.trim()) { toast('El nombre es obligatorio', 'error'); return; }
 
   // Recolectar permisos (solo para no-admin)
   let modulos_permitidos = null;
@@ -12934,47 +12953,72 @@ async function actualizarUsuario() {
   }
 
   const row = {
-    nombre:             document.getElementById('editUsuNombre').value,
+    nombre:             document.getElementById('editUsuNombre').value.trim().toUpperCase(),
     rol,
     sede_id:            document.getElementById('editUsuSede').value ? parseInt(document.getElementById('editUsuSede').value) : null,
     activo:             document.getElementById('editUsuActivo').value === 'true',
     modulos_permitidos,
     cajas_permitidas
   };
-  // (código histórico inalcanzable; la contraseña ahora se gestiona en Supabase Auth)
+
+  // Protección: el admin no puede dejarse sin acceso a sí mismo
+  if (p.id === sesionActiva?.id && (row.rol !== 'admin' || !row.activo)) {
+    toast('No puedes quitarte el rol admin ni desactivar tu propia cuenta', 'error');
+    return;
+  }
 
   try {
-    await sbFetch(`sistema_usuarios?id=eq.${id}`, { method: 'PATCH', body: row });
-    // Actualizar en memoria
-    const u = dbAdmin.usuarios.find(x => x.id === parseInt(id));
-    if(u) Object.assign(u, { ...row, modulos_permitidos: modulos_permitidos });
+    showLoader('Guardando...');
+    const { error } = await supa.from('perfiles').update(row).eq('id', id);
+    if (error) throw error;
+
+    // Sync legacy (módulo asesores y dropdowns leen sistema_usuarios)
+    try {
+      await sbFetch(`sistema_usuarios?usuario=eq.${encodeURIComponent(p.usuario)}`, { method: 'PATCH', body: row });
+    } catch(e) { console.warn('No se pudo sincronizar sistema_usuarios:', e); }
+
+    // Nueva contraseña → Edge Function (service_role) + cambio obligatorio
+    if (pass) await llamarAdminUsuarios({ action: 'reset_password', user_id: id, password: pass });
+
     closeModal('modalEditarUsuario');
     await cargarUsuarios();
-    toast('Permisos y datos actualizados ✅');
+    cargarAsesoresActivos();
+    toast('Usuario actualizado ✅' + (pass && id !== sesionActiva?.id ? ' Deberá cambiar la contraseña en su próximo ingreso' : ''));
   } catch(e) { toast('Error: ' + e.message, 'error'); }
+  finally { hideLoader(); }
 }
 
 async function toggleEstadoUsuario(id) {
-  const u = dbAdmin.usuarios.find(x => x.id === id);
-  if (!u) return;
-  if (u.id === sesionActiva?.id) { toast('No puedes desactivar tu propia cuenta', 'error'); return; }
+  const p = dbAdmin.perfiles.find(x => x.id === id);
+  if (!p) return;
+  if (p.id === sesionActiva?.id) { toast('No puedes desactivar tu propia cuenta', 'error'); return; }
+  const nuevo = !(p.activo !== false);
   try {
-    await sbFetch(`sistema_usuarios?id=eq.${id}`, { method: 'PATCH', body: { activo: !u.activo } });
-    await cargarUsuarios();
-    toast('Estado actualizado ✅');
+    const { error } = await supa.from('perfiles').update({ activo: nuevo }).eq('id', id);
+    if (error) throw error;
+    try {
+      await sbFetch(`sistema_usuarios?usuario=eq.${encodeURIComponent(p.usuario)}`, { method: 'PATCH', body: { activo: nuevo } });
+    } catch(e) { console.warn('No se pudo sincronizar sistema_usuarios:', e); }
+    p.activo = nuevo;
+    renderUsuarios();
+    cargarAsesoresActivos();
+    toast(nuevo ? `"${p.usuario}" activado ✅` : `"${p.usuario}" desactivado — ya no podrá iniciar sesión`);
   } catch(e) { toast('Error: ' + e.message, 'error'); }
 }
 
 async function eliminarUsuario(id) {
-  const u = dbAdmin.usuarios.find(x => x.id === id);
-  if (!u) return;
-  if (u.id === sesionActiva?.id) { toast('No puedes eliminar tu propia cuenta', 'error'); return; }
-  if (!confirm(`¿Eliminar usuario "${u.usuario}"? Esta acción no se puede deshacer.`)) return;
+  const p = dbAdmin.perfiles.find(x => x.id === id);
+  if (!p) return;
+  if (p.id === sesionActiva?.id) { toast('No puedes eliminar tu propia cuenta', 'error'); return; }
+  if (!confirm(`¿Eliminar usuario "${p.usuario}"? Se borra su cuenta y su acceso. Esta acción no se puede deshacer.`)) return;
   try {
-    await sbFetch(`sistema_usuarios?id=eq.${id}`, { method: 'DELETE' });
+    showLoader('Eliminando usuario...');
+    await llamarAdminUsuarios({ action: 'eliminar', user_id: id });
     await cargarUsuarios();
+    cargarAsesoresActivos();
     toast('Usuario eliminado');
   } catch(e) { toast('Error: ' + e.message, 'error'); }
+  finally { hideLoader(); }
 }
 
 // ============================================================
