@@ -9728,6 +9728,8 @@ async function confirmarAbono() {
       obs,
       nroCuota,
       cuotasTotal: credito.cuotas,
+      financiera:  credito.financiera || '',
+      numContrato: credito.numContrato || '',
       fecha:     new Date().toLocaleDateString('es-CO',{timeZone:'America/Bogota',year:'numeric',month:'long',day:'numeric'}),
       numero:    numeroReciboAbono(abono ? abono.id : null)
     });
@@ -10482,6 +10484,7 @@ function mostrarReciboAbono(d) {
       <div><span style="color:#888899;">Equipo:</span> <strong>${d.equipo}</strong></div>
       ${d.imei?`<div><span style="color:#888899;">IMEI:</span> <strong>${d.imei}</strong></div>`:''}
       <div><span style="color:#888899;">N° Cuota:</span> <strong style="color:#6B2D8B;">Cuota ${d.nroCuota} de ${d.cuotasTotal||'—'}</strong></div>
+      ${d.numContrato?`<div style="grid-column:1/-1;"><span style="color:#888899;">N° Contrato${d.financiera&&d.financiera!=='—'?' '+escapeHtml(d.financiera):''}:</span> <strong style="font-family:monospace;color:#c2410c;">${escapeHtml(d.numContrato)}</strong></div>`:''}
     </div>
     <div style="background:#f7f5fb;border-radius:12px;padding:16px;margin-bottom:16px;">
       <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px;">
@@ -10561,6 +10564,8 @@ async function abrirHistorialCredito(id) {
       <div><span style="color:#888899;">Equipo:</span> <strong>${credito.equipo||'—'}</strong></div>
       ${credito.imei?`<div><span style="color:#888899;">IMEI:</span> <strong>${credito.imei}</strong></div>`:''}
       <div><span style="color:#888899;">Cédula:</span> <strong>${credito.cedula||'—'}</strong></div>
+      ${credito.financiera&&credito.financiera!=='—'?`<div><span style="color:#888899;">Financiera:</span> <strong>${escapeHtml(credito.financiera)}</strong></div>`:''}
+      ${credito.numContrato?`<div><span style="color:#888899;">N° Contrato:</span> <strong style="font-family:monospace;color:#c2410c;">${escapeHtml(credito.numContrato)}</strong></div>`:''}
     </div>
     <table style="width:100%;border-collapse:collapse;font-size:13px;">
       <thead>
@@ -10613,6 +10618,8 @@ function verReciboAbono(i) {
     obs:         a.notas || '',
     nroCuota:    i + 1,
     cuotasTotal: c.cuotas,
+    financiera:  c.financiera || '',
+    numContrato: c.numContrato || '',
     fecha,
     numero:      numeroReciboAbono(a.id)
   });
@@ -10650,6 +10657,8 @@ function imprimirReciboHistorial() {
       <div><span style="color:#888899;">Equipo:</span> <strong>${c.equipo||'—'}</strong></div>
       ${c.imei?`<div><span style="color:#888899;">IMEI:</span> <strong>${c.imei}</strong></div>`:''}
       <div><span style="color:#888899;">Cédula:</span> <strong>${c.cedula||'—'}</strong></div>
+      ${c.financiera&&c.financiera!=='—'?`<div><span style="color:#888899;">Financiera:</span> <strong>${escapeHtml(c.financiera)}</strong></div>`:''}
+      ${c.numContrato?`<div><span style="color:#888899;">N° Contrato:</span> <strong style="font-family:monospace;color:#c2410c;">${escapeHtml(c.numContrato)}</strong></div>`:''}
     </div>
     <div style="font-size:13px;font-weight:700;color:#6B2D8B;margin-bottom:6px;">Abonos realizados</div>
     <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:14px;">
