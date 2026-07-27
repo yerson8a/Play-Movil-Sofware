@@ -1889,9 +1889,15 @@
                 <input type="number" class="form-control" id="gfCuotas" placeholder="12" min="1" max="72">
               </div>
             </div>
-            <div class="form-group">
-              <label class="form-label">Valor cuota quincenal</label>
-              <div class="input-money-wrap"><input type="text" class="form-control" id="gfValorCuota" placeholder="0" oninput="fmtMoneyInput(this)" inputmode="numeric"></div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Valor cuota quincenal</label>
+                <div class="input-money-wrap"><input type="text" class="form-control" id="gfValorCuota" placeholder="0" oninput="fmtMoneyInput(this)" inputmode="numeric"></div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">N° Contrato financiera</label>
+                <input type="text" class="form-control" id="gfNumContrato" maxlength="50" placeholder="Ej: C-2024-001">
+              </div>
             </div>
           </div>
 
@@ -8128,6 +8134,7 @@ function gfGenerarVistaPrevia() {
     equipo: gfProductos[0]?.producto || '',
     imei:   gfProductos[0]?.imei || '',
     asesor, sede, financiera,
+    numContrato: (document.getElementById('gfNumContrato')?.value||'').trim().toUpperCase(),
     precioBase: subtotal,
     precioFinal: total,
     descuento,
@@ -9639,7 +9646,7 @@ async function guardarCredito(){
       valorEfectivo:   esMixto ? getMoneyValue('crdValorEfectivo') : 0,
       precioFinal, ganancia, inicial:ini,
       saldoFinanciar:totalFinanciar, cuotas:quincenas,
-      valorCuota, financiera:finSel,
+      valorCuota, financiera:finSel, numContrato:datos.numContrato||'',
       intereses:totalIntereses, tasaInteres:aplicaInt?tasaInt:0,
       // Lista de productos individual para factura desglosada
       productosList: productosVentaCrd.map(p => ({
@@ -9977,6 +9984,7 @@ async function verFacturaVenta() {
     asesor:       v.asesor  || '',
     sede:         v.sede    || 'PLAY MÓVIL',
     financiera:   financiera,
+    numContrato:  cred ? (cred.numContrato||'') : '',
     // Precios
     precioBase:   totalBase,
     precioFinal:  precioFinal,
@@ -12520,6 +12528,7 @@ function generarHTMLFactura(d) {
         <div style="font-size:13px;color:#555;">Modalidad: ${d.tipo === 'credito' ? 'Crédito — '+d.financiera : 'Contado'}${d.esMixto?' (Pago Mixto)':''}</div>
         ${d.esMixto && (d.valorFinanciero > 0 || d.valorEfectivo > 0) ? `<div style="font-size:12px;color:#888;margin-top:2px;">Financiera: ${fmt(d.valorFinanciero)} + Efectivo: ${fmt(d.valorEfectivo)}</div>` : ''}
         ${d.tipo === 'credito' ? `<div style="font-size:13px;color:#555;">${d.cuotas} quincenas</div>` : ''}
+        ${d.numContrato ? `<div style="margin-top:6px;display:inline-block;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;padding:4px 9px;font-size:12px;color:#92400e;">N° Contrato${d.financiera?' '+d.financiera:''}: <strong style="font-family:monospace;font-size:13px;">${escapeHtml(d.numContrato)}</strong></div>` : ''}
       </div>
     </div>
 
