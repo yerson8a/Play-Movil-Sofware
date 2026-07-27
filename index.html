@@ -1334,6 +1334,9 @@
         <button class="btn btn-ghost btn-sm" onclick="limpiarFiltrosCreditos()">✕ Limpiar</button>
       </div>
 
+      <!-- Resumen de saldo por financiera (solo al filtrar por financiera) -->
+      <div id="resumenCredFinanciera" style="display:none;margin-bottom:16px;"></div>
+
       <div id="creditosGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;"></div>
     </div>
 
@@ -3338,7 +3341,7 @@
           <div class="form-row">
             <div class="form-group">
               <label class="form-label" id="crdNumContratoLabel">N° Contrato</label>
-              <input type="text" class="form-control" id="crdNumContrato" placeholder="Ej: C-2024-001">
+              <input type="text" class="form-control" id="crdNumContrato" maxlength="50" placeholder="Ej: C-2024-001">
             </div>
           </div>
           <div class="form-row">
@@ -4972,6 +4975,7 @@ function mapCredito(c) {
     equipo: c.producto_desc || '—',
     asesor: c.asesor || '',
     financiera: c.financiera || '—',
+    numContrato: c.numero_contrato || '',
     bitacoraCount: 0,
     total: parseFloat(c.monto_total) || 0,
     inicial: parseFloat(c.inicial) || 0,
@@ -5216,6 +5220,7 @@ async function guardarCreditoDB(datos) {
       doc_foto_entrega:   datos.docFoto      || null,
       doc_contrato:       datos.docContrato  || null,
       financiera:         datos.financiera   || null,
+      numero_contrato:    datos.numContrato  || null,
       es_mixto:           datos.esMixto      || false,
       valor_financiera:   datos.valorFinanciero || 0,
       valor_efectivo:     datos.valorEfectivo   || 0
@@ -6160,6 +6165,89 @@ async function sincronizarEstadosCreditosDB() {
   } catch (e) { console.error('Error sincronizando estados de créditos:', e); }
 }
 
+// ── N° de contrato de la financiera en las tarjetas ─────────
+function esFinancieraBrilla(fin){ return (fin||'').toUpperCase().includes('BRILLA'); }
+
+function puedeEditarContrato(){
+  return typeof sesionActiva !== 'undefined' && sesionActiva && sesionActiva.rol !== 'consulta';
+}
+
+function htmlContratoCredito(c){
+  const esBrilla = esFinancieraBrilla(c.financiera);
+  const num      = (c.numContrato||'').trim();
+  const editable = puedeEditarContrato();
+  if(!esBrilla && !num) return '';
+  const base = 'border-radius:6px;padding:3px 8px;margin-top:4px;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:5px;';
+  if(num){
+    const est = esBrilla
+      ? 'background:#fff7ed;border:1px solid #fdba74;color:#c2410c;'
+      : 'background:#f7f5fb;border:1px solid #e6e0f0;color:#6B2D8B;';
+    return `<div id="ctr-${c.id}" style="${est}${base}">
+      📄 ${esBrilla?'Contrato BRILLA':'Contrato'}: <span style="font-family:monospace;">${escapeHtml(num)}</span>
+      ${editable?`<span onclick="editarNumContrato(${c.id})" title="Editar N° de contrato" style="cursor:pointer;opacity:.65;">✏️</span>`:''}
+    </div>`;
+  }
+  // BRILLA sin N° de contrato registrado
+  return `<div id="ctr-${c.id}" style="background:#fef2f2;border:1px dashed #fca5a5;color:#dc2626;${base}${editable?'cursor:pointer;':''}"
+    ${editable?`onclick="editarNumContrato(${c.id})" title="Registrar N° de contrato"`:''}>
+    📄 BRILLA sin N° de contrato${editable?' · agregar':''}
+  </div>`;
+}
+
+function editarNumContrato(id){
+  if(!puedeEditarContrato()) return;
+  const cont = document.getElementById('ctr-'+id);
+  const c    = db.creditos.find(x=>x.id===id);
+  if(!cont || !c) return;
+  cont.style.cssText = 'display:flex;align-items:center;gap:5px;margin-top:4px;';
+  cont.innerHTML = `<input type="text" id="ctrInput-${id}" class="form-control" maxlength="50" value="${escapeHtml(c.numContrato||'')}" placeholder="N° de contrato" style="height:26px;font-size:11px;padding:2px 6px;width:140px;">
+    <button class="btn btn-sm btn-outline" style="font-size:10px;padding:2px 8px;" onclick="guardarNumContrato(${id})">✔</button>
+    <button class="btn btn-sm btn-ghost" style="font-size:10px;padding:2px 6px;" onclick="renderCreditos(tabCreditosActual)">✕</button>`;
+  const inp = document.getElementById('ctrInput-'+id);
+  if(inp){
+    inp.focus();
+    inp.onkeydown = e => { if(e.key==='Enter'){ e.preventDefault(); guardarNumContrato(id); } };
+  }
+}
+
+async function guardarNumContrato(id){
+  const inp = document.getElementById('ctrInput-'+id);
+  const c   = db.creditos.find(x=>x.id===id);
+  if(!inp || !c) return;
+  const val = inp.value.trim().toUpperCase().substring(0,50);
+  try{
+    showLoader('Guardando N° de contrato...');
+    await sbFetch(`creditos?id=eq.${id}`, { method:'PATCH', body:{ numero_contrato: val || null } });
+    c.numContrato = val;
+    hideLoader();
+    toast('N° de contrato actualizado ✅');
+  }catch(e){
+    hideLoader();
+    toast('Error guardando N° de contrato: '+e.message,'error');
+  }
+  renderCreditos(tabCreditosActual);
+}
+
+// Resumen del saldo pendiente de los créditos filtrados por financiera
+function pintarResumenCredFinanciera(financiera, data){
+  const box = document.getElementById('resumenCredFinanciera');
+  if(!box) return;
+  if(!financiera){ box.style.display='none'; box.innerHTML=''; return; }
+  const totalSaldo = data.reduce((a,c)=>a+(c.saldo||0),0);
+  box.style.display = '';
+  box.innerHTML = `
+    <div style="background:linear-gradient(90deg,#f7f5fb,#fff);border:1px solid #e6e0f0;border-left:4px solid #6B2D8B;border-radius:10px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;">
+      <div>
+        <div style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;">Saldo pendiente · ${escapeHtml(financiera)}</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:2px;">${data.length} crédito(s) en esta vista</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:22px;font-weight:800;color:#6B2D8B;">${fmt(totalSaldo)}</div>
+        <div style="font-size:11px;color:var(--text2);">total por cobrar a los clientes</div>
+      </div>
+    </div>`;
+}
+
 function renderCreditos(filtro='activos'){
   // Actualizar estado mora automáticamente por fechas
   db.creditos.forEach(c => {
@@ -6218,6 +6306,9 @@ function renderCreditos(filtro='activos'){
   );
   if(finBusca) data = data.filter(c => c.financiera === finBusca);
 
+  // Sumatoria del saldo pendiente cuando se filtra por financiera
+  pintarResumenCredFinanciera(finBusca, data);
+
   $('creditosGrid').innerHTML=data.length?data.map(c=>{
     const pct=Math.round((c.pagadas/c.cuotas)*100)||0;
     return `<div class="credito-card">
@@ -6227,6 +6318,7 @@ function renderCreditos(filtro='activos'){
           ${c.imei?`<div class="cc-equipo" style="margin-top:2px;">🔢 IMEI: ${escapeHtml(c.imei)}</div>`:''}
           <div class="cc-equipo" style="margin-top:2px;">👤 ${escapeHtml(c.asesor)}</div>
           <div class="cc-equipo" style="margin-top:2px;">🗓️ Compra: ${fmtFechaCorta(c.fechaInicio)}</div>
+          ${htmlContratoCredito(c)}
         </div>
         <div class="cc-monto">
           <div class="cc-total">${fmt(c.saldo)}</div>
@@ -6332,6 +6424,7 @@ async function filtrarCreditosPorIMEI(q) {
   // Renderizar resultado filtrado
   const grid = document.getElementById('creditosGrid');
   if(!grid) return;
+  pintarResumenCredFinanciera('', []); // el resumen por financiera no aplica en búsqueda por IMEI
   if(!data.length) {
     grid.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-text">Sin creditos con ese IMEI</div></div>';
     return;
@@ -6354,6 +6447,7 @@ async function filtrarCreditosPorIMEI(q) {
           ${c.imei?`<div class="cc-equipo" style="margin-top:2px;">🔢 IMEI: ${escapeHtml(c.imei)}</div>`:''}
           <div class="cc-equipo" style="margin-top:2px;">👤 ${escapeHtml(c.asesor)}</div>
           <div class="cc-equipo" style="margin-top:2px;">🗓️ Compra: ${fmtFechaCorta(c.fechaInicio)}</div>
+          ${htmlContratoCredito(c)}
         </div>
         <div class="cc-monto">
           <div class="cc-total">${fmt(c.saldo)}</div>
@@ -9477,6 +9571,7 @@ async function guardarCredito(){
     docFoto:      getUrlArchivo('upFotoEntrega'),
     docContrato:  getUrlArchivo('upContrato'),
     financiera:   ((($('crdFinanciera')?.value||'CONTADO:0').split(':')[0]).substring(0,50)).substring(0,50),
+    numContrato:  ($('crdNumContrato')?.value||'').trim().toUpperCase().substring(0,50),
     fechaPrimerPago:  fPP,
     fechaSegundoPago: fSP,
     diaPago1:         new Date(fPP).getUTCDate(),
