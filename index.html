@@ -932,6 +932,20 @@
         </div>
       </div>
 
+      <div class="card">
+        <div class="card-title">🏷️ Estado de las ventas del período
+          <span style="font-size:11px;color:#888;font-weight:500;text-transform:none;letter-spacing:0;">(solo las ACTIVAS suman a los totales de arriba)</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Estado</th><th>Cantidad</th><th>Valor</th><th>% del total</th></tr>
+            </thead>
+            <tbody id="igTbodyEstados"></tbody>
+          </table>
+        </div>
+      </div>
+
       <div class="grid-2">
         <div class="card">
           <div class="card-title">📈 Ventas últimos 7 días</div>
@@ -971,7 +985,7 @@
         <div class="table-wrap">
           <table>
             <thead>
-              <tr><th>Hora</th><th>Cliente</th><th>Equipo</th><th>Valor</th><th>Asesor</th><th>Sede</th></tr>
+              <tr><th>Hora</th><th>Cliente</th><th>Equipo</th><th>Valor</th><th>Estado</th><th>Asesor</th><th>Sede</th></tr>
             </thead>
             <tbody id="igTbodyVentas"></tbody>
           </table>
@@ -1229,6 +1243,9 @@
 
       <div class="tabs">
         <button class="tab active" onclick="switchVentasTab('todas',this)">Todas</button>
+        <button class="tab" onclick="switchVentasTab('activas',this)">✅ Activas</button>
+        <button class="tab" onclick="switchVentasTab('pendientes',this)">⏳ Pendientes</button>
+        <button class="tab" onclick="switchVentasTab('anuladas',this)">❌ Anuladas / Devueltas</button>
         <button class="tab" onclick="switchVentasTab('contado',this)">Contado</button>
         <button class="tab" onclick="switchVentasTab('credito',this)">Crédito</button>
         <button class="tab" onclick="switchVentasTab('marzo',this)">Marzo 2026</button>
@@ -4639,13 +4656,43 @@
     </div>
     <div id="detalleVentaContenido"></div>
     <div style="display:flex;gap:10px;justify-content:space-between;align-items:center;margin-top:16px;">
-      <button class="btn btn-sm btn-ghost" id="btnAnularVentaDetalle" style="color:#dc2626;border:1px solid #dc2626;" onclick="protegerBoton('btnAnularVentaDetalle', confirmarAnularVentaContado)">❌ Anular Venta</button>
+      <button class="btn btn-sm btn-ghost" id="btnAnularVentaDetalle" style="color:#dc2626;border:1px solid #dc2626;" onclick="abrirNovedadVenta()">⚠️ Cambiar estado</button>
       <button class="btn btn-sm btn-outline" id="btnVerFacturaDetalle" onclick="verFacturaVenta()">🧾 Ver Factura</button>
       <!-- Visibilidad controlada por JS según rol -->
       <div style="display:flex;gap:10px;">
         <button class="btn btn-ghost" onclick="closeModal('modalDetalleVenta')">Cerrar</button>
         <button class="btn btn-outline" onclick="imprimirDetalleVenta()">🖨️ Imprimir</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Estado / Novedad de Venta -->
+<div class="modal-overlay" id="modalNovedadVenta">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-header">
+      <div class="modal-title">⚠️ Estado de la Venta</div>
+      <button class="modal-close" onclick="closeModal('modalNovedadVenta')">✕</button>
+    </div>
+    <div id="novedadVentaResumen" style="background:#f7f5fb;border-radius:10px;padding:12px;margin-bottom:14px;font-size:13px;"></div>
+    <div class="form-group">
+      <label class="form-label">Nuevo estado</label>
+      <select class="form-control" id="novedadVentaEstado" onchange="actualizarAvisoNovedadVenta()">
+        <option value="pendiente">⏳ PENDIENTE — registrada, aún sin confirmar (no suma al mes)</option>
+        <option value="anulada">❌ ANULADA — la venta se deshace</option>
+        <option value="devuelta">↩️ DEVUELTA — el cliente devolvió el equipo</option>
+        <option value="reversada">🔁 REVERSADA — la financiera reversó la operación</option>
+        <option value="activa">✅ ACTIVA — venta normal (suma al mes)</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Motivo</label>
+      <textarea class="form-control" id="novedadVentaMotivo" rows="2" placeholder="Detalle el motivo del cambio de estado..."></textarea>
+    </div>
+    <div id="novedadVentaAviso" style="font-size:12px;border-radius:10px;padding:10px;margin-bottom:6px;"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:10px;">
+      <button class="btn btn-ghost" onclick="closeModal('modalNovedadVenta')">Cancelar</button>
+      <button class="btn btn-primary" id="btnNovedadVentaConfirmar" onclick="protegerBoton('btnNovedadVentaConfirmar', ejecutarNovedadVenta)">Confirmar</button>
     </div>
   </div>
 </div>
@@ -4948,8 +4995,73 @@ function mapProductoAInventario(p) {
   };
 }
 
+// ─── Estados de venta ────────────────────────────────────────────────────────
+// La columna `estado` de la tabla ventas es la fuente de verdad (antes se
+// deducía leyendo si las observaciones empezaban por 'ANULADA'). Solo 'activa'
+// cuenta como venta efectiva del período; 'pendiente' se muestra aparte y
+// anulada/devuelta/reversada quedan fuera de los totales.
+const ESTADOS_VENTA = {
+  activa:    { label:'ACTIVA',    icono:'✅', badge:'badge-green',  color:'#16a34a' },
+  pendiente: { label:'PENDIENTE', icono:'⏳', badge:'badge-yellow', color:'#ca8a04' },
+  anulada:   { label:'ANULADA',   icono:'❌', badge:'badge-red',    color:'#dc2626' },
+  devuelta:  { label:'DEVUELTA',  icono:'↩️', badge:'badge-orange', color:'#d97706' },
+  reversada: { label:'REVERSADA', icono:'🔁', badge:'badge-red',    color:'#dc2626' }
+};
+const ESTADOS_VENTA_ORDEN = ['activa','pendiente','anulada','devuelta','reversada'];
+
+function infoEstadoVenta(estado){ return ESTADOS_VENTA[estado] || ESTADOS_VENTA.activa; }
+// Venta efectiva: la única que suma a las ventas del mes.
+function ventaEsEfectiva(v){ return (v?.estado || 'activa') === 'activa'; }
+// La venta no se concretó y el equipo debe volver al inventario.
+function ventaEsRevertida(v){
+  const e = v?.estado || 'activa';
+  return e === 'anulada' || e === 'devuelta' || e === 'reversada';
+}
+// Clasifica un conjunto de ventas por estado. Es la base de los informes:
+// permite decir "del mes: N activas, N pendientes, N anuladas…" con sus valores.
+function resumenVentasPorEstado(ventas){
+  const r = { total:{cantidad:0, valor:0}, efectivas:{cantidad:0, valor:0, ganancia:0} };
+  ESTADOS_VENTA_ORDEN.forEach(e => { r[e] = { cantidad:0, valor:0, ganancia:0 }; });
+  (ventas||[]).forEach(v => {
+    const slot = r[v.estado] || r.activa;
+    slot.cantidad++;
+    slot.valor    += v.valorBruto || 0;
+    slot.ganancia += v.gananciaBruta || 0;
+    r.total.cantidad++;
+    r.total.valor += v.valorBruto || 0;
+    if(ventaEsEfectiva(v)){
+      r.efectivas.cantidad++;
+      r.efectivas.valor    += v.venta || 0;
+      r.efectivas.ganancia += v.ganancia || 0;
+    }
+  });
+  return r;
+}
+
+// Chips "✅ 12 ACTIVAS · $ x" para mostrar el desglose por estado en los informes.
+function chipsEstadoVentas(resumen){
+  return ESTADOS_VENTA_ORDEN
+    .filter(e => resumen[e] && resumen[e].cantidad > 0)
+    .map(e => {
+      const info = ESTADOS_VENTA[e];
+      return `<span class="badge ${info.badge}" style="font-size:10px;">${info.icono} ${resumen[e].cantidad} ${info.label} · ${fmt(resumen[e].valor)}</span>`;
+    }).join(' ');
+}
+
+// Normaliza el estado de una fila de Supabase; si es antigua y no tiene estado,
+// se deduce de las observaciones para no perder las anulaciones históricas.
+function normalizarEstadoVenta(row){
+  const e = String(row?.estado || '').toLowerCase();
+  if(ESTADOS_VENTA[e]) return e;
+  return String(row?.observaciones || '').toUpperCase().startsWith('ANULADA') ? 'anulada' : 'activa';
+}
+
 function mapVenta(v) {
-  const anulada = (v.observaciones || '').startsWith('ANULADA');
+  const estado   = normalizarEstadoVenta(v);
+  const efectiva = estado === 'activa';
+  // Valores originales: se conservan para poder reportar cuánto se anuló/devolvió.
+  const valorBruto    = parseFloat(v.valor_venta) || 0;
+  const gananciaBruta = parseFloat(v.ganancia) || 0;
   return {
     id: v.id,
     fecha: v.fecha_venta,
@@ -4958,8 +5070,10 @@ function mapVenta(v) {
     cliente: v.cliente,
     asesor: v.asesor || '',
     costo: parseFloat(v.valor_compra) || 0,
-    venta: anulada ? 0 : (parseFloat(v.valor_venta) || 0),
-    ganancia: anulada ? 0 : (parseFloat(v.ganancia) || 0),
+    venta: efectiva ? valorBruto : 0,
+    ganancia: efectiva ? gananciaBruta : 0,
+    valorBruto,
+    gananciaBruta,
     financiera: v.financiera || 'CONTADO',
     tipo: v.forma_pago === 'Contado' ? 'contado' : 'credito',
     comisionAsesor: parseFloat(v.comision_asesor) || 0,
@@ -4967,7 +5081,11 @@ function mapVenta(v) {
     cedula: v.cedula_cliente || '',
     telefono: v.telefono_cliente || '',
     sedeId: v.sede_id || null,
-    anulada: anulada,
+    estado,
+    motivoEstado: v.motivo_estado || '',
+    fechaEstado: v.fecha_estado || null,
+    // Compatibilidad: `anulada` = "no cuenta como venta del período".
+    anulada: !efectiva,
     observaciones: v.observaciones || ''
   };
 }
@@ -5167,6 +5285,7 @@ async function guardarVentaDB(datos) {
       comision_asesor: datos.comisionAsesor || 0,
       sede_id: sedeId,
       observaciones: datos.obs || null,
+      estado: 'activa',
       fecha_venta: fechaColombia()
     };
     const res = await sbFetch('ventas', { method: 'POST', body: row });
@@ -5592,7 +5711,8 @@ function toast(msg, type='success') {
 function openModal(id) {
   const el = $(id);
   if(!el) return;
-  if(id === 'modalFactura' || id === 'modalNuevoCliente' || id === 'modalEditarCliente') {
+  if(id === 'modalFactura' || id === 'modalNuevoCliente' || id === 'modalEditarCliente'
+     || id === 'modalNovedadVenta') {  // se abre encima del detalle de venta
     el.style.zIndex = '9500';
   }
   el.classList.add('open');
@@ -5792,11 +5912,13 @@ function renderDashboard() {
   const mesActual = ahora.getFullYear()+'-'+String(ahora.getMonth()+1).padStart(2,'0');
   const mesNombre = ahora.toLocaleDateString('es-CO',{month:'long',year:'numeric'});
 
-  // Ventas del mes actual
-  // Excluir ventas anuladas del dashboard
-  const ventasMes = db.ventas.filter(v => v.fecha && v.fecha.startsWith(mesActual) && !v.anulada);
-  const totalVentasMes = ventasMes.reduce((a,v)=>a+v.venta,0);
-  const totalGananciaMes = ventasMes.reduce((a,v)=>a+v.ganancia,0);
+  // Ventas del mes actual: solo las de estado ACTIVA suman; las anuladas,
+  // devueltas, reversadas y pendientes se cuentan aparte.
+  const ventasMesTodas = db.ventas.filter(v => v.fecha && v.fecha.startsWith(mesActual));
+  const resMes = resumenVentasPorEstado(ventasMesTodas);
+  const ventasMes = ventasMesTodas.filter(ventaEsEfectiva);
+  const totalVentasMes = resMes.efectivas.valor;
+  const totalGananciaMes = resMes.efectivas.ganancia;
 
   // Equipos disponibles
   const equiposDisp = db.inventario.filter(e=>e.estado==='DISPONIBLE').length;
@@ -5810,7 +5932,9 @@ function renderDashboard() {
   // Actualizar stat cards dinámicas
   const setEl = (id,val) => { const e=$(id); if(e) e.textContent=val; };
   setEl('dashVentasMes',    fmt(totalVentasMes));
-  setEl('dashVentasDelta',  mesNombre);
+  const fueraMes = resMes.total.cantidad - resMes.efectivas.cantidad;
+  setEl('dashVentasDelta',  mesNombre + ' · ' + resMes.efectivas.cantidad + ' activas' +
+    (fueraMes > 0 ? ' · ' + fueraMes + ' anuladas/devueltas/pendientes' : ''));
 
   setEl('dashEquipos',      equiposDisp+'');
   setEl('dashEquiposDelta', equiposTotal+' en inventario total');
@@ -6012,7 +6136,14 @@ function filaVenta(v) {
     : (sesionActiva?.rol==='admin'
         ? `<button class="btn btn-sm btn-ghost" style="font-size:10px;padding:2px 7px;" onclick="editarComisionVenta(${v.id})">+ Agregar</button>`
         : '—');
-  return `<tr style="${v.anulada?'opacity:0.55;background:#fff5f5;':''}">
+  const est      = infoEstadoVenta(v.estado);
+  const efectiva = ventaEsEfectiva(v);
+  // Si la venta no es efectiva se muestra el valor original tachado, para que
+  // se vea cuánto se anuló / devolvió sin que sume al total.
+  const valorHtml = efectiva
+    ? fmt(v.venta)
+    : `<span style="text-decoration:line-through;color:${est.color};">${fmt(v.valorBruto)}</span>`;
+  return `<tr style="${efectiva?'':'opacity:0.6;background:#fff8f5;'}">
     <td style="font-family:monospace;font-size:11px;color:var(--text2);font-weight:600;">#${v.id}</td>
     <td style="font-size:12px;">${v.fecha}</td>
     <td style="font-weight:500;">${escapeHtml((v.equipo||'').substring(0,22))}</td>
@@ -6021,11 +6152,14 @@ function filaVenta(v) {
     <td>${escapeHtml(v.cliente)}</td>
     <td>${escapeHtml(v.asesor)}</td>
     <td class="solo-costo" style="color:var(--text2);">${fmt(v.costo)}</td>
-    <td style="font-weight:600;color:${v.anulada?'#dc2626':'inherit'};">${v.anulada?'ANULADA':fmt(v.venta)}</td>
-    <td class="solo-admin" style="color:${v.anulada?'#dc2626':'var(--green)'};font-weight:600;">${v.anulada?'$0':fmt(v.ganancia)}</td>
+    <td style="font-weight:600;color:${efectiva?'inherit':est.color};">${valorHtml}</td>
+    <td class="solo-admin" style="color:${efectiva?'var(--green)':est.color};font-weight:600;">${efectiva?fmt(v.ganancia):'$0'}</td>
     <td class="solo-admin" style="color:#6B2D8B;font-weight:600;">${comisionHtml}</td>
     <td><span class="badge badge-blue" style="font-size:10px;">${v.financiera}</span></td>
-    <td><span class="badge ${v.anulada?'badge-red':v.tipo==='contado'?'badge-green':'badge-pink'}">${v.anulada?'❌ ANULADA':v.tipo}</span></td>
+    <td>
+      <span class="badge ${est.badge}" title="${escapeHtml(v.motivoEstado||'')}">${est.icono} ${est.label}</span>
+      <div style="font-size:10px;color:var(--text2);margin-top:3px;">${v.tipo}</div>
+    </td>
     <td><button class="btn btn-sm btn-ghost" style="font-size:11px;padding:3px 8px;" onclick="verDetalleVenta(${v.id})">🔍</button></td>
   </tr>`;
 }
@@ -6045,6 +6179,9 @@ function renderVentas(filtro){
   let data=ventasVisiblesModulo();
   if(filtro==='contado')data=data.filter(v=>v.tipo==='contado');
   else if(filtro==='credito')data=data.filter(v=>v.tipo==='credito');
+  else if(filtro==='activas')data=data.filter(v=>ventaEsEfectiva(v));
+  else if(filtro==='pendientes')data=data.filter(v=>v.estado==='pendiente');
+  else if(filtro==='anuladas')data=data.filter(v=>ventaEsRevertida(v));
   else if(filtro==='marzo')data=data.filter(v=>v.fecha&&v.fecha.startsWith('2026-03'));
   else if(filtro==='febrero')data=data.filter(v=>v.fecha&&v.fecha.startsWith('2026-02'));
   $('tbodyVentas').innerHTML = data.length
@@ -6090,12 +6227,16 @@ async function aplicarFiltrosVentas() {
   if(fDesde) data = data.filter(v => (v.fecha||'') >= fDesde);
   if(fHasta) data = data.filter(v => (v.fecha||'') <= fHasta);
 
-  // Resumen en tiempo real
+  // Resumen en tiempo real: solo las ventas activas suman al total; el resto
+  // se muestra desglosado por estado para que se vea qué se anuló o devolvió.
   const resumen = document.getElementById('ventasFiltroResumen');
   if(resumen) {
-    const totalVenta    = data.filter(v=>!v.anulada).reduce((s,v)=>s+(v.venta||0),0);
-    const totalGanancia = data.filter(v=>!v.anulada).reduce((s,v)=>s+(v.ganancia||0),0);
-    resumen.innerHTML = `${data.length} ventas · Total: <span style="color:#16a34a;">${fmt(totalVenta)}</span>${puedeVerGanancias() ? ` · Ganancia: <span style="color:#6B2D8B;">${fmt(totalGanancia)}</span>` : ''}`;
+    const r = resumenVentasPorEstado(data);
+    resumen.innerHTML =
+      `${r.efectivas.cantidad} venta${r.efectivas.cantidad===1?'':'s'} activa${r.efectivas.cantidad===1?'':'s'} · ` +
+      `Total: <span style="color:#16a34a;">${fmt(r.efectivas.valor)}</span>` +
+      (puedeVerGanancias() ? ` · Ganancia: <span style="color:#6B2D8B;">${fmt(r.efectivas.ganancia)}</span>` : '') +
+      `<div style="margin-top:4px;display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;">${chipsEstadoVentas(r)}</div>`;
   }
 
   renderVentas_data(data);
@@ -6521,7 +6662,9 @@ async function renderContabilidad(){
 
   // Renderizar resumen consolidado
   await renderResumenGastosConsolidado(mesActual);
-  const ventasMes = db.ventas.filter(v=>v.fecha&&v.fecha.startsWith(mesActual)&&!v.anulada);
+  // Solo ventas en estado ACTIVA: las anuladas/devueltas/reversadas/pendientes
+  // no son ingreso del mes.
+  const ventasMes = db.ventas.filter(v=>v.fecha&&v.fecha.startsWith(mesActual)&&ventaEsEfectiva(v));
   const ingresosMes = ventasMes.reduce((a,v)=>a+v.venta,0);
   const gastosMes = db.gastos.filter(g=>g.fecha&&g.fecha.startsWith(mesActual)).reduce((a,g)=>a+g.pago,0);
   const utilidad = ingresosMes - gastosMes;
@@ -8245,9 +8388,11 @@ function igDiasEnStock(fechaCompra) {
   return Math.max(0, Math.floor((hoy - f) / (1000*60*60*24)));
 }
 
-function igFiltrarVentas() {
+// Todas las ventas del período sin importar el estado: base del desglose
+// activas / pendientes / anuladas / devueltas / reversadas.
+function igFiltrarVentasTodas() {
   const fechaSel = document.getElementById('igFecha')?.value || fechaColombia();
-  const ventas = (db.ventas || []).filter(v => !v.anulada);
+  const ventas = (db.ventas || []);
   if(igRangoActivo === '7dias') {
     const desde = new Date(fechaColombia());
     desde.setUTCDate(desde.getUTCDate() - 6);
@@ -8259,6 +8404,11 @@ function igFiltrarVentas() {
     return ventas.filter(v => (v.fecha||'').startsWith(mesPrefix));
   }
   return ventas.filter(v => v.fecha === fechaSel);
+}
+
+// Solo las ventas efectivas (estado activa): las que suman a los KPIs.
+function igFiltrarVentas() {
+  return igFiltrarVentasTodas().filter(ventaEsEfectiva);
 }
 
 function igFiltrarGastos() {
@@ -8334,9 +8484,34 @@ async function renderInformeGerencial() {
     }
   }
 
-  const ventasFiltradas = igFiltrarVentas();
+  const ventasPeriodo   = igFiltrarVentasTodas();
+  const ventasFiltradas = ventasPeriodo.filter(ventaEsEfectiva);
   const gastosFiltrados = igFiltrarGastos();
   const salidasCaja = await igCargarSalidasCaja();
+
+  // ── Desglose por estado: activas / pendientes / anuladas / devueltas / reversadas ──
+  const resEstados = resumenVentasPorEstado(ventasPeriodo);
+  const tbEstados = document.getElementById('igTbodyEstados');
+  if(tbEstados) {
+    const filas = ESTADOS_VENTA_ORDEN.map(e => {
+      const info = ESTADOS_VENTA[e];
+      const r    = resEstados[e];
+      const pct  = resEstados.total.cantidad > 0
+        ? ((r.cantidad / resEstados.total.cantidad) * 100).toFixed(1) : '0.0';
+      return `<tr style="${r.cantidad?'':'opacity:0.45;'}">
+        <td><span class="badge ${info.badge}">${info.icono} ${info.label}</span></td>
+        <td style="font-weight:700;">${r.cantidad}</td>
+        <td style="font-weight:600;color:${info.color};">${fmt(r.valor)}</td>
+        <td style="color:var(--text2);">${pct}%</td>
+      </tr>`;
+    }).join('');
+    tbEstados.innerHTML = filas + `<tr style="border-top:2px solid #ece8f5;">
+      <td style="font-weight:700;">TOTAL REGISTRADO</td>
+      <td style="font-weight:700;">${resEstados.total.cantidad}</td>
+      <td style="font-weight:700;">${fmt(resEstados.total.valor)}</td>
+      <td>100%</td>
+    </tr>`;
+  }
 
   // KPIs
   const totalVentas = ventasFiltradas.reduce((s,v)=>s+(v.venta||0), 0);
@@ -8349,7 +8524,10 @@ async function renderInformeGerencial() {
 
   const setText = (id, txt) => { const el = document.getElementById(id); if(el) el.textContent = txt; };
   setText('igKpiVentas', fmt(totalVentas));
-  setText('igKpiVentasSub', `${ventasFiltradas.length} equipo${ventasFiltradas.length===1?'':'s'}`);
+  const noEfectivas = resEstados.total.cantidad - resEstados.efectivas.cantidad;
+  setText('igKpiVentasSub',
+    `${ventasFiltradas.length} venta${ventasFiltradas.length===1?'':'s'} activa${ventasFiltradas.length===1?'':'s'}` +
+    (noEfectivas > 0 ? ` · ${noEfectivas} excluida${noEfectivas===1?'':'s'} (anuladas/devueltas/pendientes)` : ''));
   setText('igKpiGastos', fmt(totalGastos));
   setText('igKpiGastosSub', `${gastosFiltrados.length} movimiento${gastosFiltrados.length===1?'':'s'}`);
   setText('igKpiUtilidad', fmt(utilidad));
@@ -8506,19 +8684,26 @@ async function renderInformeGerencial() {
   }
 
   // ── Tabla ventas del período ──
+  // Se listan TODAS las ventas del período con su estado; las que no son
+  // activas van tachadas para que se vea qué se anuló, devolvió o quedó pendiente.
   const tbV = document.getElementById('igTbodyVentas');
-  setText('igVentasCount', String(ventasFiltradas.length));
+  setText('igVentasCount', `${ventasFiltradas.length} activas de ${ventasPeriodo.length}`);
   if(tbV) {
-    const ventasOrden = [...ventasFiltradas].sort((a,b) => (a.createdAt||'').localeCompare(b.createdAt||''));
-    tbV.innerHTML = ventasOrden.length ? ventasOrden.map(v => `
-      <tr>
+    const ventasOrden = [...ventasPeriodo].sort((a,b) => (a.createdAt||'').localeCompare(b.createdAt||''));
+    tbV.innerHTML = ventasOrden.length ? ventasOrden.map(v => {
+      const info = infoEstadoVenta(v.estado);
+      const ok   = ventaEsEfectiva(v);
+      return `
+      <tr style="${ok?'':'opacity:0.6;'}">
         <td>${igFmtHora(v.createdAt)}</td>
         <td>${v.cliente||'—'}</td>
         <td>${v.equipo||'—'}</td>
-        <td style="font-weight:700;color:#16a34a;">${fmt(v.venta||0)}</td>
+        <td style="font-weight:700;color:${ok?'#16a34a':info.color};${ok?'':'text-decoration:line-through;'}">${fmt(v.valorBruto||0)}</td>
+        <td><span class="badge ${info.badge}" style="font-size:10px;">${info.icono} ${info.label}</span></td>
         <td>${v.asesor||'—'}</td>
         <td>${igFmtSede(v.sedeId)}</td>
-      </tr>`).join('') : '<tr><td colspan="6" style="text-align:center;color:#888;padding:24px;">Sin ventas en el período</td></tr>';
+      </tr>`;
+    }).join('') : '<tr><td colspan="7" style="text-align:center;color:#888;padding:24px;">Sin ventas en el período</td></tr>';
   }
 
   // ── Tabla gastos del período ──
@@ -9401,6 +9586,7 @@ async function guardarVentaContado(){
       ganancia, financiera: finSel, forma_pago: 'Contado',
       comision_asesor: 0, sede_id: sedeActual.includes('ARMENIA')?2:1,
       observaciones: obs + (nMulti>1 ? ` | Venta con ${nMulti} productos` : ''),
+      estado: 'activa',
       fecha_venta: fechaColombia()
     };
     const resM = await sbFetch('ventas', { method:'POST', body:rowMaestra });
@@ -9600,6 +9786,7 @@ async function guardarCredito(){
       ganancia, financiera: finSel, forma_pago: 'Credito',
       comision_asesor: 0, sede_id: sedeActual.includes('ARMENIA')?2:1,
       observaciones: (datos.obs||'') + (nProdC>1 ? ` | Venta con ${nProdC} productos` : ''),
+      estado: 'activa',
       fecha_venta: fechaColombia()
     };
     const resVM = await sbFetch('ventas', { method:'POST', body:rowVM });
@@ -9828,13 +10015,14 @@ async function verDetalleVenta(id) {
   const contenido = document.getElementById('detalleVentaContenido');
   if(!contenido) return;
 
-  const esAdmin = puedeVerGanancias();
-  const veCosto = puedeVerCostos();
+  const esAdmin  = puedeVerGanancias();
+  const veCosto  = puedeVerCostos();
+  const estVenta = infoEstadoVenta(v.estado);
 
-  // Mostrar botón anular solo para admin y si no está ya anulada
+  // Cambiar estado: solo admin y solo si la venta sigue viva (activa o pendiente)
   const btnAnular = document.getElementById('btnAnularVentaDetalle');
   if(btnAnular) {
-    btnAnular.style.display = (!v.anulada && esAdmin) ? 'inline-flex' : 'none';
+    btnAnular.style.display = (!ventaEsRevertida(v) && esAdmin) ? 'inline-flex' : 'none';
   }
 
   // Cargar detalles de productos desde ventas_detalle
@@ -9884,15 +10072,20 @@ async function verDetalleVenta(id) {
       ${fila('Asesor', v.asesor || '—')}
       ${fila('Financiera', v.financiera || '—')}
       ${fila('Tipo', v.tipo === 'contado' ? '💵 Contado' : '🤝 Crédito')}
+      ${fila('Estado', `<span class="badge ${estVenta.badge}">${estVenta.icono} ${estVenta.label}</span>`)}
     </div>
     <div style="background:#f7f5fb;border-radius:12px;padding:14px;margin-top:12px;">
       <div style="font-size:11px;color:#888899;margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:1px;">Resumen Financiero</div>
       ${veCosto ? fila('Costo del equipo', fmt(v.costo), '#888899') : ''}
-      ${fila('Precio de venta', fmt(v.venta), '#111')}
-      ${esAdmin ? fila('Ganancia neta', fmt(v.ganancia), '#16a34a') : ''}
+      ${fila('Precio de venta', fmt(v.valorBruto), '#111')}
+      ${esAdmin ? fila('Ganancia neta', fmt(ventaEsEfectiva(v) ? v.ganancia : v.gananciaBruta), '#16a34a') : ''}
       ${esAdmin ? fila('Comisión asesor', v.comisionAsesor>0 ? fmt(v.comisionAsesor) : '—', '#6B2D8B') : ''}
     </div>
-    ${v.anulada ? '<div style="background:#fee2e2;border-radius:10px;padding:12px;margin-top:12px;text-align:center;font-weight:700;color:#dc2626;">❌ VENTA ANULADA</div>' : ''}`;
+    ${ventaEsEfectiva(v) ? '' : `
+      <div style="background:${estVenta.badge==='badge-yellow'?'#fef9c3':'#fee2e2'};border-radius:10px;padding:12px;margin-top:12px;text-align:center;color:${estVenta.color};">
+        <div style="font-weight:700;">${estVenta.icono} VENTA ${estVenta.label}</div>
+        <div style="font-size:12px;margin-top:4px;">No suma a las ventas del período${v.motivoEstado?` · ${escapeHtml(v.motivoEstado)}`:''}</div>
+      </div>`}`;
 
   openModal('modalDetalleVenta');
 }
@@ -10019,24 +10212,109 @@ async function verFacturaVenta() {
   mostrarFactura(datosF, !!(v.correo));
 }
 
-async function confirmarAnularVentaContado() {
+// ─── Cambio de estado de una venta desde el detalle ──────────────────────────
+// Abre el modal para elegir el estado (pendiente / anulada / devuelta /
+// reversada / activa) y el motivo.
+function abrirNovedadVenta() {
+  if(sesionActiva?.rol !== 'admin') { toast('Solo un administrador puede cambiar el estado de una venta','error'); return; }
+  if(!ventaDetalleActualId) return;
+  const v = db.ventas.find(x => x.id === ventaDetalleActualId);
+  if(!v) return;
+  if(ventaEsRevertida(v)) { toast('Esta venta ya está ' + infoEstadoVenta(v.estado).label,'error'); return; }
+
+  const est = infoEstadoVenta(v.estado);
+  const res = document.getElementById('novedadVentaResumen');
+  if(res) res.innerHTML =
+    `<div style="font-weight:700;">#${v.id} · ${escapeHtml(v.equipo||'—')}</div>
+     <div style="color:#888899;">${escapeHtml(v.cliente||'')} · ${fmt(v.valorBruto)}</div>
+     <div style="margin-top:6px;">Estado actual: <span class="badge ${est.badge}">${est.icono} ${est.label}</span></div>`;
+
+  const sel = document.getElementById('novedadVentaEstado');
+  if(sel) sel.value = v.estado === 'pendiente' ? 'activa' : 'anulada';
+  const mot = document.getElementById('novedadVentaMotivo');
+  if(mot) mot.value = '';
+  actualizarAvisoNovedadVenta();
+  openModal('modalNovedadVenta');
+}
+
+function actualizarAvisoNovedadVenta() {
+  const estado = document.getElementById('novedadVentaEstado')?.value || 'anulada';
+  const aviso  = document.getElementById('novedadVentaAviso');
+  if(!aviso) return;
+  if(ventaEsRevertida({estado})) {
+    aviso.style.background = '#fee2e2';
+    aviso.style.color = '#dc2626';
+    aviso.innerHTML = 'La venta sale de los totales del período, el equipo vuelve al inventario como <strong>DISPONIBLE</strong> y, si tiene crédito vinculado, ese crédito también se anula.';
+  } else if(estado === 'pendiente') {
+    aviso.style.background = '#fef9c3';
+    aviso.style.color = '#854d0e';
+    aviso.innerHTML = 'La venta queda registrada pero <strong>no suma a las ventas del mes</strong> hasta que se marque como activa. El inventario no se toca.';
+  } else {
+    aviso.style.background = '#dcfce7';
+    aviso.style.color = '#16a34a';
+    aviso.innerHTML = 'La venta vuelve a contar como <strong>venta efectiva del período</strong>. El inventario no se toca.';
+  }
+}
+
+async function ejecutarNovedadVenta() {
+  const estado = document.getElementById('novedadVentaEstado')?.value || 'anulada';
+  const motivo = (document.getElementById('novedadVentaMotivo')?.value || '').trim();
+  closeModal('modalNovedadVenta');
+  if(ventaEsRevertida({estado})) {
+    await confirmarAnularVentaContado(estado, motivo);
+  } else {
+    await cambiarEstadoVentaSimple(estado, motivo);
+  }
+}
+
+// Cambio de estado que no mueve inventario ni créditos (activa ⇄ pendiente).
+async function cambiarEstadoVentaSimple(estado, motivo) {
+  const v = db.ventas.find(x => x.id === ventaDetalleActualId);
+  if(!v) return;
+  try {
+    showLoader('Actualizando estado...');
+    await sbFetch(`ventas?id=eq.${v.id}`, { method:'PATCH', body:{
+      estado,
+      motivo_estado:  motivo || null,
+      fecha_estado:   new Date().toISOString(),
+      usuario_estado: sesionActiva?.nombre || sesionActiva?.usuario || ''
+    }});
+    v.estado       = estado;
+    v.motivoEstado = motivo;
+    v.anulada      = estado !== 'activa';
+    v.venta        = estado === 'activa' ? v.valorBruto : 0;
+    v.ganancia     = estado === 'activa' ? v.gananciaBruta : 0;
+    hideLoader();
+    closeModal('modalDetalleVenta');
+    toast('✅ Venta marcada como ' + infoEstadoVenta(estado).label);
+    renderVentas();
+    renderDashboard();
+    renderContabilidad();
+    renderComisiones();
+  } catch(e) { hideLoader(); toast('Error: ' + e.message, 'error'); }
+}
+
+async function confirmarAnularVentaContado(estadoDestino, motivoNovedad) {
+  const estadoNuevo = ventaEsRevertida({estado:estadoDestino}) ? estadoDestino : 'anulada';
+  const etiqueta    = infoEstadoVenta(estadoNuevo).label;
+  const motivo      = (motivoNovedad || '').trim();
   // Por rol (no por usuario literal 'admin'): el botón se muestra a todo rol
   // admin, así que la acción debe aceptar a los mismos usuarios.
   if(sesionActiva?.rol !== 'admin') { toast('Solo un administrador puede anular ventas','error'); return; }
   if(!ventaDetalleActualId) return;
   const v = db.ventas.find(x => x.id === ventaDetalleActualId);
   if(!v) return;
-  if(v.anulada) { toast('Esta venta ya esta anulada','error'); return; }
+  if(ventaEsRevertida(v)) { toast('Esta venta ya está ' + infoEstadoVenta(v.estado).label,'error'); return; }
 
   const esVentaCredito = v.tipo === 'credito';
-  const msgConfirm = 'Anular la venta de ' + (v.equipo||'este equipo') + ' - ' + v.cliente + '?' +
-    ' Se anulara esta venta y el equipo volvera al inventario como DISPONIBLE.' +
+  const msgConfirm = 'Marcar como ' + etiqueta + ' la venta de ' + (v.equipo||'este equipo') + ' - ' + v.cliente + '?' +
+    ' Saldra de las ventas del periodo y el equipo volvera al inventario como DISPONIBLE.' +
     (esVentaCredito
       ? ' Tambien se anulara el credito vinculado a ESTA venta (los demas creditos del cliente no se tocan).'
       : '');
   if(!confirm(msgConfirm)) return;
 
-  showLoader('Anulando venta...');
+  showLoader('Procesando ' + etiqueta.toLowerCase() + '...');
   const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH, 'Content-Type': 'application/json' };
   const base = SUPABASE_URL + '/rest/v1';
   const resumen = { ventasAnuladas:0, equiposDevueltos:[], creditosAnulados:[] };
@@ -10054,11 +10332,18 @@ async function confirmarAnularVentaContado() {
     const todasVentasGrupo = [v];
 
     for(const vx of todasVentasGrupo) {
+      // El estado manda: valor_venta y ganancia se conservan para poder
+      // reportar cuánto se anuló/devolvió; los informes excluyen por estado.
+      const notaEstado = etiqueta + ': ' + (motivo || 'Cambio de estado manual desde módulo ventas');
       const rAnul = await fetch(`${base}/ventas?id=eq.${vx.id}`, {
         method:'PATCH', headers,
         body: JSON.stringify({
-          observaciones: 'ANULADA: Anulación manual desde módulo ventas',
-          valor_venta: 0, ganancia: 0, comision_asesor: 0
+          estado: estadoNuevo,
+          motivo_estado: notaEstado,
+          fecha_estado: new Date().toISOString(),
+          usuario_estado: sesionActiva?.nombre || sesionActiva?.usuario || '',
+          observaciones: notaEstado,
+          comision_asesor: 0
         })
       });
       if(!rAnul.ok) {
@@ -10067,7 +10352,10 @@ async function confirmarAnularVentaContado() {
       }
       // Actualizar memoria
       const vMem = db.ventas.find(x=>x.id===vx.id);
-      if(vMem){ vMem.anulada=true; vMem.venta=0; vMem.ganancia=0; }
+      if(vMem){
+        vMem.estado=estadoNuevo; vMem.motivoEstado=notaEstado;
+        vMem.anulada=true; vMem.venta=0; vMem.ganancia=0; vMem.comisionAsesor=0;
+      }
       resumen.ventasAnuladas++;
 
       // ── PASO 2: Devolver cada producto del detalle al inventario ──
@@ -10163,7 +10451,7 @@ async function confirmarAnularVentaContado() {
     renderComisiones();
 
     // Resumen de la anulacion
-    const linea1 = resumen.ventasAnuladas + ' venta(s) anulada(s)';
+    const linea1 = resumen.ventasAnuladas + ' venta(s) marcada(s) como ' + etiqueta;
     const linea2 = resumen.equiposDevueltos.length > 0 ? 'Devuelto al inventario: ' + resumen.equiposDevueltos.join(', ') : 'Equipo no encontrado en inventario';
     const linea3 = esVentaCredito
       ? (resumen.creditosAnulados.length > 0 ? 'Credito anulado: ' + resumen.creditosAnulados.join(', ') : 'ATENCION: no se encontro el credito vinculado, anulalo desde Creditos')
@@ -11902,36 +12190,54 @@ async function ejecutarAnulacion() {
         body: { estado: 'anulado', observaciones: nota }
       });
 
-      // 2. Anular la venta asociada — buscar por producto + asesor + estado no anulado
-      if(credito.equipo) {
-        // Buscar venta por nombre del equipo y asesor
+      // 2. Anular la venta asociada. Prioridad: vínculo directo por venta_id;
+      //    si el crédito es antiguo y no lo tiene, se cae al IMEI y, como
+      //    último recurso, a producto + asesor. Antes se usaba siempre la
+      //    búsqueda difusa y quedaban ventas anuladas contando en el mes.
+      let ventasAnular = [];
+      if(credito.ventaId) {
+        ventasAnular = [{ id: credito.ventaId }];
+      }
+      if(!ventasAnular.length && credito.imei) {
+        const rI = await fetch(`${baseUrl}/ventas?select=id&imei=eq.${encodeURIComponent(credito.imei)}&estado=eq.activa&limit=3`, {headers});
+        ventasAnular = rI.ok ? (await rI.json() || []) : [];
+      }
+      if(!ventasAnular.length && credito.equipo) {
         const resVenta = await fetch(
-          `${baseUrl}/ventas?select=id,valor_venta,ganancia&producto=eq.${encodeURIComponent(credito.equipo)}&asesor=eq.${encodeURIComponent(credito.asesor)}&limit=3`,
+          `${baseUrl}/ventas?select=id&producto=eq.${encodeURIComponent(credito.equipo)}&asesor=eq.${encodeURIComponent(credito.asesor)}&estado=eq.activa&limit=3`,
           {headers}
         );
-        const ventas = await resVenta.json();
-        for(const v of ventas) {
-          // Solo anular si la observación no dice ya ANULADA
-          await fetch(`${baseUrl}/ventas?id=eq.${v.id}`, {
-            method: 'PATCH',
-            headers: {...headers, 'Content-Type':'application/json'},
-            body: JSON.stringify({
-              observaciones: 'ANULADA: ' + nota,
-              valor_venta: 0,
-              ganancia: 0
-            })
-          });
-        }
-        // Actualizar memoria local de ventas
-        db.ventas.forEach(v => {
-          if((v.equipo||'') === credito.equipo && (v.asesor||'') === credito.asesor && !v.anulada) {
-            v.anulada = true;
-            v.venta = 0;
-            v.ganancia = 0;
-            v.observaciones = 'ANULADA: ' + nota;
-          }
-        });
+        ventasAnular = resVenta.ok ? (await resVenta.json() || []) : [];
       }
+      const idsAnulados = new Set();
+      for(const vRow of ventasAnular) {
+        const rV = await fetch(`${baseUrl}/ventas?id=eq.${vRow.id}`, {
+          method: 'PATCH',
+          headers: {...headers, 'Content-Type':'application/json'},
+          body: JSON.stringify({
+            estado: 'anulada',
+            motivo_estado: nota,
+            fecha_estado: new Date().toISOString(),
+            usuario_estado: sesionActiva?.nombre || sesionActiva?.usuario || '',
+            observaciones: 'ANULADA: ' + nota,
+            comision_asesor: 0
+          })
+        });
+        if(rV.ok) idsAnulados.add(vRow.id);
+        else console.error('No se pudo anular la venta', vRow.id, rV.status);
+      }
+      // Actualizar memoria local de ventas
+      db.ventas.forEach(v => {
+        if(idsAnulados.has(v.id)) {
+          v.estado = 'anulada';
+          v.motivoEstado = nota;
+          v.anulada = true;
+          v.venta = 0;
+          v.ganancia = 0;
+          v.comisionAsesor = 0;
+          v.observaciones = 'ANULADA: ' + nota;
+        }
+      });
 
       // 3. Devolver TODOS los equipos al inventario
       // credito.equipo puede ser "PROD A | PROD B | PROD C" para multi-producto
@@ -12106,10 +12412,10 @@ async function ejecutarAnulacion() {
         }
 
         for(const vid of ventaIds) {
-          const mRows = await sbFetch(`ventas?select=id,producto,imei,valor_compra,ganancia,observaciones&id=eq.${vid}`);
+          const mRows = await sbFetch(`ventas?select=id,producto,imei,valor_compra,ganancia,observaciones,estado&id=eq.${vid}`);
           const m = mRows && mRows[0];
           if(!m) continue;
-          if((m.observaciones||'').startsWith('ANULADA')) continue; // una venta anulada no se recalcula
+          if(normalizarEstadoVenta(m) !== 'activa') continue; // una venta anulada/devuelta no se recalcula
 
           // Línea del equipo anterior en el detalle (fuente del costo si el
           // equipo que sale ya no se ubica en inventario)
@@ -12265,17 +12571,14 @@ async function validarDisponibilidadProducto(imei, nombreEquipo) {
   if(imei && imei.length > 5) {
     try {
       const headers2 = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH };
-      // Filtrar: IMEI igual, valor_venta > 0 (no anulada), y observaciones no empieza con ANULADA
+      // El estado manda; observaciones/valor_venta solo cubren filas antiguas.
       const resV = await fetch(
-        `${SUPABASE_URL}/rest/v1/ventas?select=id,observaciones,valor_venta&imei=eq.${imei}&limit=5`,
+        `${SUPABASE_URL}/rest/v1/ventas?select=id,observaciones,valor_venta,estado&imei=eq.${imei}&limit=5`,
         {headers:headers2}
       );
       const ventasExist = await resV.json();
-      // Filtrar solo las ventas NO anuladas (valor_venta > 0 Y observaciones no empieza con ANULADA)
       const activas = Array.isArray(ventasExist)
-        ? ventasExist.filter(v =>
-            (parseFloat(v.valor_venta)||0) > 0 &&
-            !(v.observaciones||'').toUpperCase().startsWith('ANULADA'))
+        ? ventasExist.filter(v => normalizarEstadoVenta(v) === 'activa')
         : [];
       if(activas.length > 0) {
         toast('Este IMEI ya tiene una venta ACTIVA registrada. No se puede duplicar.','error');
