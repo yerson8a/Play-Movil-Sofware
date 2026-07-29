@@ -1633,7 +1633,12 @@
 
         <div class="grid-2">
           <div class="card">
-            <div class="card-title">💸 Gastos Fijos Mensuales</div>
+            <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+              <span>💸 Gastos Fijos Mensuales</span>
+              <select class="form-control" id="gfMesSelect" onchange="cambiarMesGastosFijos(this.value)"
+                      style="width:auto;min-width:150px;font-size:12px;padding:5px 10px;text-transform:none;">
+              </select>
+            </div>
             <div id="gastosFijos"></div>
           </div>
           <div class="card">
@@ -5651,7 +5656,10 @@ async function cargarConfigMesAnterior(tipo, mes) {
   return null;
 }
 
-async function cargarGastosFijosMes(mes) {
+// `soloConsulta` evita el efecto secundario de heredar-y-guardar: al revisar
+// un mes anterior desde el filtro no se debe crear un registro que no existía.
+// Devuelve null cuando el mes no tiene datos propios y no se debe inventar.
+async function cargarGastosFijosMes(mes, soloConsulta = false) {
   try {
     const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH };
     const res = await fetch(`${SUPABASE_URL}/rest/v1/configuracion_contabilidad?tipo=eq.gastos_fijos&mes=eq.${mes}`, {headers});
@@ -5660,6 +5668,7 @@ async function cargarGastosFijosMes(mes) {
       _cacheGastos[mes] = JSON.parse(rows[0].datos);
       return _cacheGastos[mes];
     }
+    if(soloConsulta) return null;
     // Sin datos propios: heredar nombres y valores del último mes registrado
     // y guardarlos como registro propio del mes nuevo.
     const heredado = await cargarConfigMesAnterior('gastos_fijos', mes);
@@ -5669,7 +5678,17 @@ async function cargarGastosFijosMes(mes) {
       return _cacheGastos[mes];
     }
   } catch(e) { console.error('Error cargando gastos fijos:', e); }
-  return GASTOS_FIJOS_LABELS.map(label => ({ label, valor: 0 }));
+  return soloConsulta ? null : GASTOS_FIJOS_LABELS.map(label => ({ label, valor: 0 }));
+}
+
+// Meses con gastos fijos registrados, más recientes primero. Alimenta el filtro.
+async function mesesConGastosFijos() {
+  try {
+    const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH };
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/configuracion_contabilidad?tipo=eq.gastos_fijos&select=mes&order=mes.desc`, {headers});
+    const rows = await res.json();
+    return Array.isArray(rows) ? [...new Set(rows.map(r => r.mes).filter(Boolean))] : [];
+  } catch(e) { console.error('Error listando meses de gastos fijos:', e); return []; }
 }
 
 function getNominasMes(mes) {
@@ -6764,30 +6783,8 @@ async function renderContabilidad(){
   setEl('contGanancia',      fmt(gananciasMes));
   setEl('contGananciaDelta', 'Ganancia '+mesActual);
 
-  // ── Gastos fijos editables por mes ──
-  const gastosMesData = await cargarGastosFijosMes(mesActual);
-  const totalFijos = gastosMesData.reduce((a,g)=>a+g.valor,0);
-  const gfEl = $('gastosFijos');
-  if(gfEl) gfEl.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-      <span style="font-size:11px;color:#888899;">MES: ${mesActual}</span>
-      <div style="display:flex;gap:6px;">
-        <button class="btn btn-sm btn-ghost" style="font-size:11px;" onclick="agregarGastoFijo('${mesActual}')">➕ Agregar</button>
-        <button class="btn btn-sm btn-ghost" style="font-size:11px;" onclick="editarTodosGastosFijos('${mesActual}')">✏️ Editar todos</button>
-      </div>
-    </div>` +
-    gastosMesData.map((g,i)=>`
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f0ecf8;">
-      <span style="font-size:13px;">${g.label}</span>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <span style="font-size:13px;font-weight:600;color:#6B2D8B;">${fmt(g.valor)}</span>
-        <button class="btn btn-sm btn-ghost" style="padding:2px 7px;font-size:11px;" onclick="editarUnGastoFijo('${mesActual}',${i})">✏️</button>
-        <button class="btn btn-sm btn-ghost" style="padding:2px 7px;font-size:11px;color:#dc2626;" onclick="eliminarGastoFijo('${mesActual}',${i})" title="Eliminar este gasto">🗑️</button>
-      </div>
-    </div>`).join('') +
-    `<div style="display:flex;justify-content:space-between;padding:12px 0;font-weight:700;border-top:2px solid #6B2D8B;margin-top:4px;">
-      <span>TOTAL FIJOS</span><span style="color:#6B2D8B;">${fmt(totalFijos)}</span>
-    </div>`;
+  // ── Gastos fijos editables por mes (respeta el mes elegido en el filtro) ──
+  await renderGastosFijos();
 
   // ── Cartera por financiera ──
   const carteras={};
@@ -6902,6 +6899,88 @@ function limpiarFiltroGastos(){
   if(fD) fD.value = '';
   if(fH) fH.value = '';
   renderTablaGastos();
+}
+
+// ── Tarjeta de Gastos Fijos con filtro por mes ────────────────
+// null = mes en curso. Al elegir un mes anterior la tarjeta pasa a modo
+// consulta: se ve lo que realmente se registró, sin heredar del mes previo
+// (heredar crearía un registro que nunca existió y falsearía el histórico).
+let gastosFijosMesSel = null;
+
+function mesLegible(mes) {
+  const [a, m] = String(mes || '').split('-');
+  const nombres = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                   'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  return (nombres[parseInt(m,10)-1] || mes) + ' ' + (a || '');
+}
+
+async function poblarSelectorMesesGastosFijos() {
+  const sel = document.getElementById('gfMesSelect');
+  if(!sel) return;
+  const mesActual = mesColombia();
+  const registrados = await mesesConGastosFijos();
+  // El mes en curso siempre está disponible aunque aún no tenga registro.
+  const meses = [...new Set([mesActual, ...registrados])].sort().reverse();
+  sel.innerHTML = meses.map(m =>
+    `<option value="${m}">${mesLegible(m)}${m === mesActual ? ' (actual)' : ''}</option>`
+  ).join('');
+  sel.value = gastosFijosMesSel || mesActual;
+}
+
+async function cambiarMesGastosFijos(mes) {
+  gastosFijosMesSel = (mes === mesColombia()) ? null : mes;
+  await renderGastosFijos();
+}
+
+async function renderGastosFijos() {
+  const gfEl = document.getElementById('gastosFijos');
+  if(!gfEl) return;
+
+  const mesActual = mesColombia();
+  const mes       = gastosFijosMesSel || mesActual;
+  const esActual  = mes === mesActual;
+
+  await poblarSelectorMesesGastosFijos();
+
+  // En meses anteriores no se hereda ni se crea nada: solo se muestra lo real.
+  const data = await cargarGastosFijosMes(mes, !esActual);
+
+  if(data === null) {
+    gfEl.innerHTML = `
+      <div style="text-align:center;padding:28px 12px;color:#888899;">
+        <div style="font-size:32px;margin-bottom:8px;">📭</div>
+        <div style="font-weight:600;font-size:13px;">Sin gastos fijos registrados</div>
+        <div style="font-size:12px;margin-top:4px;">No hay registro para ${mesLegible(mes)}.</div>
+      </div>`;
+    return;
+  }
+
+  const total = data.reduce((a,g)=>a+(g.valor||0), 0);
+  const avisoMes = esActual ? '' :
+    `<div style="background:#fef9c3;color:#854d0e;border-radius:8px;padding:7px 10px;margin-bottom:10px;font-size:11px;font-weight:600;">
+       📅 Consultando ${mesLegible(mes)} — mes anterior. Los cambios afectan ese mes, no el actual.
+     </div>`;
+
+  gfEl.innerHTML = avisoMes + `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <span style="font-size:11px;color:#888899;">MES: ${mes}</span>
+      <div style="display:flex;gap:6px;">
+        <button class="btn btn-sm btn-ghost" style="font-size:11px;" onclick="agregarGastoFijo('${mes}')">➕ Agregar</button>
+        <button class="btn btn-sm btn-ghost" style="font-size:11px;" onclick="editarTodosGastosFijos('${mes}')">✏️ Editar todos</button>
+      </div>
+    </div>` +
+    data.map((g,i)=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f0ecf8;">
+      <span style="font-size:13px;">${escapeHtml(g.label)}</span>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:13px;font-weight:600;color:#6B2D8B;">${fmt(g.valor)}</span>
+        <button class="btn btn-sm btn-ghost" style="padding:2px 7px;font-size:11px;" onclick="editarUnGastoFijo('${mes}',${i})">✏️</button>
+        <button class="btn btn-sm btn-ghost" style="padding:2px 7px;font-size:11px;color:#dc2626;" onclick="eliminarGastoFijo('${mes}',${i})" title="Eliminar este gasto">🗑️</button>
+      </div>
+    </div>`).join('') +
+    `<div style="display:flex;justify-content:space-between;padding:12px 0;font-weight:700;border-top:2px solid #6B2D8B;margin-top:4px;">
+      <span>TOTAL FIJOS</span><span style="color:#6B2D8B;">${fmt(total)}</span>
+    </div>`;
 }
 
 // ── Editar gasto fijo / nómina con modal visual ───────────────
