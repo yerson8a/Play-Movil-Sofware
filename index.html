@@ -924,6 +924,9 @@
           <div class="stat-label">📊 Utilidad neta</div>
           <div class="stat-value purple" id="igKpiUtilidad">$ 0</div>
           <div class="stat-sub" id="igKpiUtilidadSub">Margen: 0%</div>
+          <div class="stat-sub" id="igAvisoFijos" style="display:none;color:#d97706;font-weight:600;margin-top:3px;">
+            ⚠️ Sin gastos fijos (usa «Este mes»)
+          </div>
         </div>
         <div class="stat-card blue">
           <div class="stat-label">🎯 Ticket promedio</div>
@@ -8714,7 +8717,21 @@ async function renderInformeGerencial() {
   const totalGanancia = ventasFiltradas.reduce((s,v)=>s+(v.ganancia||0), 0);
   const totalGastos = gastosFiltrados.reduce((s,g)=>s+(g.pago||0), 0);
   const totalSalidasCaja = salidasCaja.reduce((s,m)=>s+(parseFloat(m.valor)||0), 0);
-  const utilidad = totalGanancia - totalGastos - totalSalidasCaja;
+
+  // Gastos fijos: son un valor MENSUAL (arriendos, servicios, plataformas), así
+  // que solo se restan cuando el informe cubre el mes completo. En "Hoy",
+  // "Ayer" o "7 días" restarlos íntegros distorsionaría la utilidad del período,
+  // y prorratearlos daría una cifra estimada; se avisa que no están incluidos.
+  const rangoEsMesCompleto = igRangoActivo === 'mes';
+  let totalGastosFijos = 0;
+  if(rangoEsMesCompleto) {
+    try {
+      const fijos = await cargarGastosFijosMes(mesColombia());
+      totalGastosFijos = (fijos || []).reduce((s,f) => s + (parseFloat(f.valor)||0), 0);
+    } catch(e) { console.error('No se pudieron cargar los gastos fijos:', e); }
+  }
+
+  const utilidad = totalGanancia - totalGastos - totalSalidasCaja - totalGastosFijos;
   const ticket = ventasFiltradas.length > 0 ? Math.round(totalVentas / ventasFiltradas.length) : 0;
   const margen = totalVentas > 0 ? ((utilidad / totalVentas) * 100).toFixed(1) : '0';
 
@@ -8727,12 +8744,21 @@ async function renderInformeGerencial() {
   setText('igKpiGastos', fmt(totalGastos));
   setText('igKpiGastosSub', `${gastosFiltrados.length} movimiento${gastosFiltrados.length===1?'':'s'}`);
   setText('igKpiUtilidad', fmt(utilidad));
-  setText('igKpiUtilidadSub', `Ganancia ${fmt(totalGanancia)} − Gastos ${fmt(totalGastos)} − Cajas ${fmt(totalSalidasCaja)}`);
+  setText('igKpiUtilidadSub',
+    `Ganancia ${fmt(totalGanancia)} − Gastos ${fmt(totalGastos)} − Cajas ${fmt(totalSalidasCaja)}` +
+    (rangoEsMesCompleto ? ` − Fijos ${fmt(totalGastosFijos)}` : ''));
   const elUtil = document.getElementById('igKpiUtilidad');
   if(elUtil) {
     elUtil.classList.remove('purple','red');
     elUtil.classList.add(utilidad < 0 ? 'red' : 'purple');
-    elUtil.parentElement.title = `Margen sobre ventas: ${margen}%`;
+    elUtil.parentElement.title = rangoEsMesCompleto
+      ? `Margen sobre ventas: ${margen}% · incluye ${fmt(totalGastosFijos)} de gastos fijos del mes`
+      : `Margen sobre ventas: ${margen}% · NO incluye gastos fijos (son mensuales)`;
+  }
+  // Aviso visible: en rangos cortos la utilidad no descuenta los fijos.
+  const elAvisoFijos = document.getElementById('igAvisoFijos');
+  if(elAvisoFijos) {
+    elAvisoFijos.style.display = rangoEsMesCompleto ? 'none' : 'block';
   }
   setText('igKpiTicket', fmt(ticket));
 
