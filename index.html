@@ -6156,7 +6156,7 @@ function switchInvSede(sede, el) {
 }
 
 function aplicarFiltroInvSede() {
-  renderTablaInventario(getInvDataFiltrada());
+  aplicarFiltrosInventario();
 }
 
 function renderTablaInventario(data) {
@@ -6182,19 +6182,22 @@ function renderTablaInventario(data) {
     </tr>`).join(''):'<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text2);">Sin equipos en este filtro</td></tr>';
 }
 
-function filtrarInventario(q) {
-  q=q.toLowerCase();
-  const base = getInvDataFiltrada();
-  renderTablaInventario(base.filter(e=>
-    e.producto.toLowerCase().includes(q) ||
+// Los filtros de inventario (sede + búsqueda + estado) se aplican juntos, para
+// que al cambiar uno no se pierdan los demás.
+function aplicarFiltrosInventario() {
+  const q = ($('searchInv')?.value || '').toLowerCase().trim();
+  const est = $('filtroEstadoInv')?.value || '';
+  let data = getInvDataFiltrada();
+  if(q) data = data.filter(e=>
+    (e.producto||'').toLowerCase().includes(q) ||
     (e.imei||'').includes(q) ||
     (e.proveedor||'').toLowerCase().includes(q)
-  ));
+  );
+  if(est) data = data.filter(e=>e.estado===est);
+  renderTablaInventario(data);
 }
-function filtrarInventarioPorEstado(s) {
-  const base = getInvDataFiltrada();
-  renderTablaInventario(s ? base.filter(e=>e.estado===s) : base);
-}
+function filtrarInventario(q) { aplicarFiltrosInventario(); }
+function filtrarInventarioPorEstado(s) { aplicarFiltrosInventario(); }
 function filtrarInventarioPorSede(s) {
   renderTablaInventario(s ? db.inventario.filter(e=>e.sede.includes(s)) : db.inventario);
 }
