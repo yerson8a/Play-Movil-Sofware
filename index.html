@@ -1935,19 +1935,26 @@
           <!-- Datos de credito (solo si es credito) -->
           <div id="gfCreditoFields" style="display:none;background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:12px;margin-bottom:12px;">
             <div style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:8px;">💳 Datos del Crédito</div>
+            <div class="form-group">
+              <label class="form-label">Frecuencia de cuotas</label>
+              <select class="form-control" id="gfPeriodicidad" onchange="gfActualizarUI()">
+                <option value="quincenal">Quincenal</option>
+                <option value="mensual">Mensual</option>
+              </select>
+            </div>
             <div class="form-row">
               <div class="form-group">
                 <label class="form-label">Inicial pagada</label>
                 <div class="input-money-wrap"><input type="text" class="form-control" id="gfInicial" placeholder="0" oninput="fmtMoneyInput(this);gfActualizarTotales()" inputmode="numeric"></div>
               </div>
               <div class="form-group">
-                <label class="form-label">Cuotas (quincenas)</label>
+                <label class="form-label" id="gfLblCuotas">Cuotas (quincenas)</label>
                 <input type="number" class="form-control" id="gfCuotas" placeholder="12" min="1" max="72">
               </div>
             </div>
             <div class="form-row">
               <div class="form-group">
-                <label class="form-label">Valor cuota quincenal</label>
+                <label class="form-label" id="gfLblValorCuota">Valor cuota quincenal</label>
                 <div class="input-money-wrap"><input type="text" class="form-control" id="gfValorCuota" placeholder="0" oninput="fmtMoneyInput(this)" inputmode="numeric"></div>
               </div>
               <div class="form-group">
@@ -8404,6 +8411,13 @@ function gfActualizarUI() {
   const tipo = document.getElementById('gfTipo')?.value || 'contado';
   const credFields = document.getElementById('gfCreditoFields');
   if(credFields) credFields.style.display = tipo === 'credito' ? 'block' : 'none';
+
+  // Etiquetas segun la frecuencia de las cuotas
+  const esMensual = (document.getElementById('gfPeriodicidad')?.value || 'quincenal') === 'mensual';
+  const lblCuotas = document.getElementById('gfLblCuotas');
+  if(lblCuotas) lblCuotas.textContent = esMensual ? 'Cuotas (meses)' : 'Cuotas (quincenas)';
+  const lblValorCuota = document.getElementById('gfLblValorCuota');
+  if(lblValorCuota) lblValorCuota.textContent = esMensual ? 'Valor cuota mensual' : 'Valor cuota quincenal';
 }
 
 function gfAgregarProducto() {
@@ -8480,6 +8494,7 @@ function gfGenerarVistaPrevia() {
   const inicial    = getMoneyValue('gfInicial');
   const cuotas     = parseInt(document.getElementById('gfCuotas')?.value) || 0;
   const valorCuota = getMoneyValue('gfValorCuota');
+  const periodicidad = document.getElementById('gfPeriodicidad')?.value || 'quincenal';
 
   if(!cliente) { toast('Falta el nombre del cliente','error'); return; }
 
@@ -8513,6 +8528,7 @@ function gfGenerarVistaPrevia() {
     saldoFinanciar,
     cuotas,
     valorCuota,
+    periodicidad,
     intereses: 0,
     tasaInteres: 0,
     fecha: (() => {
@@ -13047,6 +13063,11 @@ function mostrarFactura(datos, enviarCorreo) {
 }
 
 function generarHTMLFactura(d) {
+  // Frecuencia de las cuotas: quincenal por defecto (el resto del sistema trabaja en quincenas)
+  const cuotaMensual = d.periodicidad === 'mensual';
+  const txtPlazo = cuotaMensual ? 'meses' : 'quincenas';
+  const txtTasa  = cuotaMensual ? 'mens' : 'qnal';
+
   // ── Construir filas de productos ─────────────────────────────
   const esMulti = d.productosList && d.productosList.length > 0;
   let subtotalProductos = 0;
@@ -13137,7 +13158,7 @@ function generarHTMLFactura(d) {
         <div style="font-size:14px;font-weight:600;">${d.asesor}</div>
         <div style="font-size:13px;color:#555;">Modalidad: ${d.tipo === 'credito' ? 'Crédito — '+d.financiera : 'Contado'}${d.esMixto?' (Pago Mixto)':''}</div>
         ${d.esMixto && (d.valorFinanciero > 0 || d.valorEfectivo > 0) ? `<div style="font-size:12px;color:#888;margin-top:2px;">Financiera: ${fmt(d.valorFinanciero)} + Efectivo: ${fmt(d.valorEfectivo)}</div>` : ''}
-        ${d.tipo === 'credito' ? `<div style="font-size:13px;color:#555;">${d.cuotas} quincenas</div>` : ''}
+        ${d.tipo === 'credito' ? `<div style="font-size:13px;color:#555;">${d.cuotas} ${txtPlazo}</div>` : ''}
         ${d.numContrato ? `<div style="margin-top:6px;display:inline-block;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;padding:4px 9px;font-size:12px;color:#92400e;">N° Contrato${d.financiera?' '+d.financiera:''}: <strong style="font-family:monospace;font-size:13px;">${escapeHtml(d.numContrato)}</strong></div>` : ''}
       </div>
     </div>
@@ -13177,8 +13198,8 @@ function generarHTMLFactura(d) {
         <div style="background:#f7f5fb;border-radius:8px;padding:12px;margin-top:8px;font-size:13px;">
           <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:#555;">Inicial:</span><span style="font-weight:600;color:#16a34a;">${fmt(d.inicial)}</span></div>
           <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:#555;">Saldo a financiar:</span><span style="font-weight:600;">${fmt(d.saldoFinanciar)}</span></div>
-          ${d.intereses > 0 ? `<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:#555;">Intereses (${d.tasaInteres}% qnal):</span><span style="color:#d97706;">${fmt(d.intereses)}</span></div>` : ''}
-          <div style="display:flex;justify-content:space-between;"><span style="color:#555;">Plazo:</span><span style="font-weight:700;color:#6B2D8B;">${d.cuotas} quincenas</span></div>
+          ${d.intereses > 0 ? `<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:#555;">Intereses (${d.tasaInteres}% ${txtTasa}):</span><span style="color:#d97706;">${fmt(d.intereses)}</span></div>` : ''}
+          <div style="display:flex;justify-content:space-between;"><span style="color:#555;">Plazo:</span><span style="font-weight:700;color:#6B2D8B;">${d.cuotas} ${txtPlazo}</span></div>
         </div>` : ''}
       </div>
     </div>
