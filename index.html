@@ -4581,11 +4581,12 @@
         <span style="color:#888899;">Cuota a pagar:</span>
         <strong style="color:#6B2D8B;">Cuota # <span id="abonoNroCuota">1</span> — <span id="abonoCuotaInfo">$0</span></strong>
       </div>
+      <div id="abonoParcialInfo" style="display:none;margin-top:8px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:8px;font-size:12px;color:#92400e;"></div>
     </div>
     <div class="form-group">
       <label class="form-label">Valor del Abono ($) *</label>
       <div class="input-money-wrap"><input type="text" class="form-control" id="abonoValor" placeholder="0" min="0" style="font-size:18px;font-weight:700;color:#6B2D8B;" oninput="fmtMoneyInput(this)" inputmode="numeric"></div>
-      <div style="font-size:11px;color:#888899;margin-top:4px;">Puede abonar más del valor de la cuota</div>
+      <div style="font-size:11px;color:#888899;margin-top:4px;">Puede abonar más del valor de la cuota, hasta el saldo pendiente</div>
     </div>
     <div class="form-row">
       <div class="form-group">
@@ -4976,6 +4977,21 @@ function hideLoader() {
   if (el) el.style.display = 'none';
 }
 
+// Total abonado por crédito (suma real de la tabla abonos). De aquí salen las
+// cuotas completas y el abono parcial que se muestran en el módulo de créditos.
+async function cargarAbonadoPorCredito() {
+  try {
+    const abonos = await sbFetch('abonos?select=credito_id,valor&limit=100000');
+    const porCredito = {};
+    (Array.isArray(abonos) ? abonos : []).forEach(a => {
+      porCredito[a.credito_id] = (porCredito[a.credito_id] || 0) + (parseFloat(a.valor) || 0);
+    });
+    db.creditos.forEach(c => { c.abonado = porCredito[c.id] || 0; });
+  } catch(e) {
+    console.error('No se pudo cargar el acumulado de abonos:', e);
+  }
+}
+
 // ── CARGAR TODOS LOS DATOS AL INICIAR ──────────────────────
 async function cargarTodosLosDatos() {
   showLoader('Conectando con Supabase...');
@@ -4997,6 +5013,7 @@ async function cargarTodosLosDatos() {
     db.creditos    = creditos.map(mapCredito);
     db.garantias   = garantias.map(mapGarantia);
     db.gastos      = gastos.map(mapGasto);
+    await cargarAbonadoPorCredito();
 
     // Persistir estados mora/al_dia recalculados (sin bloquear la carga)
     sincronizarEstadosCreditosDB();
@@ -5474,6 +5491,13 @@ async function registrarAbonoDB(creditoId, valor, metodo = 'Efectivo', extra = {
     const credito = db.creditos.find(c => c.id === creditoId);
     if (!credito) throw new Error('Crédito no encontrado');
 
+    // Un abono nunca puede superar el saldo: se rechaza para que abonos y saldo
+    // sigan cuadrando (no existe "saldo a favor" en el modelo de datos)
+    const saldoActual = Math.round(credito.saldo || 0);
+    if (Math.round(valor) > saldoActual) {
+      throw new Error(`El abono (${fmt(valor)}) supera el saldo pendiente (${fmt(saldoActual)}). Registra máximo ${fmt(saldoActual)}.`);
+    }
+
     // Guardar abono (con datos para reimprimir el recibo: ref, obs, asesor)
     const insRes = await sbFetch('abonos', {
       method: 'POST',
@@ -5493,20 +5517,20 @@ async function registrarAbonoDB(creditoId, valor, metodo = 'Efectivo', extra = {
     // Una cuota solo se completa cuando la suma de abonos alcanza su valor: un
     // abono menor queda como pago parcial de esa cuota, y si es mayor el
     // excedente queda como abono parcial de la siguiente. El saldo siempre
-    // baja por el valor exacto abonado.
-    const nuevoSaldo = Math.max(0, credito.saldo - valor);
-    let nuevasCuotas;
-    if (nuevoSaldo <= 0) {
-      nuevasCuotas = credito.cuotas;
-    } else if (credito.valorCuota > 0) {
-      const abonosRows = await sbFetch(`abonos?select=valor&credito_id=eq.${creditoId}`);
-      const totalAbonado = (Array.isArray(abonosRows) ? abonosRows : [])
+    // baja por el valor exacto abonado. Siempre se relee la suma real de la
+    // tabla abonos para no depender de un contador incremental.
+    const nuevoSaldo = Math.max(0, saldoActual - Math.round(valor));
+    let totalAbonado;
+    try {
+      const abonosRows = await sbFetch(`abonos?select=valor&credito_id=eq.${creditoId}&limit=100000`);
+      totalAbonado = (Array.isArray(abonosRows) ? abonosRows : [])
         .reduce((s, a) => s + (parseFloat(a.valor) || 0), 0); // incluye el abono recién insertado
-      nuevasCuotas = Math.min(credito.cuotas, Math.floor(totalAbonado / credito.valorCuota));
-    } else {
-      // Sin valor de cuota registrado no se puede prorratear: conservar conteo clásico
-      nuevasCuotas = Math.min(credito.pagadas + 1, credito.cuotas);
+    } catch(e) {
+      // Si la relectura falla, seguir con el acumulado que ya se tenía
+      totalAbonado = (credito.abonado || 0) + valor;
     }
+    const calc = calcularCuotasCredito({ ...credito, saldo: nuevoSaldo }, totalAbonado);
+    const nuevasCuotas = calc.pagadas;
     // Estado real tras el abono: si queda saldo, mora o al_dia según la fecha de
     // la próxima cuota (antes se escribía al_dia siempre y ocultaba la mora)
     const nuevoEstado = nuevoSaldo <= 0 ? 'pagado'
@@ -5521,12 +5545,13 @@ async function registrarAbonoDB(creditoId, valor, metodo = 'Efectivo', extra = {
       }
     });
 
-    credito.saldo = nuevoSaldo;
+    credito.saldo   = nuevoSaldo;
     credito.pagadas = nuevasCuotas;
-    credito.estado = nuevoEstado;
+    credito.estado  = nuevoEstado;
+    credito.abonado = totalAbonado;
 
     hideLoader();
-    return { credito, abono: abonoRow };
+    return { credito, abono: abonoRow, calc };
   } catch(e) {
     hideLoader();
     toast('Error registrando abono: ' + e.message, 'error');
@@ -6608,7 +6633,7 @@ function renderCreditos(filtro='activos'){
       </div>
       <div class="cc-progress">
         <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text2);margin-bottom:5px;">
-          <span>${c.pagadas}/${c.cuotas} cuotas</span><span>${pct}%</span>
+          <span>${txtCuotasCredito(c)}</span><span>${pct}%</span>
         </div>
         <div class="progress-bar"><div class="progress-fill green" style="width:${pct}%;"></div></div>
         ${(()=>{
@@ -6737,7 +6762,7 @@ async function filtrarCreditosPorIMEI(q) {
       </div>
       <div class="cc-progress">
         <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text2);margin-bottom:5px;">
-          <span>${c.pagadas}/${c.cuotas} cuotas</span><span>${pct}%</span>
+          <span>${txtCuotasCredito(c)}</span><span>${pct}%</span>
         </div>
         <div class="progress-bar"><div class="progress-fill green" style="width:${pct}%;"></div></div>
         ${(()=>{
@@ -9089,6 +9114,44 @@ function igExportarPDF() {
 // ============================================================
 // CÁLCULO DE MORA POR FECHAS DE CUOTA
 // ============================================================
+// ── Cuotas completas y abono parcial ────────────────────────────────────
+// Una cuota solo cuenta como pagada cuando el acumulado abonado alcanza su
+// valor completo; lo que sobra queda como abono parcial de la siguiente y se
+// acumula con los pagos posteriores. La última cuota es un caso aparte: como
+// valor_cuota * cuotas_total casi nunca da exacto (208.333 x 12 = 2.499.996
+// contra un monto de 2.500.000), el cierre lo manda el saldo, no el conteo.
+// `totalAbonado` sale de la suma real de la tabla abonos; si no se conoce se
+// asume el acumulado de las cuotas ya contadas para no inventar un parcial.
+function calcularCuotasCredito(credito, totalAbonadoConocido) {
+  const cuotasTotal = credito.cuotas || 0;
+  const valorCuota  = Math.round(credito.valorCuota || 0);
+  const saldo       = Math.round(credito.saldo || 0);
+  const abonadoRef  = totalAbonadoConocido != null ? totalAbonadoConocido
+                    : (credito.abonado != null ? credito.abonado
+                      : (credito.pagadas || 0) * valorCuota);
+  const totalAbonado = Math.max(0, Math.round(abonadoRef));
+
+  // Crédito cerrado: el saldo manda sobre el conteo de cuotas
+  if(saldo <= 0) {
+    return { pagadas: cuotasTotal, parcial: 0, faltante: 0, cerrado: true, totalAbonado, cuotasTotal, valorCuota };
+  }
+  if(valorCuota <= 0) {
+    return { pagadas: Math.min(credito.pagadas || 0, cuotasTotal), parcial: 0, faltante: 0, cerrado: false, totalAbonado, cuotasTotal, valorCuota };
+  }
+
+  const pagadas  = Math.min(Math.floor(totalAbonado / valorCuota), cuotasTotal);
+  const parcial  = pagadas >= cuotasTotal ? 0 : Math.max(0, totalAbonado - pagadas * valorCuota);
+  const faltante = parcial > 0 ? valorCuota - parcial : 0;
+  return { pagadas, parcial, faltante, cerrado: false, totalAbonado, cuotasTotal, valorCuota };
+}
+
+// Texto de cuotas para tarjetas y modales: "1/12 cuotas + parcial $191.667"
+function txtCuotasCredito(credito, totalAbonadoConocido) {
+  const calc = calcularCuotasCredito(credito, totalAbonadoConocido);
+  const base = `${calc.pagadas}/${calc.cuotasTotal} cuotas`;
+  return calc.parcial > 0 ? `${base} + parcial ${fmt(calc.parcial)}` : base;
+}
+
 function calcularProximaCuota(credito) {
   // Retorna: { fecha, diasAtraso, enMora, vencida }
   // Los créditos mensuales solo tienen una fecha de pago al mes
@@ -10236,8 +10299,19 @@ function registrarPago(id) {
   document.getElementById('abonoEquipoInfo').textContent  = credito.equipo || '—';
   document.getElementById('abonoSaldoInfo').textContent   = fmt(credito.saldo);
   document.getElementById('abonoCuotaInfo').textContent   = fmt(credito.valorCuota || 0);
-  document.getElementById('abonoNroCuota').textContent    = (credito.pagadas + 1);
-  setMoneyValue('abonoValor', credito.valorCuota || 0);
+  const calcPago = calcularCuotasCredito(credito);
+  document.getElementById('abonoNroCuota').textContent    = Math.min(calcPago.pagadas + 1, calcPago.cuotasTotal || (calcPago.pagadas + 1));
+  const infoParcial = document.getElementById('abonoParcialInfo');
+  if(infoParcial) {
+    if(calcPago.parcial > 0) {
+      infoParcial.style.display = 'block';
+      infoParcial.innerHTML = `Esta cuota ya tiene un abono parcial de <strong>${fmt(calcPago.parcial)}</strong>. Faltan <strong>${fmt(calcPago.faltante)}</strong> para completarla.`;
+    } else {
+      infoParcial.style.display = 'none';
+      infoParcial.innerHTML = '';
+    }
+  }
+  setMoneyValue('abonoValor', Math.min(credito.valorCuota || 0, credito.saldo || 0));
   document.getElementById('abonoMetodo').value            = 'Efectivo';
   document.getElementById('abonoNroTransf').value         = '';
   document.getElementById('abonoObs').value               = '';
@@ -10272,10 +10346,16 @@ async function confirmarAbono() {
   if(valor <= 0) { toast('El valor del abono debe ser mayor a 0','error'); return; }
   const credito = db.creditos.find(c => c.id === id);
   if(!credito) return;
-  const nroCuota = credito.pagadas + 1;
+  // El abono no puede pasarse del saldo: se rechaza en vez de dejar saldo a favor
+  if(Math.round(valor) > Math.round(credito.saldo || 0)) {
+    toast(`El abono (${fmt(valor)}) supera el saldo pendiente (${fmt(credito.saldo||0)}). Registra máximo ${fmt(credito.saldo||0)}.`,'error');
+    return;
+  }
+  const calcPrevio = calcularCuotasCredito(credito);
+  const nroCuota = Math.min(calcPrevio.pagadas + 1, calcPrevio.cuotasTotal || (calcPrevio.pagadas + 1));
   _guardandoAbono = true;
   try {
-    const { abono } = await registrarAbonoDB(id, valor, metodo, { transf, obs });
+    const { abono, calc } = await registrarAbonoDB(id, valor, metodo, { transf, obs });
     closeModal('modalRegistrarAbono');
     renderCreditos(tabCreditosActual);
     // Mostrar recibo
@@ -10288,7 +10368,12 @@ async function confirmarAbono() {
       transf,
       obs,
       nroCuota,
-      cuotasTotal: credito.cuotas,
+      cuotasTotal:  credito.cuotas,
+      cuotasPagadas: calc ? calc.pagadas : credito.pagadas,
+      parcial:       calc ? calc.parcial : 0,
+      faltante:      calc ? calc.faltante : 0,
+      saldo:         credito.saldo,
+      cerrado:       calc ? calc.cerrado : (credito.saldo <= 0),
       financiera:  credito.financiera || '',
       numContrato: credito.numContrato || '',
       fecha:     new Date().toLocaleDateString('es-CO',{timeZone:'America/Bogota',year:'numeric',month:'long',day:'numeric'}),
@@ -11072,7 +11157,7 @@ function mostrarReciboAbono(d) {
       <div><span style="color:#888899;">Fecha:</span> <strong>${d.fecha}</strong></div>
       <div><span style="color:#888899;">Equipo:</span> <strong>${d.equipo}</strong></div>
       ${d.imei?`<div><span style="color:#888899;">IMEI:</span> <strong>${d.imei}</strong></div>`:''}
-      <div><span style="color:#888899;">N° Cuota:</span> <strong style="color:#6B2D8B;">Cuota ${d.nroCuota} de ${d.cuotasTotal||'—'}</strong></div>
+      <div><span style="color:#888899;">Cuotas pagadas:</span> <strong style="color:#16a34a;">${d.cuotasPagadas != null ? d.cuotasPagadas : (d.nroCuota-1)} de ${d.cuotasTotal||'—'}</strong></div>
       ${d.numContrato?`<div style="grid-column:1/-1;"><span style="color:#888899;">N° Contrato${d.financiera&&d.financiera!=='—'?' '+escapeHtml(d.financiera):''}:</span> <strong style="font-family:monospace;color:#c2410c;">${escapeHtml(d.numContrato)}</strong></div>`:''}
     </div>
     <div style="background:#f7f5fb;border-radius:12px;padding:16px;margin-bottom:16px;">
@@ -11085,6 +11170,14 @@ function mostrarReciboAbono(d) {
         <span style="font-size:22px;font-weight:800;color:#6B2D8B;">${fmt(d.valor)}</span>
       </div>
     </div>
+    ${d.cerrado ? `
+    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:14px;margin-bottom:16px;text-align:center;">
+      <div style="font-size:15px;font-weight:800;color:#16a34a;">✅ Crédito cancelado en su totalidad</div>
+    </div>` : (d.parcial > 0 ? `
+    <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:12px;margin-bottom:16px;font-size:13px;color:#92400e;">
+      Abono parcial a la cuota ${(d.cuotasPagadas != null ? d.cuotasPagadas : 0) + 1}: <strong>${fmt(d.parcial)}</strong><br>
+      Faltan <strong>${fmt(d.faltante)}</strong> para completarla.
+    </div>` : '')}
     ${d.obs?`<div style="margin-top:10px;font-size:12px;color:#888899;">Obs: ${d.obs}</div>`:''}
     <div style="margin-top:20px;font-size:10px;color:#aaa;text-align:center;">
       Documento generado por Play Móvil Sistema de Gestión · ${d.fecha}
@@ -11132,7 +11225,9 @@ async function abrirHistorialCredito(id) {
   }
 
   const totalAbonado = _histAbonos.reduce((s,a)=> s + (parseFloat(a.valor)||0), 0);
-  const restantes = Math.max(0, (credito.cuotas||0) - (credito.pagadas||0));
+  credito.abonado = totalAbonado;   // acumulado fresco para el cálculo de cuotas
+  const calcHist  = calcularCuotasCredito(credito, totalAbonado);
+  const restantes = Math.max(0, (credito.cuotas||0) - calcHist.pagadas);
 
   const filas = _histAbonos.length
     ? _histAbonos.map((a,i) => `
@@ -11175,7 +11270,8 @@ async function abrirHistorialCredito(id) {
     <div style="display:flex;gap:10px;margin-top:10px;">
       <div style="flex:1;background:#f0fdf4;border-radius:8px;padding:8px;text-align:center;">
         <div style="font-size:11px;color:#888899;">Cuotas pagadas</div>
-        <div style="font-size:18px;font-weight:800;color:#16a34a;">${credito.pagadas||0} / ${credito.cuotas||0}</div>
+        <div style="font-size:18px;font-weight:800;color:#16a34a;">${calcHist.pagadas} / ${calcHist.cuotasTotal}</div>
+        ${calcHist.parcial > 0 ? `<div style="font-size:10px;color:#d97706;font-weight:700;margin-top:2px;">+ parcial ${fmt(calcHist.parcial)} · faltan ${fmt(calcHist.faltante)}</div>` : ''}
       </div>
       <div style="flex:1;background:#fff7ed;border-radius:8px;padding:8px;text-align:center;">
         <div style="font-size:11px;color:#888899;">Cuotas restantes</div>
@@ -11197,6 +11293,10 @@ function verReciboAbono(i) {
   // Asegurar que el recibo quede por encima del modal de historial
   const recEl = document.getElementById('modalReciboAbono');
   if(recEl) recEl.style.zIndex = '9600';
+  // El recibo reimpreso muestra el estado ACTUAL del crédito, el mismo que la
+  // tarjeta de historial: así la información nunca se contradice entre las dos.
+  const abonadoTotal = _histAbonos.reduce((s,x)=> s + (parseFloat(x.valor)||0), 0);
+  const calcEse = calcularCuotasCredito(c, abonadoTotal);
   mostrarReciboAbono({
     cliente:     c.cliente,
     equipo:      c.equipo || '—',
@@ -11207,6 +11307,10 @@ function verReciboAbono(i) {
     obs:         a.notas || '',
     nroCuota:    i + 1,
     cuotasTotal: c.cuotas,
+    cuotasPagadas: calcEse.pagadas,
+    parcial:       calcEse.parcial,
+    faltante:      calcEse.faltante,
+    cerrado:       calcEse.cerrado,
     financiera:  c.financiera || '',
     numContrato: c.numContrato || '',
     fecha,
@@ -11220,7 +11324,8 @@ function imprimirReciboHistorial() {
   if(!_histCredito) return;
   const c = _histCredito;
   const totalAbonado = _histAbonos.reduce((s,a)=> s + (parseFloat(a.valor)||0), 0);
-  const restantes = Math.max(0, (c.cuotas||0) - (c.pagadas||0));
+  const calcRec   = calcularCuotasCredito(c, totalAbonado);
+  const restantes = Math.max(0, (c.cuotas||0) - calcRec.pagadas);
   const hoy = new Date().toLocaleDateString('es-CO',{timeZone:'America/Bogota',year:'numeric',month:'long',day:'numeric'});
 
   const filas = _histAbonos.length
@@ -11265,10 +11370,17 @@ function imprimirReciboHistorial() {
       <span>Total abonado</span>
       <span style="color:#6B2D8B;">${fmt(totalAbonado)}</span>
     </div>
+    ${calcRec.cerrado ? `
+    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:10px;margin-top:10px;text-align:center;font-size:14px;font-weight:800;color:#16a34a;">
+      ✅ Crédito cancelado en su totalidad
+    </div>` : (calcRec.parcial > 0 ? `
+    <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:10px;margin-top:10px;font-size:12px;color:#92400e;">
+      Abono parcial a la cuota ${calcRec.pagadas + 1}: <strong>${fmt(calcRec.parcial)}</strong> — Faltan <strong>${fmt(calcRec.faltante)}</strong> para completarla.
+    </div>` : '')}
     <div style="display:flex;gap:12px;margin-top:14px;">
       <div style="flex:1;border:1px solid #ece8f5;border-radius:10px;padding:10px;text-align:center;">
         <div style="font-size:11px;color:#888899;">Cuotas pagadas</div>
-        <div style="font-size:20px;font-weight:800;color:#16a34a;">${c.pagadas||0} de ${c.cuotas||0}</div>
+        <div style="font-size:20px;font-weight:800;color:#16a34a;">${calcRec.pagadas} de ${calcRec.cuotasTotal}</div>
       </div>
       <div style="flex:1;border:1px solid #ece8f5;border-radius:10px;padding:10px;text-align:center;">
         <div style="font-size:11px;color:#888899;">Cuotas restantes</div>
@@ -14941,6 +15053,7 @@ async function cargarDatosPorSede(user) {
     db.creditos    = creditos.map(mapCredito);
     db.garantias   = garantias.map(mapGarantia);
     db.gastos      = gastos.map(mapGasto);
+    await cargarAbonadoPorCredito();
 
     // Persistir estados mora/al_dia recalculados (sin bloquear el login)
     sincronizarEstadosCreditosDB();
