@@ -1389,7 +1389,7 @@
       <div class="section-header">
         <div>
           <div class="section-title">🧮 Simulador de Ventas</div>
-          <div class="section-sub">Calcula precio de venta, inicial, intereses y cuotas quincenales</div>
+          <div class="section-sub">Calcula precio de venta, inicial, intereses y cuotas quincenales o mensuales</div>
         </div>
       </div>
 
@@ -1458,9 +1458,18 @@
             <div style="font-size:11px;color:#92400e;margin-top:4px;">Deja en blanco para ver opciones de 20%, 30% y 40% automaticas</div>
           </div>
 
-          <!-- Plazo en quincenas -->
+          <!-- Frecuencia de las cuotas -->
           <div class="form-group">
-            <label class="form-label">Plazo (quincenas)</label>
+            <label class="form-label">Frecuencia de cuotas</label>
+            <select class="form-control" id="simFrecuencia" onchange="simCambiarFrecuencia()">
+              <option value="quincenal">Quincenal (2 pagos al mes)</option>
+              <option value="mensual">Mensual (1 pago al mes)</option>
+            </select>
+          </div>
+
+          <!-- Plazo en quincenas o meses -->
+          <div class="form-group">
+            <label class="form-label" id="simLblPlazo">Plazo (quincenas)</label>
             <select class="form-control" id="simQuincenas" onchange="calcularSim()">
               <option value="1">1 quincena (0.5 meses)</option>
               <option value="2">2 quincenas (1 mes)</option>
@@ -1578,7 +1587,7 @@
             <thead>
               <tr>
                 <th>% Inicial</th><th>Valor Inicial</th><th>Saldo</th>
-                <th>Total c/Interes</th><th>Cuota Quincenal</th>
+                <th>Total c/Interes</th><th id="simThCuota">Cuota Quincenal</th>
               </tr>
             </thead>
             <tbody id="tbodySim"></tbody>
@@ -3450,6 +3459,13 @@
               <option value="CONTADO:0">💵 CONTADO (0%)</option>
             </select>
           </div>
+          <div class="form-group">
+            <label class="form-label">Frecuencia de cuotas</label>
+            <select class="form-control" id="crdFrecuencia" onchange="crdCambiarFrecuencia()">
+              <option value="quincenal">Quincenal (2 pagos al mes)</option>
+              <option value="mensual">Mensual (1 pago al mes)</option>
+            </select>
+          </div>
           <div class="form-row">
             <div class="form-group">
               <label class="form-label">% Comisión financiera</label>
@@ -3457,7 +3473,7 @@
               <div style="font-size:11px;color:#888899;margin-top:3px;">Comisión: <span id="crdComFinVal" style="color:#dc2626;font-weight:600;">$0</span></div>
             </div>
             <div class="form-group">
-              <label class="form-label">Plazo (quincenas)</label>
+              <label class="form-label" id="crdLblPlazo">Plazo (quincenas)</label>
               <select class="form-control" id="crdPlazoQuincenas" onchange="recalcCredito()">
                 <option value="2">2 quincenas (1 mes)</option>
                 <option value="4">4 quincenas (2 meses)</option>
@@ -3501,8 +3517,8 @@
 
           <!-- Fechas de pago quincenal (obligatorias) -->
           <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:12px;margin-top:10px;">
-            <div style="font-size:12px;font-weight:700;color:#d97706;margin-bottom:8px;">📅 Fechas de Pago Quincenal (obligatorio)</div>
-            <div style="font-size:11px;color:#92400e;margin-bottom:10px;">
+            <div style="font-size:12px;font-weight:700;color:#d97706;margin-bottom:8px;" id="crdTituloFechas">📅 Fechas de Pago Quincenal (obligatorio)</div>
+            <div style="font-size:11px;color:#92400e;margin-bottom:10px;" id="crdTextoFechas">
               El cliente pagará 2 veces al mes en las fechas seleccionadas. De estas fechas depende la detección automática de mora.
             </div>
             <div class="form-row">
@@ -3511,7 +3527,7 @@
                 <input type="date" class="form-control" id="crdPrimerPago" onchange="recalcFechasCuotas()">
                 <div style="font-size:10px;color:#888899;margin-top:2px;">Día del mes: <span id="crdDia1">—</span></div>
               </div>
-              <div class="form-group">
+              <div class="form-group" id="crdSegundoPagoGroup">
                 <label class="form-label">Segunda cuota *</label>
                 <input type="date" class="form-control" id="crdSegundoPago" onchange="recalcFechasCuotas()">
                 <div style="font-size:10px;color:#888899;margin-top:2px;">Día del mes: <span id="crdDia2">—</span></div>
@@ -3565,7 +3581,7 @@
             </div>
             <div class="form-row" id="crdInteresesRow" style="display:none;">
               <div class="form-group" style="margin-bottom:0;">
-                <label class="form-label">% Interés quincenal</label>
+                <label class="form-label" id="crdLblTasa">% Interés quincenal</label>
                 <select class="form-control" id="crdTasaInteres" onchange="recalcCredito()">
                   <option value="1.3">1.3%</option>
                   <option value="1.8">1.8%</option>
@@ -3645,7 +3661,7 @@
           </div>
           <!-- Cuota quincenal resultado -->
           <div id="crdCuotaResultado" style="margin-top:10px;display:none;background:#f0ecf8;border-radius:10px;padding:12px;">
-            <div style="font-size:12px;color:#555577;margin-bottom:4px;">Cuota quincenal estimada:</div>
+            <div style="font-size:12px;color:#555577;margin-bottom:4px;" id="crdLblCuotaEstimada">Cuota quincenal estimada:</div>
             <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:22px;color:#6B2D8B;" id="crdCuotaValor">$0</div>
             <div style="font-size:11px;color:#888899;margin-top:2px;" id="crdCuotaDetalle"></div>
           </div>
@@ -5204,6 +5220,7 @@ function mapCredito(c) {
     imei: c.imei || '',
     productoId: c.producto_id || null,
     ventaId: c.venta_id || null,
+    frecuencia: c.frecuencia || 'Quincenal',
     fechaInicio: c.fecha_inicio || c.created_at || null,
     fechaPrimerPago:  c.fecha_primer_pago  || null,
     fechaSegundoPago: c.fecha_segundo_pago || null,
@@ -9074,19 +9091,26 @@ function igExportarPDF() {
 // ============================================================
 function calcularProximaCuota(credito) {
   // Retorna: { fecha, diasAtraso, enMora, vencida }
-  if(!credito.fechaPrimerPago || !credito.fechaSegundoPago || !credito.diaPago1 || !credito.diaPago2) {
+  // Los créditos mensuales solo tienen una fecha de pago al mes
+  const esMensual = credito.frecuencia === 'Mensual';
+  if(!credito.fechaPrimerPago || !credito.diaPago1) {
+    return { fecha:null, diasAtraso:0, enMora:false };
+  }
+  if(!esMensual && (!credito.fechaSegundoPago || !credito.diaPago2)) {
     return { fecha:null, diasAtraso:0, enMora:false };
   }
   const pagadas = credito.pagadas || 0;
   const f1 = new Date(credito.fechaPrimerPago);
-  const f2 = new Date(credito.fechaSegundoPago);
+  const f2 = credito.fechaSegundoPago ? new Date(credito.fechaSegundoPago) : null;
 
   // La próxima cuota es (pagadas + 1)
   const idxProx = pagadas; // 0-indexed
-  const esPar = idxProx % 2 === 0;
-  const meses = Math.floor(idxProx / 2);
+  const esPar = esMensual ? true : idxProx % 2 === 0;
+  const meses = esMensual ? idxProx : Math.floor(idxProx / 2);
 
   const prox = new Date(esPar ? f1 : f2);
+  // Fijar el día 1 antes de mover el mes evita que setUTCMonth se desborde
+  prox.setUTCDate(1);
   prox.setUTCMonth(prox.getUTCMonth() + meses);
 
   // Si el día elegido no existe en ese mes (ej: 31 en febrero), ajustar al último día
@@ -10057,14 +10081,18 @@ async function guardarCredito(){
     return;
   }
 
-  // Validar fechas de pago quincenal
+  // Validar fechas de pago (2 fechas si es quincenal, 1 si es mensual)
+  const esMensualG = crdEsMensual();
   const fPP = document.getElementById('crdPrimerPago')?.value;
-  const fSP = document.getElementById('crdSegundoPago')?.value;
-  if(!fPP || !fSP) {
-    toast('Debes escoger las 2 fechas de pago quincenal','error'); return;
+  const fSP = esMensualG ? '' : (document.getElementById('crdSegundoPago')?.value || '');
+  if(!fPP) {
+    toast(esMensualG ? 'Debes escoger la fecha de pago mensual' : 'Debes escoger las 2 fechas de pago quincenal','error'); return;
   }
-  if(new Date(fSP) <= new Date(fPP)) {
-    toast('La segunda fecha debe ser posterior a la primera','error'); return;
+  if(!esMensualG) {
+    if(!fSP) { toast('Debes escoger las 2 fechas de pago quincenal','error'); return; }
+    if(new Date(fSP) <= new Date(fPP)) {
+      toast('La segunda fecha debe ser posterior a la primera','error'); return;
+    }
   }
 
   // Validar disponibilidad de cada IMEI
@@ -10099,7 +10127,7 @@ async function guardarCredito(){
     asesor: ($U('crdAsesorSelect')||$U('crdAsesor')||sesionActiva?.nombre||'').toUpperCase(),
     total: precioFinal, inicial: ini,
     saldo: totalFinanciar, cuotas: quincenas, valorCuota,
-    frecuencia: 'Quincenal', sede: sedeActual,
+    frecuencia: esMensualG ? 'Mensual' : 'Quincenal', sede: sedeActual,
     esMixto,
     valorFinanciero: esMixto ? valorFinanciero : 0,
     valorEfectivo:   esMixto ? getMoneyValue('crdValorEfectivo') : 0,
@@ -10111,9 +10139,9 @@ async function guardarCredito(){
     financiera:   ((($('crdFinanciera')?.value||'CONTADO:0').split(':')[0]).substring(0,50)).substring(0,50),
     numContrato:  ($('crdNumContrato')?.value||'').trim().toUpperCase().substring(0,50),
     fechaPrimerPago:  fPP,
-    fechaSegundoPago: fSP,
+    fechaSegundoPago: fSP || null,
     diaPago1:         new Date(fPP).getUTCDate(),
-    diaPago2:         new Date(fSP).getUTCDate()
+    diaPago2:         fSP ? new Date(fSP).getUTCDate() : null
   };
 
   try {
@@ -10178,6 +10206,7 @@ async function guardarCredito(){
       valorEfectivo:   esMixto ? getMoneyValue('crdValorEfectivo') : 0,
       precioFinal, ganancia, inicial:ini,
       saldoFinanciar:totalFinanciar, cuotas:quincenas,
+      periodicidad: esMensualG ? 'mensual' : 'quincenal',
       valorCuota, financiera:finSel, numContrato:datos.numContrato||'',
       intereses:totalIntereses, tasaInteres:aplicaInt?tasaInt:0,
       // Lista de productos individual para factura desglosada
@@ -10568,6 +10597,7 @@ async function verFacturaVenta() {
     inicial:       cred ? (cred.inicial||0) : 0,
     saldoFinanciar:cred ? (cred.saldo||0)   : 0,
     cuotas:        cred ? (cred.cuotas||0)  : 0,
+    periodicidad:  cred && cred.frecuencia === 'Mensual' ? 'mensual' : 'quincenal',
     valorCuota:    cred ? (cred.valorCuota||0): 0,
     intereses:     cred ? (cred.intereses||0) : 0,
     tasaInteres:   0,
@@ -10757,6 +10787,9 @@ function abrirModalCredito() {
   // Limpiar fechas cuotas
   ['crdPrimerPago','crdSegundoPago'].forEach(id => { const e=document.getElementById(id); if(e) e.value=''; });
   const wrap = document.getElementById('crdProximasCuotas'); if(wrap) wrap.style.display='none';
+  // Volver a la frecuencia quincenal
+  const frecCrd = document.getElementById('crdFrecuencia');
+  if(frecCrd) frecCrd.value = 'quincenal';
 
   // Limpiar inputs money
   ['crdCosto','crdVentaBase','crdDescuento','crdProdAdicVal'].forEach(id => {
@@ -10817,6 +10850,8 @@ function abrirModalCredito() {
   // Limpiar lista de productos
   productosVentaCrd = []; _idxProdCrd = 0;
   renderListaProductos('crd');
+  // Rehacer plazo, etiquetas y fechas con la frecuencia ya reseteada
+  crdCambiarFrecuencia();
   openModal('modalNuevoCredito');
 }
 
@@ -11492,6 +11527,32 @@ function cambiarModoPrecio() {
   calcularSim();
 }
 
+// Rehace el plazo y las etiquetas del simulador segun la frecuencia
+function simCambiarFrecuencia(){
+  const esMensual = ($('simFrecuencia')?.value || 'quincenal') === 'mensual';
+  const sel = $('simQuincenas');
+  if(sel){
+    const anterior = parseInt(sel.value)||0;
+    const max = esMensual ? 36 : 72;
+    let opciones = '';
+    for(let i=1; i<=max; i++){
+      if(esMensual){
+        opciones += `<option value="${i}">${i} ${i===1?'mes':'meses'}</option>`;
+      } else {
+        const m = (i/2).toFixed(1).replace('.0','');
+        opciones += `<option value="${i}">${i} ${i===1?'quincena':'quincenas'} (${m} ${i===2?'mes':'meses'})</option>`;
+      }
+    }
+    sel.innerHTML = opciones;
+    sel.value = (anterior>=1 && anterior<=max) ? anterior : (esMensual ? 6 : 12);
+  }
+  const lbl = $('simLblPlazo');
+  if(lbl) lbl.textContent = esMensual ? 'Plazo (meses)' : 'Plazo (quincenas)';
+  const th = $('simThCuota');
+  if(th) th.textContent = esMensual ? 'Cuota Mensual' : 'Cuota Quincenal';
+  calcularSim();
+}
+
 function calcularSim(){
   const costo     = getMoneyValue('simCosto');
   const modo      = document.querySelector('input[name="simModoPrecio"]:checked')?.value || 'margen';
@@ -11500,7 +11561,8 @@ function calcularSim(){
   const asesor    = $('simAsesor').value || '—';
   const modelo    = $('simModelo').value || 'Equipo';
   const inicialP  = getMoneyValue('simInicial');
-  const quincenas = parseInt($('simQuincenas').value) || 12;
+  const periodos  = parseInt($('simQuincenas').value) || 12;
+  const esMensual = ($('simFrecuencia')?.value || 'quincenal') === 'mensual';
   const tasaInt   = parseFloat($('simTasaInteres').value) || 0;
 
   if(!costo) {
@@ -11524,7 +11586,11 @@ function calcularSim(){
 
   const ganancia    = precioVenta - costo;
   const pctReal     = ((ganancia / precioVenta) * 100).toFixed(1);
-  const meses       = quincenas / 2;
+  const meses       = esMensual ? periodos : periodos / 2;
+  const txtPlazo    = esMensual
+    ? `${periodos} ${periodos===1?'mes':'meses'}`
+    : `${periodos} quincenas (${meses} meses)`;
+  const txtCuota    = esMensual ? 'Cuota mensual' : 'Cuota quincenal';
 
   // Calculo con inicial personalizada
   if(inicialP > 0) {
@@ -11536,7 +11602,7 @@ function calcularSim(){
     // Interes simple sobre el saldo total durante los meses
     const interesTotal = Math.round(saldoFinanciar * (tasaInt/100) * meses);
     const totalConInt  = saldoFinanciar + interesTotal;
-    const valorCuota   = Math.round(totalConInt / quincenas);
+    const valorCuota   = Math.round(totalConInt / periodos);
     const totalAPagar  = inicialP + totalConInt;
 
     $('simResultado').innerHTML = `
@@ -11554,9 +11620,9 @@ function calcularSim(){
         <div class="sim-row" style="border-bottom:1px solid #fed7aa;"><span class="sim-row-label">Saldo a financiar</span><span class="sim-row-value">${fmt(saldoFinanciar)}</span></div>
         <div class="sim-row" style="border-bottom:1px solid #fed7aa;"><span class="sim-row-label">Interes (${tasaInt}% x ${meses} meses)</span><span class="sim-row-value" style="color:#dc2626;">+${fmt(interesTotal)}</span></div>
         <div class="sim-row" style="border-bottom:1px solid #fed7aa;"><span class="sim-row-label">Total con interes</span><span class="sim-row-value" style="font-weight:700;">${fmt(totalConInt)}</span></div>
-        <div class="sim-row" style="border-bottom:1px solid #fed7aa;"><span class="sim-row-label">Plazo</span><span class="sim-row-value">${quincenas} quincenas (${meses} meses)</span></div>
+        <div class="sim-row" style="border-bottom:1px solid #fed7aa;"><span class="sim-row-label">Plazo</span><span class="sim-row-value">${txtPlazo}</span></div>
         <div class="sim-row" style="background:#fff;border-radius:8px;padding:10px;margin-top:6px;border:1px solid #fed7aa;">
-          <span class="sim-row-label" style="font-weight:700;color:#d97706;">Cuota quincenal</span>
+          <span class="sim-row-label" style="font-weight:700;color:#d97706;">${txtCuota}</span>
           <span class="sim-row-value" style="color:#d97706;font-size:18px;font-weight:700;">${fmt(valorCuota)}</span>
         </div>
       </div>
@@ -11579,7 +11645,7 @@ function calcularSim(){
       <div class="sim-row"><span class="sim-row-label">🏷️ Precio Venta ${modo==="manual"?"(manual)":"("+(margen*100).toFixed(0)+"%)"}</span><span class="sim-row-value highlight">${fmt(precioVenta)}</span></div>
       <div class="sim-row"><span class="sim-row-label">💚 Ganancia</span><span class="sim-row-value green">${fmt(ganancia)}</span></div>
       <div class="sim-row"><span class="sim-row-label">📊 Margen real</span><span class="sim-row-value">${pctReal}%</span></div>
-      <div class="sim-row"><span class="sim-row-label">📅 Plazo</span><span class="sim-row-value">${quincenas} quincenas (${meses} meses)</span></div>
+      <div class="sim-row"><span class="sim-row-label">📅 Plazo</span><span class="sim-row-value">${txtPlazo}</span></div>
       <div class="sim-row"><span class="sim-row-label">📊 Interes</span><span class="sim-row-value">${tasaInt}% mensual</span></div>
       <div class="sim-row"><span class="sim-row-label">👤 Asesor</span><span class="sim-row-value" style="font-size:14px;">${asesor}</span></div>
     </div>
@@ -11590,7 +11656,7 @@ function calcularSim(){
         const saldo = precioVenta - ini;
         const interes = Math.round(saldo * (tasaInt/100) * meses);
         const totalI = saldo + interes;
-        const cuota = Math.round(totalI / quincenas);
+        const cuota = Math.round(totalI / periodos);
         return `<div class="inicial-card" onclick="selectInicial(this,${p},${ini},${saldo})">
           <div class="inicial-pct">${(p*100).toFixed(0)}%</div>
           <div class="inicial-label">Inicial</div>
@@ -11607,7 +11673,7 @@ function calcularSim(){
     const saldo = precioVenta - ini;
     const interes = Math.round(saldo * (tasaInt/100) * meses);
     const totalI = saldo + interes;
-    const cuota = Math.round(totalI / quincenas);
+    const cuota = Math.round(totalI / periodos);
     return `<tr>
       <td style="font-weight:700;color:var(--pink);">${(p*100).toFixed(0)}%</td>
       <td style="color:var(--green);font-weight:600;">${fmt(ini)}</td>
@@ -11970,44 +12036,110 @@ function autoComisionCredito(){
   recalcCredito();
 }
 
-// Calcula próximas fechas de cuota basado en los 2 días del mes
+// ── Frecuencia de las cuotas del crédito (quincenal o mensual) ──────────
+function crdEsMensual() {
+  return (document.getElementById('crdFrecuencia')?.value || 'quincenal') === 'mensual';
+}
+
+// Rehace el plazo, las etiquetas y las fechas de pago según la frecuencia
+function crdCambiarFrecuencia() {
+  const esMensual = crdEsMensual();
+
+  // Plazo: meses (1 a 36) o quincenas (2 a 72, de dos en dos)
+  const sel = document.getElementById('crdPlazoQuincenas');
+  if(sel) {
+    const anterior = parseInt(sel.value)||0;
+    let opciones = '';
+    if(esMensual) {
+      for(let i=1; i<=36; i++) opciones += `<option value="${i}">${i} ${i===1?'mes':'meses'}</option>`;
+    } else {
+      for(let i=2; i<=72; i+=2) {
+        const m = i/2;
+        opciones += `<option value="${i}">${i} quincenas (${m} ${m===1?'mes':'meses'})</option>`;
+      }
+    }
+    sel.innerHTML = opciones;
+    const sirve = esMensual ? (anterior>=1 && anterior<=36) : (anterior>=2 && anterior<=72 && anterior%2===0);
+    sel.value = sirve ? anterior : (esMensual ? 6 : 12);
+  }
+
+  const lblPlazo = document.getElementById('crdLblPlazo');
+  if(lblPlazo) lblPlazo.textContent = esMensual ? 'Plazo (meses)' : 'Plazo (quincenas)';
+  const lblTasa = document.getElementById('crdLblTasa');
+  if(lblTasa) lblTasa.textContent = esMensual ? '% Interés mensual' : '% Interés quincenal';
+
+  // Fechas de pago: mensual usa una sola fecha
+  const titulo = document.getElementById('crdTituloFechas');
+  if(titulo) titulo.textContent = esMensual ? '📅 Fecha de Pago Mensual (obligatorio)' : '📅 Fechas de Pago Quincenal (obligatorio)';
+  const texto = document.getElementById('crdTextoFechas');
+  if(texto) texto.textContent = esMensual
+    ? 'El cliente pagará 1 vez al mes en la fecha seleccionada. De esta fecha depende la detección automática de mora.'
+    : 'El cliente pagará 2 veces al mes en las fechas seleccionadas. De estas fechas depende la detección automática de mora.';
+  const grupo2 = document.getElementById('crdSegundoPagoGroup');
+  if(grupo2) grupo2.style.display = esMensual ? 'none' : '';
+  if(esMensual) {
+    const f2El = document.getElementById('crdSegundoPago');
+    if(f2El) f2El.value = '';
+    const spanD2 = document.getElementById('crdDia2');
+    if(spanD2) spanD2.textContent = '—';
+  }
+
+  recalcFechasCuotas();
+  recalcCredito();
+}
+
+// Calcula próximas fechas de cuota basado en los días de pago del mes
 function recalcFechasCuotas() {
+  const esMensual = crdEsMensual();
   const f1 = document.getElementById('crdPrimerPago')?.value;
   const f2 = document.getElementById('crdSegundoPago')?.value;
   const lista = document.getElementById('crdListaProximas');
   const wrap  = document.getElementById('crdProximasCuotas');
-  if(!f1 || !f2) { if(wrap) wrap.style.display='none'; return; }
+  if(!f1 || (!esMensual && !f2)) { if(wrap) wrap.style.display='none'; return; }
 
-  const d1 = new Date(f1), d2 = new Date(f2);
-  const dia1 = d1.getUTCDate(), dia2 = d2.getUTCDate();
+  const d1 = new Date(f1);
+  const dia1 = d1.getUTCDate();
   const spanD1 = document.getElementById('crdDia1');
-  const spanD2 = document.getElementById('crdDia2');
   if(spanD1) spanD1.textContent = dia1;
-  if(spanD2) spanD2.textContent = dia2;
 
-  // Validar orden
-  if(d2 <= d1) {
-    toast('La segunda fecha debe ser posterior a la primera','error');
-    return;
-  }
-  // Validar que sean quincenales (entre 10 y 20 dias de diferencia)
-  const diffDias = Math.round((d2-d1)/(1000*60*60*24));
-  if(diffDias < 10 || diffDias > 20) {
-    toast('Las fechas deben ser quincenales (aprox 15 dias de diferencia)','error');
+  const d2 = esMensual ? null : new Date(f2);
+  const dia2 = d2 ? d2.getUTCDate() : null;
+  if(!esMensual) {
+    const spanD2 = document.getElementById('crdDia2');
+    if(spanD2) spanD2.textContent = dia2;
+
+    // Validar orden
+    if(d2 <= d1) {
+      toast('La segunda fecha debe ser posterior a la primera','error');
+      return;
+    }
+    // Validar que sean quincenales (entre 10 y 20 dias de diferencia)
+    const diffDias = Math.round((d2-d1)/(1000*60*60*24));
+    if(diffDias < 10 || diffDias > 20) {
+      toast('Las fechas deben ser quincenales (aprox 15 dias de diferencia)','error');
+    }
   }
 
-  // Calcular próximas 4 cuotas
+  // Calcular próximas cuotas
   const plazo = parseInt(document.getElementById('crdPlazoQuincenas')?.value)||12;
   const preview = [];
   for(let i=0; i<Math.min(plazo, 8); i++) {
     const fecha = new Date(d1);
-    const esPar = i % 2 === 0;
-    if(esPar) {
-      fecha.setUTCMonth(d1.getUTCMonth() + Math.floor(i/2));
+    if(esMensual) {
+      // Una cuota por mes, ajustando el día si el mes es más corto
+      fecha.setUTCDate(1);
+      fecha.setUTCMonth(d1.getUTCMonth() + i);
+      const ultDia = new Date(Date.UTC(fecha.getUTCFullYear(), fecha.getUTCMonth()+1, 0)).getUTCDate();
+      fecha.setUTCDate(Math.min(dia1, ultDia));
     } else {
-      fecha.setUTCFullYear(d2.getUTCFullYear());
-      fecha.setUTCMonth(d2.getUTCMonth() + Math.floor(i/2));
-      fecha.setUTCDate(dia2);
+      const esPar = i % 2 === 0;
+      if(esPar) {
+        fecha.setUTCMonth(d1.getUTCMonth() + Math.floor(i/2));
+      } else {
+        fecha.setUTCFullYear(d2.getUTCFullYear());
+        fecha.setUTCMonth(d2.getUTCMonth() + Math.floor(i/2));
+        fecha.setUTCDate(dia2);
+      }
     }
     preview.push('Cuota ' + (i+1) + ': ' + fecha.toISOString().slice(0,10));
   }
@@ -12143,14 +12275,20 @@ function recalcCredito(){
   const totalFinanciar = saldoFinanciar + totalIntereses;
   setEl('crdValorFinanciar', fmt(totalFinanciar));
 
-  // Cuota quincenal
+  // Cuota de cada periodo (quincenal o mensual)
+  const esMensualCrd = crdEsMensual();
+  const lblCuotaEst = $('crdLblCuotaEstimada');
+  if(lblCuotaEst) lblCuotaEst.textContent = esMensualCrd ? 'Cuota mensual estimada:' : 'Cuota quincenal estimada:';
   const resEl = $('crdCuotaResultado');
   if(quincenas > 0 && totalFinanciar > 0) {
     const cuotaQ = Math.round(totalFinanciar / quincenas);
     if(resEl) resEl.style.display = 'block';
     setEl('crdCuotaValor', fmt(cuotaQ));
     const meses = (quincenas/2).toFixed(1).replace('.0','');
-    setEl('crdCuotaDetalle', `Inicial: ${fmt(inicialUsada)} · ${quincenas} quincenas (${meses} meses) · Financiar: ${fmt(totalFinanciar)}${aplicaIntereses?' · Interés '+tasaInteres+'% qnal':''}`);
+    const txtPlazoCrd = esMensualCrd
+      ? `${quincenas} ${quincenas===1?'mes':'meses'}`
+      : `${quincenas} quincenas (${meses} meses)`;
+    setEl('crdCuotaDetalle', `Inicial: ${fmt(inicialUsada)} · ${txtPlazoCrd} · Financiar: ${fmt(totalFinanciar)}${aplicaIntereses?' · Interés '+tasaInteres+(esMensualCrd?'% mens':'% qnal'):''}`);
   } else {
     if(resEl) resEl.style.display = 'none';
   }
@@ -12205,6 +12343,7 @@ function previsualizarFactura() {
     prodAdicDesc, prodAdicVal, comision:comVal,
     precioFinal, ganancia:0, inicial:ini,
     saldoFinanciar:totalFin, cuotas:quincenas,
+    periodicidad: crdEsMensual() ? 'mensual' : 'quincenal',
     valorCuota, financiera:finSel,
     intereses:totalInt, tasaInteres:aplicaInt?tasaInt:0,
     productosList: (productosVentaCrd && productosVentaCrd.length > 0)
