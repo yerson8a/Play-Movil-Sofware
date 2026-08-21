@@ -4863,6 +4863,51 @@
 const SUPABASE_URL = 'https://gopwheqqxxiafpdgpjrp.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdvcHdoZXFxeHhpYWZwZGdwanJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1NTc2MzMsImV4cCI6MjA5MDEzMzYzM30.Lc5Hpr_MaKWpISmSWzNy7r4bT81iVr7tu9Iizg42iww';
 
+// ── MODO PRUEBAS: bloqueo de escrituras fuera del sitio publicado ───────
+// La URL y la key de Supabase están fijas en este archivo y no existe una base
+// de pruebas: abrir este index en local escribe en la MISMA base que usa el
+// negocio. Por eso, cuando la app corre en local se bloquea toda escritura —
+// se puede entrar, navegar y consultar datos reales, pero nada se guarda.
+// Se deja pasar el login (/auth/v1/) y las URLs firmadas de storage, que hacen
+// falta para poder mirar. Solo se bloquea local: si mañana cambia el dominio
+// de producción, el sitio publicado sigue guardando normalmente.
+const MODO_SOLO_LECTURA = (() => {
+  const h = (location.hostname || '').toLowerCase();
+  return location.protocol === 'file:' || !h ||
+         h === 'localhost' || h === '127.0.0.1' || h === '::1' || h === '[::1]' ||
+         h.endsWith('.local') || h.endsWith('.localhost');
+})();
+
+if (MODO_SOLO_LECTURA) {
+  const fetchOriginal = window.fetch.bind(window);
+  const METODOS_ESCRITURA = ['POST','PUT','PATCH','DELETE'];
+  window.fetch = (entrada, config) => {
+    const url    = typeof entrada === 'string' ? entrada : (entrada && entrada.url) || '';
+    const metodo = String((config && config.method) || (entrada && entrada.method) || 'GET').toUpperCase();
+    if (url.startsWith(SUPABASE_URL) && METODOS_ESCRITURA.includes(metodo)) {
+      const esLogin      = url.includes('/auth/v1/');                  // iniciar sesión
+      const esUrlFirmada = url.includes('/storage/v1/object/sign');    // ver documentos
+      if (!esLogin && !esUrlFirmada) {
+        console.warn('[MODO PRUEBAS] Escritura bloqueada:', metodo, url);
+        if (typeof toast === 'function') toast('MODO PRUEBAS: esta copia local no guarda nada en la base real','error');
+        return Promise.reject(new Error('MODO PRUEBAS: escritura bloqueada. Esta copia local no puede modificar la base de datos real.'));
+      }
+    }
+    return fetchOriginal(entrada, config);
+  };
+
+  // Franja permanente para que nunca se confunda con la app publicada
+  document.addEventListener('DOMContentLoaded', () => {
+    const aviso = document.createElement('div');
+    aviso.id = 'aviso-modo-pruebas';
+    aviso.textContent = '🧪 MODO PRUEBAS — copia local: puedes navegar y consultar datos reales, pero NO se guarda nada';
+    aviso.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99999;background:#7c2d12;color:#fff;'
+      + 'font-family:\'DM Sans\',sans-serif;font-size:12px;font-weight:700;text-align:center;padding:7px 12px;'
+      + 'letter-spacing:.3px;box-shadow:0 -2px 12px rgba(0,0,0,.25);';
+    document.body.appendChild(aviso);
+  });
+}
+
 // ── Cliente de Supabase Auth ────────────────────────────────
 // Usa la anon key (NUNCA la service_role en el frontend). Maneja el login,
 // la sesión persistente y el cierre. La tabla `perfiles` se lee/escribe con
