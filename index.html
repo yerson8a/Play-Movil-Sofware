@@ -4865,18 +4865,33 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 
 // ── MODO PRUEBAS: bloqueo de escrituras fuera del sitio publicado ───────
 // La URL y la key de Supabase están fijas en este archivo y no existe una base
-// de pruebas: abrir este index en local escribe en la MISMA base que usa el
-// negocio. Por eso, cuando la app corre en local se bloquea toda escritura —
-// se puede entrar, navegar y consultar datos reales, pero nada se guarda.
-// Se deja pasar el login (/auth/v1/) y las URLs firmadas de storage, que hacen
-// falta para poder mirar. Solo se bloquea local: si mañana cambia el dominio
-// de producción, el sitio publicado sigue guardando normalmente.
-const MODO_SOLO_LECTURA = (() => {
+// de pruebas: cualquier copia de la app escribe en la MISMA base que usa el
+// negocio. Por eso se bloquean las escrituras en dos casos:
+//   · local  → file://, localhost, 127.0.0.1, *.local
+//   · preview → despliegues de rama de Vercel (*.vercel.app que no son los
+//     del sitio publicado)
+// En ambos se puede entrar, navegar y consultar datos reales, pero nada se
+// guarda. Se deja pasar el login (/auth/v1/) y las URLs firmadas de storage,
+// que hacen falta para poder mirar.
+// La lista de hosts publicados solo se consulta para dominios .vercel.app: un
+// dominio propio (playmovil.store y cualquiera que se agregue después) nunca
+// cae en modo pruebas, así que cambiar de dominio no deja el sitio real en
+// solo lectura por olvidar actualizar esta lista.
+const HOSTS_PUBLICADOS = [
+  'play-movil-sofware.vercel.app',
+  'play-movil-sofware-play-movil.vercel.app',
+  'play-movil-sofware-git-main-play-movil.vercel.app'
+];
+const MODO_PRUEBAS = (() => {
   const h = (location.hostname || '').toLowerCase();
-  return location.protocol === 'file:' || !h ||
-         h === 'localhost' || h === '127.0.0.1' || h === '::1' || h === '[::1]' ||
-         h.endsWith('.local') || h.endsWith('.localhost');
+  const esLocal = location.protocol === 'file:' || !h ||
+                  h === 'localhost' || h === '127.0.0.1' || h === '::1' || h === '[::1]' ||
+                  h.endsWith('.local') || h.endsWith('.localhost');
+  if (esLocal) return 'local';
+  if (h.endsWith('.vercel.app') && !HOSTS_PUBLICADOS.includes(h)) return 'preview';
+  return null;
 })();
+const MODO_SOLO_LECTURA = MODO_PRUEBAS !== null;
 
 if (MODO_SOLO_LECTURA) {
   const fetchOriginal = window.fetch.bind(window);
@@ -4889,8 +4904,8 @@ if (MODO_SOLO_LECTURA) {
       const esUrlFirmada = url.includes('/storage/v1/object/sign');    // ver documentos
       if (!esLogin && !esUrlFirmada) {
         console.warn('[MODO PRUEBAS] Escritura bloqueada:', metodo, url);
-        if (typeof toast === 'function') toast('MODO PRUEBAS: esta copia local no guarda nada en la base real','error');
-        return Promise.reject(new Error('MODO PRUEBAS: escritura bloqueada. Esta copia local no puede modificar la base de datos real.'));
+        if (typeof toast === 'function') toast('MODO PRUEBAS: esta copia no guarda nada en la base real','error');
+        return Promise.reject(new Error('MODO PRUEBAS: escritura bloqueada. Esta copia no puede modificar la base de datos real.'));
       }
     }
     return fetchOriginal(entrada, config);
@@ -4900,7 +4915,9 @@ if (MODO_SOLO_LECTURA) {
   document.addEventListener('DOMContentLoaded', () => {
     const aviso = document.createElement('div');
     aviso.id = 'aviso-modo-pruebas';
-    aviso.textContent = '🧪 MODO PRUEBAS — copia local: puedes navegar y consultar datos reales, pero NO se guarda nada';
+    aviso.textContent = MODO_PRUEBAS === 'preview'
+      ? '🧪 MODO PRUEBAS — despliegue de prueba: puedes navegar y consultar datos reales, pero NO se guarda nada'
+      : '🧪 MODO PRUEBAS — copia local: puedes navegar y consultar datos reales, pero NO se guarda nada';
     aviso.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99999;background:#7c2d12;color:#fff;'
       + 'font-family:\'DM Sans\',sans-serif;font-size:12px;font-weight:700;text-align:center;padding:7px 12px;'
       + 'letter-spacing:.3px;box-shadow:0 -2px 12px rgba(0,0,0,.25);';
