@@ -13698,6 +13698,13 @@ async function toggleEstadoSede(id) {
   } catch(e) { toast('Error: ' + e.message, 'error'); }
 }
 
+// Nombre de una sede a partir de su id (usa las sedes reales, no una lista fija)
+function nombreSede(id) {
+  if(!id) return null;
+  const s = (dbAdmin?.sedes || []).find(x => x.id === Number(id));
+  return s ? s.nombre : 'Sede ' + id;
+}
+
 function poblarSelectSedes() {
   const activas = dbAdmin.sedes.filter(s => s.activa !== false);
   // Selectores con ID de sede
@@ -13934,9 +13941,14 @@ function toggleCajasEspecificas(checkbox) {
 }
 
 // Poblar lista de cajas disponibles
-async function poblarListaCajasPermitidas(seleccionadas) {
+async function poblarListaCajasPermitidas(seleccionadas, sedeId) {
   const div = document.getElementById('listaCajasPermitidas');
   if(!div) return;
+  // Sede del usuario que se esta editando (si no se pasa, leerla del select)
+  if(sedeId === undefined) {
+    const selSede = document.getElementById('editUsuSede');
+    sedeId = selSede && selSede.value ? parseInt(selSede.value) : null;
+  }
   div.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#888;font-size:12px;padding:8px;">Cargando cajas...</div>';
 
   // Asegurar que las cajas esten cargadas
@@ -13947,19 +13959,23 @@ async function poblarListaCajasPermitidas(seleccionadas) {
     } catch(e) { console.error(e); }
   }
 
-  const cajas = dbAdmin?.cajas || [];
+  let cajas = dbAdmin?.cajas || [];
+  // Un usuario con sede asignada solo puede operar las cajas de su sede:
+  // las de otras sedes las bloquea la RLS, asignarlas lo deja sin ninguna caja visible.
+  if(sedeId) cajas = cajas.filter(c => c.sede_id === sedeId);
   if(!cajas.length) {
-    div.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#888;font-size:12px;padding:8px;">No hay cajas creadas. Crea cajas primero.</div>';
+    div.innerHTML = sedeId
+      ? '<div style="grid-column:1/-1;text-align:center;color:#888;font-size:12px;padding:8px;">No hay cajas creadas en la sede de este usuario. Crea una caja para esa sede.</div>'
+      : '<div style="grid-column:1/-1;text-align:center;color:#888;font-size:12px;padding:8px;">No hay cajas creadas. Crea cajas primero.</div>';
     return;
   }
-  const sedes = { 1: 'Pereira', 2: 'Armenia' };
   const selSet = new Set((seleccionadas || []).map(Number));
   div.innerHTML = cajas.map(c => `
     <label style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:#fff;border:1px solid #fed7aa;border-radius:6px;cursor:pointer;font-size:12px;">
       <input type="checkbox" name="caja_permitida" value="${c.id}" ${selSet.has(c.id)?'checked':''} style="width:14px;height:14px;accent-color:#d97706;">
       <div style="flex:1;">
         <div style="font-weight:600;">${c.nombre}</div>
-        <div style="font-size:10px;color:#888;">${sedes[c.sede_id]||c.sede_nombre||'—'}</div>
+        <div style="font-size:10px;color:#888;">${nombreSede(c.sede_id)||c.sede_nombre||'—'}</div>
       </div>
     </label>`).join('');
 }
@@ -14248,11 +14264,13 @@ function renderCajas() {
 
   // Filtrar cajas según permisos del usuario
   let data = dbAdmin.cajas;
+  let filtradasPorPermiso = false;
   if(sesionActiva && sesionActiva.rol !== 'admin' && sesionActiva.cajas_permitidas) {
     try {
       const permitidas = JSON.parse(sesionActiva.cajas_permitidas);
       if(Array.isArray(permitidas) && permitidas.length > 0) {
         const setIds = new Set(permitidas.map(Number));
+        filtradasPorPermiso = true;
         data = data.filter(c => setIds.has(c.id));
       }
     } catch(e){}
@@ -14267,14 +14285,13 @@ function renderCajas() {
 
   const grid = document.getElementById('cajasGrid');
   if (!grid) return;
-  const sedes = { 1: 'Pereira', 2: 'Armenia' };
 
   grid.innerHTML = data.length ? data.map(c => `
     <div class="card" style="position:relative;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
         <div>
           <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:16px;color:#111111;">${c.nombre}</div>
-          <div style="font-size:12px;color:#888899;margin-top:2px;">📍 ${c.sede_id ? (sedes[c.sede_id] || 'Sede '+c.sede_id) : (c.sede_nombre || '—')}</div>
+          <div style="font-size:12px;color:#888899;margin-top:2px;">📍 ${nombreSede(c.sede_id) || c.sede_nombre || '—'}</div>
         </div>
         <span class="badge ${c.estado === 'activa' ? 'badge-green' : 'badge-red'}">${c.estado}</span>
       </div>
@@ -14287,7 +14304,9 @@ function renderCajas() {
         ${esUsuarioAdmin()?`<button class="btn btn-sm btn-ghost" style="color:#dc2626;" onclick="eliminarCaja(${c.id})">🗑️</button>`:''}
       </div>
     </div>`).join('') :
-    '<div class="empty-state"><div class="empty-icon">💵</div><div class="empty-text">Sin cajas registradas. Crea una caja para cada sede.</div></div>';
+    (filtradasPorPermiso && dbAdmin.cajas.length
+      ? '<div class="empty-state"><div class="empty-icon">🔒</div><div class="empty-text">No tienes ninguna caja asignada de tu sede. Pídele al administrador que revise tus cajas permitidas.</div></div>'
+      : '<div class="empty-state"><div class="empty-icon">💵</div><div class="empty-text">Sin cajas registradas. Crea una caja para cada sede.</div></div>');
 }
 
 async function guardarCaja() {
@@ -14338,8 +14357,14 @@ async function registrarMovimientoCaja() {
   if (nuevoSaldo < 0) { toast('Saldo insuficiente en caja', 'error'); return; }
 
   try {
-    // Actualizar saldo de la caja
-    await sbFetch(`cajas?id=eq.${id}`, { method: 'PATCH', body: { saldo: nuevoSaldo } }).catch(() => null);
+    // Actualizar saldo de la caja.
+    // Si la RLS no permite tocar esta caja, PostgREST responde 200 con 0 filas:
+    // hay que detectarlo o el movimiento se daria por bueno sin haberse guardado.
+    const upd = await sbFetch(`cajas?id=eq.${id}`, { method: 'PATCH', body: { saldo: nuevoSaldo } });
+    if (!Array.isArray(upd) || upd.length === 0) {
+      toast('No tienes permiso para mover esta caja. Pide al administrador que revise tu sede y tus cajas permitidas.', 'error');
+      return;
+    }
     // Registrar movimiento en historial
     await sbFetch('movimientos_caja', {
       method: 'POST',
@@ -14352,7 +14377,11 @@ async function registrarMovimientoCaja() {
         fecha:         fechaColombia(),
         usuario:       sesionActiva?.nombre || 'Sistema'
       }
-    }).catch(() => null); // No bloquear si falla
+    }).catch(err => {
+      // El saldo ya quedo actualizado: avisar para que no se pierda el rastro
+      console.error(err);
+      toast('Saldo actualizado, pero el movimiento no se guardo en el historial', 'error');
+    });
     caja.saldo = nuevoSaldo;
     closeModal('modalMovimientoCaja');
     renderCajas();
