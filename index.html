@@ -4158,7 +4158,7 @@
         </select>
       </div>
       <div class="form-group"><label class="form-label">Sede</label>
-        <select class="form-control" id="editUsuSede">
+        <select class="form-control" id="editUsuSede" onchange="refrescarCajasPorSede()">
           <option value="">Todas las sedes</option>
         </select>
       </div>
@@ -4215,7 +4215,7 @@
         <div id="listaCajasPermitidas" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px;max-height:150px;overflow-y:auto;">
           <!-- Se llena dinámicamente -->
         </div>
-        <div style="font-size:10px;color:#92400e;margin-top:6px;">Sin selección = el usuario ve todas las cajas</div>
+        <div style="font-size:10px;color:#92400e;margin-top:6px;">Sin selección = solo ve la caja de su sede. Si marcas cajas, verá exactamente esas (aunque sean de otra sede) y solo podrá registrar ingresos y salidas.</div>
       </div>
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
@@ -13959,25 +13959,35 @@ async function poblarListaCajasPermitidas(seleccionadas, sedeId) {
     } catch(e) { console.error(e); }
   }
 
-  let cajas = dbAdmin?.cajas || [];
-  // Un usuario con sede asignada solo puede operar las cajas de su sede:
-  // las de otras sedes las bloquea la RLS, asignarlas lo deja sin ninguna caja visible.
-  if(sedeId) cajas = cajas.filter(c => c.sede_id === sedeId);
+  const cajas = dbAdmin?.cajas || [];
   if(!cajas.length) {
-    div.innerHTML = sedeId
-      ? '<div style="grid-column:1/-1;text-align:center;color:#888;font-size:12px;padding:8px;">No hay cajas creadas en la sede de este usuario. Crea una caja para esa sede.</div>'
-      : '<div style="grid-column:1/-1;text-align:center;color:#888;font-size:12px;padding:8px;">No hay cajas creadas. Crea cajas primero.</div>';
+    div.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#888;font-size:12px;padding:8px;">No hay cajas creadas. Crea cajas primero.</div>';
     return;
   }
   const selSet = new Set((seleccionadas || []).map(Number));
-  div.innerHTML = cajas.map(c => `
+  // Se listan las cajas de todas las sedes: marcar una caja le da acceso al
+  // usuario aunque no sea de su sede (lo respeta puede_operar_caja en Supabase).
+  // La sede propia se senala solo como referencia para el administrador.
+  div.innerHTML = cajas.map(c => {
+    const esSuSede = !!(sedeId && c.sede_id === sedeId);
+    return `
     <label style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:#fff;border:1px solid #fed7aa;border-radius:6px;cursor:pointer;font-size:12px;">
       <input type="checkbox" name="caja_permitida" value="${c.id}" ${selSet.has(c.id)?'checked':''} style="width:14px;height:14px;accent-color:#d97706;">
       <div style="flex:1;">
         <div style="font-weight:600;">${c.nombre}</div>
-        <div style="font-size:10px;color:#888;">${nombreSede(c.sede_id)||c.sede_nombre||'—'}</div>
+        <div style="font-size:10px;color:#888;">${nombreSede(c.sede_id)||c.sede_nombre||'—'}${esSuSede?' &middot; su sede':''}</div>
       </div>
-    </label>`).join('');
+    </label>`;
+  }).join('');
+}
+
+// Al cambiar la sede del usuario, rehacer la lista para que la marca
+// "su sede" corresponda a la sede nueva, conservando lo ya seleccionado.
+function refrescarCajasPorSede() {
+  const bloque = document.getElementById('bloqueCajasEspecificas');
+  if(!bloque || bloque.style.display === 'none') return;
+  const marcadas = Array.from(document.querySelectorAll('input[name="caja_permitida"]:checked')).map(cb => parseInt(cb.value));
+  poblarListaCajasPermitidas(marcadas);
 }
 
 function marcarTodasCajas(todas) {
@@ -14011,9 +14021,9 @@ async function actualizarUsuario() {
   const cajaChk = document.querySelector('#permisosGrid input[name="permiso"][value="cajas"]');
   if(cajaChk && cajaChk.checked && rol !== 'admin') {
     const seleccionadas = Array.from(document.querySelectorAll('input[name="caja_permitida"]:checked')).map(cb => parseInt(cb.value));
-    const total = document.querySelectorAll('input[name="caja_permitida"]').length;
-    // Si marcó todas o ninguna = null (ve todas las cajas); si marcó algunas = JSON array
-    cajas_permitidas = (seleccionadas.length > 0 && seleccionadas.length < total) ? JSON.stringify(seleccionadas) : null;
+    // Lo marcado se guarda tal cual, incluso si son todas: la seleccion manda
+    // sobre la sede del usuario. Ninguna marcada = null = solo la caja de su sede.
+    cajas_permitidas = seleccionadas.length > 0 ? JSON.stringify(seleccionadas) : null;
   }
 
   const row = {
@@ -14305,7 +14315,7 @@ function renderCajas() {
       </div>
     </div>`).join('') :
     (filtradasPorPermiso && dbAdmin.cajas.length
-      ? '<div class="empty-state"><div class="empty-icon">🔒</div><div class="empty-text">No tienes ninguna caja asignada de tu sede. Pídele al administrador que revise tus cajas permitidas.</div></div>'
+      ? '<div class="empty-state"><div class="empty-icon">🔒</div><div class="empty-text">No tienes ninguna caja asignada. Pídele al administrador que revise tus cajas permitidas.</div></div>'
       : '<div class="empty-state"><div class="empty-icon">💵</div><div class="empty-text">Sin cajas registradas. Crea una caja para cada sede.</div></div>');
 }
 
