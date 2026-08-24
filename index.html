@@ -1844,6 +1844,12 @@
         </div>
       </div>
 
+      <div class="tabs">
+        <button class="tab active" onclick="gfSwitchTab('nueva',this)">🧾 Nueva Factura</button>
+        <button class="tab" onclick="gfSwitchTab('historial',this)">📚 Historial</button>
+      </div>
+
+      <div id="gfTab-nueva">
       <div class="grid-2">
         <!-- Formulario -->
         <div class="card">
@@ -1989,8 +1995,43 @@
           </div>
           <div id="gfBotonesAccion" style="display:none;margin-top:14px;">
             <button class="btn btn-primary" style="width:100%;" onclick="gfImprimir()">
-              🖨️ Imprimir Factura
+              🖨️ Imprimir y Guardar en Historial
             </button>
+            <div style="font-size:11px;color:#888899;text-align:center;margin-top:6px;">
+              Al imprimir se guarda una copia en el historial con tu nombre. No afecta ventas, créditos ni contabilidad.
+            </div>
+          </div>
+        </div>
+      </div>
+      </div>
+
+      <!-- TAB: HISTORIAL -->
+      <div id="gfTab-historial" style="display:none;">
+        <div class="card">
+          <div class="flex items-center gap-12 mb-16" style="flex-wrap:wrap;">
+            <div class="search-wrap" style="flex:1;min-width:200px;">
+              <span class="search-icon">🔍</span>
+              <input type="text" class="form-control" id="gfHistBuscar" placeholder="Buscar por N° factura, cliente, cédula o quien la hizo..." oninput="gfRenderHistorial()">
+            </div>
+            <select class="form-control" style="width:150px;" id="gfHistTipo" onchange="gfRenderHistorial()">
+              <option value="">Todos los tipos</option>
+              <option value="contado">Contado</option>
+              <option value="credito">Crédito</option>
+            </select>
+            <input type="date" class="form-control" style="width:160px;" id="gfHistDesde" onchange="gfRenderHistorial()" title="Desde">
+            <input type="date" class="form-control" style="width:160px;" id="gfHistHasta" onchange="gfRenderHistorial()" title="Hasta">
+            <button class="btn btn-ghost btn-sm" onclick="gfCargarHistorial(true)">🔄 Actualizar</button>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px;">
+            <div class="stat-card blue"><div class="stat-label">Facturas listadas</div><div class="stat-value blue" id="gfHistTotal">0</div></div>
+            <div class="stat-card green"><div class="stat-label">Contado</div><div class="stat-value green" id="gfHistContado">0</div></div>
+            <div class="stat-card orange"><div class="stat-label">Crédito</div><div class="stat-value orange" id="gfHistCredito">0</div></div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>N° Factura</th><th>Fecha</th><th>Cliente</th><th>Productos</th><th>Tipo</th><th>Total</th><th>Sede</th><th>Hecha por</th><th>Acciones</th></tr></thead>
+              <tbody id="gfHistBody"></tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -3790,6 +3831,24 @@
   </div>
 </div>
 
+<!-- Modal Ver Factura del Historial (Generador de Facturas) -->
+<div class="modal-overlay" id="modalGfFactura">
+  <div class="modal" style="max-width:700px;">
+    <div class="modal-header">
+      <div class="modal-title" id="gfModalTitulo">🧾 Factura Guardada</div>
+      <button class="modal-close" onclick="closeModal('modalGfFactura')">✕</button>
+    </div>
+    <div id="gfModalMeta" style="font-size:12px;color:#555577;background:#f7f5fb;border-radius:10px;padding:10px 12px;margin-bottom:12px;"></div>
+    <div id="gfModalContenido" style="background:#fff;padding:24px;border-radius:12px;border:1px solid #ece8f5;">
+      <!-- Se genera dinámicamente -->
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+      <button class="btn btn-ghost" onclick="closeModal('modalGfFactura')">Cerrar</button>
+      <button class="btn btn-primary" onclick="gfReimprimirActual()">🖨️ Reimprimir</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal Nueva Venta (alias) -->
 <div class="modal-overlay" id="modalNuevaCreditoVenta">
   <div class="modal">
@@ -4187,6 +4246,7 @@
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;" class="perm-label"><input type="checkbox" name="permiso" value="ventas" style="width:15px;height:15px;accent-color:#6B2D8B;"> 💰 Ventas</label>
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;" class="perm-label"><input type="checkbox" name="permiso" value="creditos" style="width:15px;height:15px;accent-color:#6B2D8B;"> 🤝 Créditos</label>
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;" class="perm-label"><input type="checkbox" name="permiso" value="simulador" style="width:15px;height:15px;accent-color:#6B2D8B;"> 🧮 Simulador</label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;" class="perm-label"><input type="checkbox" name="permiso" value="genfactura" style="width:15px;height:15px;accent-color:#6B2D8B;"> 🧾 Generador Facturas</label>
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;" class="perm-label"><input type="checkbox" name="permiso" value="contabilidad" style="width:15px;height:15px;accent-color:#6B2D8B;"> 📒 Contabilidad</label>
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;" class="perm-label"><input type="checkbox" name="permiso" value="asesores" style="width:15px;height:15px;accent-color:#6B2D8B;"> 👥 Asesores</label>
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;" class="perm-label"><input type="checkbox" name="permiso" value="garantias" style="width:15px;height:15px;accent-color:#6B2D8B;"> 🛡️ Garantías</label>
@@ -4201,7 +4261,7 @@
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;" class="perm-label"><input type="checkbox" name="permiso" value="productos" style="width:15px;height:15px;accent-color:#6B2D8B;"> 📦 Productos</label>
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 8px;border-radius:8px;" class="perm-label"><input type="checkbox" name="permiso" value="tareas" style="width:15px;height:15px;accent-color:#6B2D8B;"> 📋 Tareas</label>
       </div>
-      <div style="font-size:11px;color:#888899;margin-top:6px;">Sin selección = acceso completo según su rol.</div>
+      <div style="font-size:11px;color:#888899;margin-top:6px;">Sin selección (o con TODOS marcados) = acceso según su rol. Para dar módulos que su rol no trae —como 🧾 Generador Facturas— marca solo los que debe ver.</div>
 
       <!-- Cajas específicas (visible solo si caja está marcada) -->
       <div id="bloqueCajasEspecificas" style="display:none;margin-top:12px;padding:12px;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;">
@@ -8499,6 +8559,21 @@ const _origCloseModal = typeof closeModal === 'function' ? closeModal : null;
 // GENERADOR DE FACTURAS (módulo independiente para imprimir)
 // ============================================================
 let gfProductos = [];
+// Historial de facturas generadas (tabla facturas_generadas, independiente)
+let gfHistorial      = [];
+let gfHistorialCargado = false;
+let gfTabActual      = 'nueva';
+let gfFacturaAbierta = null;   // fila del historial que se ve en el modal
+let gfGuardadaId     = null;   // id ya guardado de la vista previa actual
+
+// Las sedes del generador se escriben con el nombre completo del local;
+// aqui se traducen al id real de la tabla sedes para poder filtrar por sede.
+const GF_SEDE_IDS = {
+  'LOCAL PEREIRA': 1,
+  'LOCAL ARMENIA LA 15': 2,
+  'LOCAL ARMENIA LA 19': 2,
+  'LOCAL MANIZALES': 3
+};
 
 function gfInicializar() {
   // Resetear campos solo la primera vez
@@ -8509,6 +8584,18 @@ function gfInicializar() {
     if(elFecha && !elFecha.value) elFecha.value = fechaColombia();
   }
   gfActualizarUI();
+  if(gfTabActual === 'historial') gfCargarHistorial();
+}
+
+function gfSwitchTab(tab, el) {
+  gfTabActual = tab;
+  document.querySelectorAll('#mod-genfactura .tab').forEach(t => t.classList.remove('active'));
+  if(el) el.classList.add('active');
+  const nueva = document.getElementById('gfTab-nueva');
+  const hist  = document.getElementById('gfTab-historial');
+  if(nueva) nueva.style.display = tab === 'nueva' ? '' : 'none';
+  if(hist)  hist.style.display  = tab === 'historial' ? '' : 'none';
+  if(tab === 'historial') gfCargarHistorial();
 }
 
 function gfActualizarUI() {
@@ -8659,28 +8746,238 @@ function gfGenerarVistaPrevia() {
   // Guardar en window para imprimir luego
   window._gfHTML = html;
   window._gfDatos = datosFactura;
+  // Vista previa nueva = todavia no esta en el historial
+  gfGuardadaId = null;
 }
 
-function gfImprimir() {
-  if(!window._gfHTML) {
-    toast('Primero genera la vista previa','error');
-    return;
-  }
-  // Abrir ventana de impresión
+// Abre la ventana de impresion con el HTML de una factura
+function gfAbrirVentanaImpresion(html, numero) {
   const ventana = window.open('', '', 'width=800,height=900');
-  if(!ventana) { toast('Bloqueado por el navegador. Permite ventanas emergentes.','error'); return; }
-
-  const datos = window._gfDatos || {};
-  ventana.document.write('<!DOCTYPE html><html><head><title>Factura ' + (datos.numero||'') + '</title>');
+  if(!ventana) { toast('Bloqueado por el navegador. Permite ventanas emergentes.','error'); return false; }
+  ventana.document.write('<!DOCTYPE html><html><head><title>Factura ' + (numero||'') + '</title>');
   ventana.document.write('<meta charset="UTF-8">');
   ventana.document.write('<style>body{font-family:Arial,sans-serif;margin:20px;color:#333;}');
   ventana.document.write('@media print{body{margin:0;}}');
   ventana.document.write('</style></head><body>');
-  ventana.document.write(window._gfHTML);
+  ventana.document.write(html);
   ventana.document.write('</body></html>');
   ventana.document.close();
-  // Imprimir despues de cargar
   setTimeout(()=>{ ventana.focus(); ventana.print(); }, 300);
+  return true;
+}
+
+async function gfImprimir() {
+  if(!window._gfHTML) {
+    toast('Primero genera la vista previa','error');
+    return;
+  }
+  const datos = window._gfDatos || {};
+  // Primero se imprime (es lo que el usuario espera aunque falle el guardado)
+  if(!gfAbrirVentanaImpresion(window._gfHTML, datos.numero)) return;
+  // y despues se deja la copia en el historial
+  await gfGuardarEnHistorial(datos);
+}
+
+// ── Historial del generador ─────────────────────────────────────────
+// Guarda una copia de la factura impresa. Tabla propia: no toca ventas,
+// creditos, cajas ni contabilidad.
+async function gfGuardarEnHistorial(datos) {
+  if(gfGuardadaId) { toast('Esta factura ya estaba en el historial'); return; }
+  if(!sesionActiva) { toast('Sesión no válida, no se guardó en el historial','error'); return; }
+
+  const fechaISO = document.getElementById('gfFecha')?.value || fechaColombia();
+  const fila = {
+    numero:          datos.numero || '',
+    tipo:            datos.tipo || 'contado',
+    fecha:           fechaISO,
+    sede_id:         GF_SEDE_IDS[datos.sede] ?? sesionActiva.sede_id ?? null,
+    sede_nombre:     datos.sede || '',
+    cliente:         datos.cliente || '',
+    cedula:          datos.cedula || '',
+    telefono:        datos.telefono || '',
+    correo:          datos.correo || '',
+    asesor:          datos.asesor || '',
+    financiera:      datos.financiera || '',
+    num_contrato:    datos.numContrato || '',
+    subtotal:        datos.precioBase || 0,
+    descuento:       datos.descuento || 0,
+    iva:             datos.iva || 0,
+    iva_pct:         datos.ivaPct || 0,
+    comision:        datos.comision || 0,
+    comision_pct:    datos.comisionPct || 0,
+    total:           datos.precioFinal || 0,
+    inicial:         datos.inicial || 0,
+    saldo_financiar: datos.saldoFinanciar || 0,
+    cuotas:          datos.cuotas || 0,
+    valor_cuota:     datos.valorCuota || 0,
+    periodicidad:    datos.periodicidad || '',
+    productos:       datos.productosList || [],
+    datos:           datos,
+    creado_por:      sesionActiva.id,
+    creado_por_nombre: sesionActiva.nombre || sesionActiva.usuario || ''
+  };
+
+  try {
+    const res = await sbFetch('facturas_generadas', { method:'POST', body: fila });
+    const guardada = Array.isArray(res) ? res[0] : res;
+    if(guardada && guardada.id) {
+      gfGuardadaId = guardada.id;
+      gfHistorial.unshift(guardada);
+      if(gfHistorialCargado) gfRenderHistorial();
+    }
+    toast('Factura guardada en el historial ✅');
+  } catch(e) {
+    console.error('No se pudo guardar la factura en el historial:', e);
+    toast('La factura se imprimió pero NO se guardó en el historial','error');
+  }
+}
+
+async function gfCargarHistorial(forzar) {
+  if(gfHistorialCargado && !forzar) { gfRenderHistorial(); return; }
+  const body = document.getElementById('gfHistBody');
+  if(body) body.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:20px;color:#888;">Cargando historial...</td></tr>';
+  try {
+    const res = await sbFetch('facturas_generadas', { order:'creado_en.desc' });
+    gfHistorial = Array.isArray(res) ? res : [];
+    gfHistorialCargado = true;
+  } catch(e) {
+    console.error('Error cargando historial de facturas:', e);
+    gfHistorial = [];
+    if(body) body.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:20px;color:#dc2626;">No se pudo cargar el historial</td></tr>';
+    return;
+  }
+  gfRenderHistorial();
+}
+
+function gfHistorialFiltrado() {
+  const q     = (document.getElementById('gfHistBuscar')?.value || '').trim().toLowerCase();
+  const tipo  = document.getElementById('gfHistTipo')?.value || '';
+  const desde = document.getElementById('gfHistDesde')?.value || '';
+  const hasta = document.getElementById('gfHistHasta')?.value || '';
+
+  return gfHistorial.filter(f => {
+    if(tipo && (f.tipo||'') !== tipo) return false;
+    const fech = (f.fecha || (f.creado_en||'').slice(0,10));
+    if(desde && fech < desde) return false;
+    if(hasta && fech > hasta) return false;
+    if(q) {
+      const texto = [f.numero, f.cliente, f.cedula, f.creado_por_nombre, f.asesor, f.sede_nombre]
+        .map(v => (v||'').toString().toLowerCase()).join(' ');
+      if(!texto.includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+function gfRenderHistorial() {
+  const body = document.getElementById('gfHistBody');
+  if(!body) return;
+  const lista = gfHistorialFiltrado();
+
+  const elTotal = document.getElementById('gfHistTotal');
+  if(elTotal) elTotal.textContent = lista.length;
+  const elCont = document.getElementById('gfHistContado');
+  if(elCont) elCont.textContent = lista.filter(f => (f.tipo||'') !== 'credito').length;
+  const elCred = document.getElementById('gfHistCredito');
+  if(elCred) elCred.textContent = lista.filter(f => (f.tipo||'') === 'credito').length;
+
+  if(lista.length === 0) {
+    body.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:24px;color:#888;">No hay facturas en el historial con esos filtros.</td></tr>';
+    return;
+  }
+
+  const esAdmin = sesionActiva?.rol === 'admin';
+  body.innerHTML = lista.map(f => {
+    const prods = Array.isArray(f.productos) ? f.productos : [];
+    const resumenProd = prods.length === 0 ? '—'
+      : escapeHtml((prods[0].producto || '—').substring(0,24)) + (prods.length > 1 ? ` <span style="color:#888;">+${prods.length-1}</span>` : '');
+    const fech = f.fecha ? fmtFechaCorta(f.fecha) : fmtFechaCorta((f.creado_en||'').slice(0,10));
+    const esCred = (f.tipo||'') === 'credito';
+    return `
+    <tr>
+      <td style="font-family:monospace;font-weight:600;">${escapeHtml(f.numero)}</td>
+      <td style="font-size:12px;">${escapeHtml(fech)}</td>
+      <td>${escapeHtml(f.cliente || '—')}<div style="font-size:11px;color:#888;">${escapeHtml(f.cedula || '')}</div></td>
+      <td style="font-size:12px;">${resumenProd}</td>
+      <td><span class="badge ${esCred?'badge-orange':'badge-green'}">${esCred?'Crédito':'Contado'}</span></td>
+      <td style="font-weight:600;">${fmt(f.total||0)}</td>
+      <td style="font-size:11px;color:#555577;">${escapeHtml(f.sede_nombre || '—')}</td>
+      <td style="font-size:12px;">${escapeHtml(f.creado_por_nombre || '—')}<div style="font-size:10px;color:#888;">${escapeHtml(gfFechaHora(f.creado_en))}</div></td>
+      <td style="white-space:nowrap;">
+        <button class="btn btn-sm btn-ghost" style="font-size:11px;" onclick="gfVerFactura(${f.id})">👁️ Ver</button>
+        <button class="btn btn-sm btn-ghost" style="font-size:11px;" onclick="gfReimprimir(${f.id})">🖨️</button>
+        ${esAdmin ? `<button class="btn btn-sm btn-ghost" style="font-size:11px;color:#dc2626;" onclick="gfEliminarFactura(${f.id})">🗑️</button>` : ''}
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function gfFechaHora(iso) {
+  if(!iso) return '';
+  try {
+    return new Date(iso).toLocaleString('es-CO', { timeZone:'America/Bogota', dateStyle:'short', timeStyle:'short' });
+  } catch(e) { return ''; }
+}
+
+// Reconstruye el objeto que espera generarHTMLFactura a partir de la fila guardada
+function gfDatosDeFila(f) {
+  if(f.datos && typeof f.datos === 'object') return f.datos;
+  const prods = Array.isArray(f.productos) ? f.productos : [];
+  return {
+    tipo: f.tipo, cliente: f.cliente, cedula: f.cedula, telefono: f.telefono, correo: f.correo,
+    equipo: prods[0]?.producto || '', imei: prods[0]?.imei || '',
+    asesor: f.asesor, sede: f.sede_nombre, financiera: f.financiera, numContrato: f.num_contrato,
+    precioBase: f.subtotal, precioFinal: f.total, descuento: f.descuento,
+    iva: f.iva, ivaPct: f.iva_pct, comision: f.comision, comisionPct: f.comision_pct,
+    comisionAsesor: 0, productosList: prods,
+    inicial: f.inicial, saldoFinanciar: f.saldo_financiar, cuotas: f.cuotas,
+    valorCuota: f.valor_cuota, periodicidad: f.periodicidad,
+    intereses: 0, tasaInteres: 0,
+    fecha: f.fecha ? fmtFechaCorta(f.fecha) : '',
+    numero: f.numero
+  };
+}
+
+function gfVerFactura(id) {
+  const f = gfHistorial.find(x => x.id === id);
+  if(!f) { toast('Factura no encontrada','error'); return; }
+  gfFacturaAbierta = f;
+  const titulo = document.getElementById('gfModalTitulo');
+  if(titulo) titulo.textContent = '🧾 Factura ' + (f.numero || '');
+  const meta = document.getElementById('gfModalMeta');
+  if(meta) meta.innerHTML = `Generada por <b>${escapeHtml(f.creado_por_nombre || '—')}</b> el ${escapeHtml(gfFechaHora(f.creado_en))}`
+    + (f.sede_nombre ? ` &middot; ${escapeHtml(f.sede_nombre)}` : '');
+  const cont = document.getElementById('gfModalContenido');
+  if(cont) cont.innerHTML = generarHTMLFactura(gfDatosDeFila(f));
+  openModal('modalGfFactura');
+}
+
+function gfReimprimir(id) {
+  const f = gfHistorial.find(x => x.id === id);
+  if(!f) { toast('Factura no encontrada','error'); return; }
+  gfAbrirVentanaImpresion(generarHTMLFactura(gfDatosDeFila(f)), f.numero);
+}
+
+function gfReimprimirActual() {
+  if(!gfFacturaAbierta) return;
+  gfReimprimir(gfFacturaAbierta.id);
+}
+
+async function gfEliminarFactura(id) {
+  if(sesionActiva?.rol !== 'admin') { toast('Solo el administrador puede borrar del historial','error'); return; }
+  const f = gfHistorial.find(x => x.id === id);
+  if(!f) return;
+  if(!confirm(`¿Borrar del historial la factura ${f.numero} de ${f.cliente||'—'}?\n\nEsto solo elimina la copia guardada, no afecta ningún otro módulo.`)) return;
+  try {
+    showLoader('Eliminando...');
+    await sbFetch(`facturas_generadas?id=eq.${id}`, { method:'DELETE' });
+    gfHistorial = gfHistorial.filter(x => x.id !== id);
+    gfRenderHistorial();
+    toast('Factura eliminada del historial');
+  } catch(e) {
+    console.error(e);
+    toast('No se pudo eliminar: ' + e.message, 'error');
+  } finally { hideLoader(); }
 }
 
 // ============================================================
@@ -15193,6 +15490,8 @@ async function cerrarSesion() {
   const menu = document.getElementById('userMenu'); if (menu) menu.classList.remove('open');
   // Limpiar datos en memoria
   Object.keys(db).forEach(k => db[k] = []);
+  // Historial del generador de facturas (se recarga en el proximo ingreso)
+  gfHistorial = []; gfHistorialCargado = false; gfFacturaAbierta = null;
   mostrarLogin();
   toast('Sesión cerrada');
 }
