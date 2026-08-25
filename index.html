@@ -6801,7 +6801,7 @@ function renderCreditos(filtro='activos'){
           ${c.docContrato?`<button type="button" data-doc="${escapeHtml(c.docContrato)}" onclick="abrirDocumento(this.dataset.doc)" class="btn btn-sm btn-ghost" style="font-size:10px;padding:2px 8px;">📝 Contrato</button>`:''}
         </div>`:''}
         <div style="display:flex;gap:6px;border-top:1px solid #f0ecf8;padding-top:8px;">
-          ${sesionActiva?.rol==='admin'?`<button class="btn btn-sm btn-ghost" style="flex:1;font-size:11px;" onclick="abrirCambioEquipo(${c.id})" title="Cambiar equipo">🔄 Cambio</button>`:''}
+          ${sesionActiva?.rol==='admin'&&!creditoEstaCerrado(c)?`<button class="btn btn-sm btn-ghost" style="flex:1;font-size:11px;" onclick="abrirCambioEquipo(${c.id})" title="Cambiar equipo">🔄 Cambio</button>`:''}
           <button class="btn btn-sm btn-ghost" style="flex:1;font-size:11px;color:#6B2D8B;border-color:#6B2D8B;" onclick="abrirBitacora(${c.id})" title="Bitácora de gestiones">📋 Bitácora${c.bitacoraCount>0?` <span style="background:#6B2D8B;color:#fff;border-radius:8px;padding:0 5px;font-size:10px;">${c.bitacoraCount}</span>`:''}</button>
           ${esUsuarioAdmin()?`<button class="btn btn-sm btn-ghost" style="flex:1;font-size:11px;color:#dc2626;" onclick="confirmarAnularCredito(${c.id})" title="Anular">❌ Anular</button>`:``}
         </div>
@@ -6922,7 +6922,7 @@ async function filtrarCreditosPorIMEI(q) {
           </div>
         </div>
         <div style="display:flex;gap:6px;border-top:1px solid #f0ecf8;padding-top:8px;">
-          ${sesionActiva?.rol==='admin'?`<button class="btn btn-sm btn-ghost" style="flex:1;font-size:11px;" onclick="abrirCambioEquipo(${c.id})">Cambio</button>`:''}
+          ${sesionActiva?.rol==='admin'&&!creditoEstaCerrado(c)?`<button class="btn btn-sm btn-ghost" style="flex:1;font-size:11px;" onclick="abrirCambioEquipo(${c.id})">Cambio</button>`:''}
           <button class="btn btn-sm btn-ghost" style="flex:1;font-size:11px;color:#6B2D8B;" onclick="abrirBitacora(${c.id})">Bitacora</button>
           ${esUsuarioAdmin()?`<button class="btn btn-sm btn-ghost" style="flex:1;font-size:11px;color:#dc2626;" onclick="confirmarAnularCredito(${c.id})">Anular</button>`:''}
         </div>
@@ -12893,17 +12893,42 @@ function equipoActualDeCredito(c){
   return p || null;
 }
 
-function abrirCambioEquipo(id) {
+// Dos formas de cambiar un equipo, con consecuencias contables distintas:
+//  · simple  → el aparato se sustituye DENTRO de la misma venta y el mismo
+//              credito (garantia, falla tecnica). El precio al cliente no cambia.
+//  · refin   → el cliente se lleva un equipo de otro precio: se cierra el credito,
+//              lo pagado pasa a ser la inicial de una VENTA NUEVA y se renegocian
+//              las cuotas. Lo ejecuta cambio_equipo_refinanciado() en PostgreSQL.
+function abrirCambioEquipo(id, modo) {
   const c = db.creditos.find(x => x.id === id);
   if(!c) return;
+  modo = modo || 'simple';
   document.getElementById('anularCreditoId').value = id;
-  document.getElementById('anularTipo').value = 'cambio';
+  document.getElementById('anularTipo').value = (modo === 'refin') ? 'cambio_refin' : 'cambio';
   document.getElementById('anularTitulo').textContent = '🔄 Cambio de Equipo';
   document.getElementById('anularConfirmarBtn').style.background = '#6B2D8B';
+  const caja = document.querySelector('#modalAnularVenta .modal');
+  if(caja) caja.style.maxWidth = (modo === 'refin') ? '640px' : '500px';
   window._cambioNuevoEquipo = null;
   const ant = equipoActualDeCredito(c);
   window._cambioEquipoAnterior = ant;
-  document.getElementById('anularContenido').innerHTML = `
+
+  const selectorModo = `
+    <div style="display:flex;gap:8px;margin-bottom:14px;">
+      <button type="button" class="btn btn-sm ${modo!=='refin'?'btn-primary':'btn-ghost'}" style="flex:1;font-size:12px;"
+              onclick="abrirCambioEquipo(${id},'simple')">🔁 Cambio simple<br><span style="font-size:10px;opacity:.8;">mismo precio</span></button>
+      <button type="button" class="btn btn-sm ${modo==='refin'?'btn-primary':'btn-ghost'}" style="flex:1;font-size:12px;"
+              onclick="abrirCambioEquipo(${id},'refin')">💳 Con refinanciación<br><span style="font-size:10px;opacity:.8;">otro precio y cuotas</span></button>
+    </div>`;
+
+  if(modo === 'refin') {
+    document.getElementById('anularContenido').innerHTML = selectorModo + htmlCambioRefinanciado(c, ant);
+    setTimeout(recalcularCambioRefin, 0);
+    openModal('modalAnularVenta');
+    return;
+  }
+
+  document.getElementById('anularContenido').innerHTML = selectorModo + `
     <div style="background:#f7f5fb;border-radius:10px;padding:14px;margin-bottom:14px;font-size:13px;">
       <div>👤 Cliente: <strong>${escapeHtml(c.cliente)}</strong></div>
       <div>📱 Equipo actual: <strong>${escapeHtml(c.equipo || '—')}</strong></div>
@@ -12934,6 +12959,180 @@ function abrirCambioEquipo(id) {
       <textarea class="form-control" id="cambioObs" rows="2" placeholder="Detalle del cambio..."></textarea>
     </div>`;
   openModal('modalAnularVenta');
+}
+
+// ─── Cambio de equipo CON refinanciación ────────────────────────────────────
+// Lo pagado hasta hoy (inicial + abonos reales) se convierte en la inicial de
+// una venta nueva. La suma de abonos se relee de la tabla, nunca de un contador.
+function htmlCambioRefinanciado(c, ant) {
+  const abonado  = c.abonado || 0;
+  const trasladado = (c.inicial || 0) + abonado;
+  const verCostos = puedeVerCostos();
+  return `
+    <div style="background:#f7f5fb;border-radius:10px;padding:14px;margin-bottom:14px;font-size:13px;">
+      <div>👤 Cliente: <strong>${escapeHtml(c.cliente)}</strong></div>
+      <div>📱 Equipo que entrega: <strong>${escapeHtml(c.equipo || '—')}</strong></div>
+      ${c.imei ? `<div>🔢 IMEI: <strong>${escapeHtml(c.imei)}</strong></div>` : ''}
+      ${!ant ? `<div style="color:#d97706;">⚠️ El equipo actual no se ubicó en inventario; se buscará al confirmar.</div>` : ''}
+      <div style="margin-top:8px;padding-top:8px;border-top:1px dashed #d8cfe6;">
+        <div>Inicial pagada: <strong>${fmt(c.inicial || 0)}</strong></div>
+        <div>Abonos hechos: <strong>${fmt(abonado)}</strong> <span style="color:#888;">(${c.pagadas || 0}/${c.cuotas} cuotas)</span></div>
+        <div style="font-size:15px;color:#6B2D8B;margin-top:4px;">
+          Se traslada como inicial: <strong>${fmt(trasladado)}</strong>
+        </div>
+      </div>
+    </div>
+    <input type="hidden" id="refinTrasladado" value="${trasladado}">
+
+    <div class="form-group">
+      <label class="form-label">IMEI del equipo nuevo *</label>
+      <input type="text" class="form-control" id="refinIMEI" placeholder="Debe estar DISPONIBLE en inventario" oninput="buscarEquipoRefin(this.value)">
+      <div id="refinEquipoInfo" style="margin-top:8px;display:none;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px;font-size:13px;"></div>
+    </div>
+    <input type="hidden" id="refinProductoId">
+
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Valor de venta nuevo *</label>
+        <div class="input-money-wrap"><input type="text" class="form-control" id="refinValorVenta" placeholder="0" inputmode="numeric" oninput="fmtMoneyInput(this);recalcularCambioRefin()"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Comisión del asesor</label>
+        <div class="input-money-wrap"><input type="text" class="form-control" id="refinComision" placeholder="0" inputmode="numeric" oninput="fmtMoneyInput(this)"></div>
+      </div>
+    </div>
+
+    <div id="refinResumen" style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px;font-size:13px;color:#92400e;margin-bottom:12px;">
+      Indica el equipo y el valor de venta.
+    </div>
+
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">N.º de cuotas *</label>
+        <input type="number" class="form-control" id="refinCuotas" min="1" max="72" value="6" oninput="recalcularCambioRefin()">
+      </div>
+      <div class="form-group"><label class="form-label">Frecuencia</label>
+        <select class="form-control" id="refinFrecuencia" onchange="recalcularCambioRefin()">
+          <option value="Quincenal">Quincenal</option>
+          <option value="Mensual">Mensual</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Fecha primer pago *</label>
+        <input type="date" class="form-control" id="refinFecha1" onchange="sugerirSegundaFechaRefin()">
+      </div>
+      <div class="form-group" id="refinFecha2Wrap"><label class="form-label">Fecha segundo pago</label>
+        <input type="date" class="form-control" id="refinFecha2">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Motivo del cambio</label>
+      <select class="form-control" id="refinMotivo">
+        <option value="cliente_prefiere">Cliente prefiere otro equipo</option>
+        <option value="upgrade">Mejora de gama (upgrade)</option>
+        <option value="falla_tecnica">Falla técnica del equipo original</option>
+        <option value="otro">Otro</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Observaciones</label>
+      <textarea class="form-control" id="refinObs" rows="2" placeholder="Detalle del cambio..."></textarea>
+    </div>
+    <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#555577;cursor:pointer;">
+      <input type="checkbox" id="refinDisponible" checked style="width:15px;height:15px;accent-color:#6B2D8B;">
+      Dejar el equipo devuelto como DISPONIBLE (si lo desmarcas queda DEVUELTO, fuera de venta hasta revisión técnica)
+    </label>`;
+}
+
+async function buscarEquipoRefin(val) {
+  val = (val || '').trim();
+  const infoEl = document.getElementById('refinEquipoInfo');
+  const idEl   = document.getElementById('refinProductoId');
+  window._refinEquipo = null;
+  if(idEl) idEl.value = '';
+  if(!infoEl) return;
+  if(val.length < 5) { infoEl.style.display = 'none'; recalcularCambioRefin(); return; }
+
+  const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH };
+  const base = SUPABASE_URL + '/rest/v1/productos';
+  const sel  = 'select=id,producto,imei1,imei2,serial,estado,valor_compra,condicion,sede_id';
+  let rows = [];
+  for(const campo of ['imei1','imei2','serial']) {
+    const res = await fetch(`${base}?${sel}&${campo}=eq.${encodeURIComponent(val)}`, {headers});
+    rows = await res.json();
+    if(rows.length) break;
+  }
+
+  if(!rows.length) {
+    infoEl.style.display = 'block';
+    infoEl.style.background = '#fee2e2'; infoEl.style.borderColor = '#fca5a5';
+    infoEl.innerHTML = '❌ No se encontró ningún equipo con ese IMEI o serial.';
+    recalcularCambioRefin();
+    return;
+  }
+  const p = rows[0];
+  const libre = p.estado === 'DISPONIBLE';
+  infoEl.style.display = 'block';
+  infoEl.style.background = libre ? '#f0fdf4' : '#fee2e2';
+  infoEl.style.borderColor = libre ? '#bbf7d0' : '#fca5a5';
+  infoEl.innerHTML = `📱 <strong>${escapeHtml(p.producto)}</strong> · ${escapeHtml(p.condicion||'—')}
+    <span class="badge ${libre?'badge-green':'badge-red'}">${escapeHtml(p.estado)}</span>
+    ${puedeVerCostos() ? `<div class="solo-costo" style="margin-top:4px;">💰 Costo: <strong>${fmt(parseFloat(p.valor_compra)||0)}</strong></div>` : ''}
+    ${libre ? '' : '<div style="margin-top:4px;font-weight:700;">Solo se puede entregar un equipo DISPONIBLE.</div>'}`;
+  if(libre) { window._refinEquipo = p; if(idEl) idEl.value = p.id; }
+  recalcularCambioRefin();
+}
+
+// Saldo y cuota se derivan siempre de lo trasladado: el asesor no los digita.
+function recalcularCambioRefin() {
+  const box = document.getElementById('refinResumen');
+  if(!box) return;
+  const trasladado = parseFloat(document.getElementById('refinTrasladado')?.value) || 0;
+  const valor      = getMoneyValue('refinValorVenta');
+  const cuotas     = parseInt(document.getElementById('refinCuotas')?.value) || 0;
+  const equipo     = window._refinEquipo;
+  const esQuincenal = (document.getElementById('refinFrecuencia')?.value || 'Quincenal') === 'Quincenal';
+
+  const wrap2 = document.getElementById('refinFecha2Wrap');
+  if(wrap2) wrap2.style.display = esQuincenal ? '' : 'none';
+
+  if(!valor) { box.innerHTML = 'Indica el equipo y el valor de venta.'; return; }
+  const saldo = valor - trasladado;
+  if(saldo < 0) {
+    box.style.background = '#fee2e2'; box.style.borderColor = '#fca5a5'; box.style.color = '#dc2626';
+    box.innerHTML = `⚠️ El cliente ya pagó <strong>${fmt(trasladado)}</strong> y el equipo nuevo vale
+      <strong>${fmt(valor)}</strong>: quedaría un saldo a favor de <strong>${fmt(Math.abs(saldo))}</strong>.
+      Esa devolución se gestiona aparte, no desde aquí.`;
+    return;
+  }
+  const cuota = (saldo > 0 && cuotas > 0) ? Math.round(saldo / cuotas) : 0;
+  window._refinValorCuota = cuota;
+  const ganancia = equipo ? valor - (parseFloat(equipo.valor_compra) || 0) : null;
+
+  box.style.background = '#fffbeb'; box.style.borderColor = '#fde68a'; box.style.color = '#92400e';
+  box.innerHTML = `
+    <div style="font-weight:700;margin-bottom:6px;">📊 Cómo queda la operación</div>
+    <div>Valor de la venta nueva: <strong>${fmt(valor)}</strong></div>
+    <div>− Inicial trasladada: <strong>${fmt(trasladado)}</strong></div>
+    <div style="font-size:15px;margin-top:4px;">= Saldo a financiar: <strong>${fmt(saldo)}</strong></div>
+    ${saldo === 0
+      ? '<div style="margin-top:6px;color:#16a34a;font-weight:700;">Lo pagado cubre el equipo: la venta queda de contado, sin crédito nuevo.</div>'
+      : (cuotas > 0
+          ? `<div style="margin-top:6px;">${cuotas} cuotas ${esQuincenal?'quincenales':'mensuales'} de <strong>${fmt(cuota)}</strong>
+             <span style="color:#78716c;">(suman ${fmt(cuota*cuotas)})</span></div>`
+          : '<div style="margin-top:6px;color:#dc2626;">Indica el número de cuotas.</div>')}
+    ${(ganancia === null || !puedeVerGanancias()) ? '' : `<div style="margin-top:6px;padding-top:6px;border-top:1px dashed #fde68a;">
+       Ganancia de la venta nueva: <strong style="color:${ganancia<0?'#dc2626':'#16a34a'};">${fmt(ganancia)}</strong>
+       ${ganancia<0?' ⚠️ negativa':''}</div>`}`;
+}
+
+function sugerirSegundaFechaRefin() {
+  const f1 = document.getElementById('refinFecha1')?.value;
+  const f2 = document.getElementById('refinFecha2');
+  if(!f1 || !f2 || f2.value) return;
+  const d = new Date(f1 + 'T12:00:00');
+  d.setDate(d.getDate() + 15);
+  f2.value = d.toISOString().slice(0,10);
 }
 
 async function buscarNuevoEquipoCambio(val) {
@@ -13049,6 +13248,81 @@ async function buscarParaSalida(val) {
   }
 }
 
+// Ejecuta el cambio con refinanciación. Toda la escritura ocurre dentro de
+// cambio_equipo_refinanciado() en PostgreSQL: si algo falla no queda a medias.
+// Aquí solo se valida lo que ya se puede ver en pantalla, para dar un mensaje
+// claro antes de ir al servidor; la validación que manda es la de la función.
+async function ejecutarCambioRefinanciado(id) {
+  const credito = db.creditos.find(c => c.id === id);
+  if(!credito) return;
+
+  const productoId = parseInt(document.getElementById('refinProductoId')?.value) || 0;
+  const valor      = getMoneyValue('refinValorVenta');
+  const comision   = getMoneyValue('refinComision');
+  const cuotas     = parseInt(document.getElementById('refinCuotas')?.value) || 0;
+  const frecuencia = document.getElementById('refinFrecuencia')?.value || 'Quincenal';
+  const fecha1     = document.getElementById('refinFecha1')?.value || '';
+  const fecha2     = document.getElementById('refinFecha2')?.value || '';
+  const motivo     = document.getElementById('refinMotivo')?.value || '';
+  const obs        = (document.getElementById('refinObs')?.value || '').trim();
+  const disponible = !!document.getElementById('refinDisponible')?.checked;
+
+  const trasladado = (credito.inicial || 0) + (credito.abonado || 0);
+  const saldo      = valor - trasladado;
+
+  if(!productoId)      { toast('Busca el equipo nuevo por IMEI (debe estar DISPONIBLE)','error'); return; }
+  if(!valor)           { toast('Indica el valor de venta del equipo nuevo','error'); return; }
+  if(saldo < 0)        { toast('El equipo nuevo vale menos de lo ya pagado: gestiona la devolución aparte','error'); return; }
+  if(saldo > 0) {
+    if(cuotas < 1)     { toast('Indica el número de cuotas','error'); return; }
+    if(!fecha1)        { toast('Indica la fecha del primer pago','error'); return; }
+    if(frecuencia === 'Quincenal' && !fecha2) { toast('Indica la fecha del segundo pago','error'); return; }
+  }
+
+  const valorCuota = saldo > 0 ? (window._refinValorCuota || Math.round(saldo / cuotas)) : 0;
+
+  try {
+    showLoader('Procesando cambio de equipo...');
+    const r = await llamarRPC('cambio_equipo_refinanciado', {
+      p_credito_id:          id,
+      p_producto_nuevo_id:   productoId,
+      p_valor_venta:         valor,
+      p_cuotas:              saldo > 0 ? cuotas : 0,
+      p_valor_cuota:         valorCuota,
+      p_frecuencia:          frecuencia,
+      p_fecha_primer_pago:   saldo > 0 ? fecha1 : null,
+      p_fecha_segundo_pago:  (saldo > 0 && frecuencia === 'Quincenal' && fecha2) ? fecha2 : null,
+      p_comision_asesor:     comision,
+      p_motivo:              motivo,
+      p_observaciones:       obs,
+      p_devolver_disponible: disponible
+    });
+
+    hideLoader();
+    closeModal('modalAnularVenta');
+    window._refinEquipo = null;
+
+    // La transacción tocó ventas, créditos, inventario y detalle: se relee todo.
+    await cargarDatosPorSede(sesionActiva);
+    renderCreditos(tabCreditosActual);
+    renderVentas();
+    renderInventario();
+    renderContabilidad();
+    renderComisiones();
+    renderDashboard();
+
+    const avisos = (r?.avisos || []);
+    toast(`✅ Cambio hecho · Venta #${r?.venta_nueva}` +
+          (r?.credito_nuevo ? ` · Crédito #${r.credito_nuevo}` : ' · sin crédito (contado)') +
+          ` · inicial trasladada ${fmt(r?.inicial_trasladada || 0)}`);
+    if(avisos.length) setTimeout(() => toast('⚠️ ' + avisos.join(' | '), 'error'), 600);
+
+  } catch(e) {
+    hideLoader();
+    toast('No se pudo hacer el cambio: ' + mensajeErrorRPC(e), 'error');
+  }
+}
+
 async function ejecutarAnulacion() {
   const id = parseInt(document.getElementById('anularCreditoId').value);
   const tipo = document.getElementById('anularTipo').value;
@@ -13059,6 +13333,12 @@ async function ejecutarAnulacion() {
   }
   if(tipo === 'cambio' && sesionActiva?.rol !== 'admin') {
     toast('Solo un administrador puede hacer cambios de equipo','error'); closeModal('modalAnularVenta'); return;
+  }
+  if(tipo === 'cambio_refin') {
+    if(sesionActiva?.rol !== 'admin') {
+      toast('Solo un administrador puede hacer cambios de equipo','error'); closeModal('modalAnularVenta'); return;
+    }
+    return ejecutarCambioRefinanciado(id);
   }
 
   if(tipo === 'anular') {
