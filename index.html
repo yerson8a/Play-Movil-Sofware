@@ -1269,6 +1269,7 @@
         <button class="tab" onclick="switchVentasTab('activas',this)">✅ Activas</button>
         <button class="tab" onclick="switchVentasTab('pendientes',this)">⏳ Pendientes</button>
         <button class="tab" onclick="switchVentasTab('anuladas',this)">❌ Anuladas / Devueltas</button>
+        <button class="tab" onclick="switchVentasTab('cambios',this)">🔄 Cambios de equipo</button>
         <button class="tab" onclick="switchVentasTab('contado',this)">Contado</button>
         <button class="tab" onclick="switchVentasTab('credito',this)">Crédito</button>
         <button class="tab" onclick="switchVentasTab('marzo',this)">Marzo 2026</button>
@@ -1358,7 +1359,7 @@
         <button class="tab active" onclick="switchCreditosTab('activos',this)">Activos</button>
         <button class="tab" onclick="switchCreditosTab('mora',this)">En Mora</button>
         <button class="tab" onclick="switchCreditosTab('pagados',this)">Pagados</button>
-        <button class="tab" onclick="switchCreditosTab('anulados',this)">Anulados</button>
+        <button class="tab" onclick="switchCreditosTab('anulados',this)">Anulados / Cambios</button>
         <button class="tab" onclick="switchCreditosTab('reportados',this)">Reportados</button>
       </div>
 
@@ -5238,9 +5239,12 @@ const ESTADOS_VENTA = {
   pendiente: { label:'PENDIENTE', icono:'⏳', badge:'badge-yellow', color:'#ca8a04' },
   anulada:   { label:'ANULADA',   icono:'❌', badge:'badge-red',    color:'#dc2626' },
   devuelta:  { label:'DEVUELTA',  icono:'↩️', badge:'badge-orange', color:'#d97706' },
-  reversada: { label:'REVERSADA', icono:'🔁', badge:'badge-red',    color:'#dc2626' }
+  reversada: { label:'REVERSADA', icono:'🔁', badge:'badge-red',    color:'#dc2626' },
+  // El cliente cambió el equipo por otro: la venta no se anuló por error ni se
+  // devolvió el dinero, lo pagado se trasladó como inicial de la venta nueva.
+  cambio:    { label:'CAMBIO EQUIPO', icono:'🔄', badge:'badge-pink', color:'#6B2D8B' }
 };
-const ESTADOS_VENTA_ORDEN = ['activa','pendiente','anulada','devuelta','reversada'];
+const ESTADOS_VENTA_ORDEN = ['activa','pendiente','anulada','devuelta','reversada','cambio'];
 
 function infoEstadoVenta(estado){ return ESTADOS_VENTA[estado] || ESTADOS_VENTA.activa; }
 
@@ -5255,7 +5259,7 @@ function ventaEsEfectiva(v){ return (v?.estado || 'activa') === 'activa'; }
 // La venta no se concretó y el equipo debe volver al inventario.
 function ventaEsRevertida(v){
   const e = v?.estado || 'activa';
-  return e === 'anulada' || e === 'devuelta' || e === 'reversada';
+  return e === 'anulada' || e === 'devuelta' || e === 'reversada' || e === 'cambio';
 }
 // Clasifica un conjunto de ventas por estado. Es la base de los informes:
 // permite decir "del mes: N activas, N pendientes, N anuladas…" con sus valores.
@@ -5330,6 +5334,15 @@ function mapVenta(v) {
     anulada: !efectiva,
     observaciones: v.observaciones || ''
   };
+}
+
+// Un credito cerrado por cambio de equipo ya no es cartera viva: su saldo se
+// traslado a la venta nueva. No debe calcular mora ni contarse como activo,
+// pero si tiene que seguir siendo consultable (pestaña Anulados / Cambios).
+function creditoCerradoPorCambio(c){ return (c?.estado || '') === 'CERRADO_POR_CAMBIO'; }
+function creditoEstaCerrado(c){
+  const e = c?.estado || '';
+  return e === 'pagado' || e === 'anulado' || creditoCerradoPorCambio(c);
 }
 
 function mapCredito(c) {
@@ -6447,7 +6460,7 @@ function toggleMostrarAnuladas(el){
 // Oculta las no efectivas salvo que el usuario las pida, o que la pestaña
 // activa sea justamente la de anuladas.
 function filtrarPorVisibilidadEstado(data, filtro){
-  if(mostrarVentasAnuladas || filtro === 'anuladas' || filtro === 'pendientes') return data;
+  if(mostrarVentasAnuladas || filtro === 'anuladas' || filtro === 'pendientes' || filtro === 'cambios') return data;
   return data.filter(ventaEsEfectiva);
 }
 
@@ -6460,6 +6473,7 @@ function renderVentas(filtro){
   else if(filtro==='activas')data=data.filter(v=>ventaEsEfectiva(v));
   else if(filtro==='pendientes')data=data.filter(v=>v.estado==='pendiente');
   else if(filtro==='anuladas')data=data.filter(v=>ventaEsRevertida(v));
+  else if(filtro==='cambios')data=data.filter(v=>v.estado==='cambio');
   else if(filtro==='marzo')data=data.filter(v=>v.fecha&&v.fecha.startsWith('2026-03'));
   else if(filtro==='febrero')data=data.filter(v=>v.fecha&&v.fecha.startsWith('2026-02'));
   data = filtrarPorVisibilidadEstado(data, filtro || tabVentasActual);
@@ -6577,7 +6591,7 @@ function renderVentas_data(data){
 // cada render) para que los reportes y filtros sobre la BD sean confiables.
 async function sincronizarEstadosCreditosDB() {
   const cambios = db.creditos.filter(c => {
-    if (c.estado === 'pagado' || c.estado === 'anulado') return false;
+    if (creditoEstaCerrado(c)) return false;
     const estadoCalc = calcularProximaCuota(c).enMora ? 'mora' : 'al_dia';
     if (estadoCalc === c.estado) return false;
     c.estado = estadoCalc;
@@ -6678,7 +6692,7 @@ function pintarResumenCredFinanciera(financiera, data){
 function renderCreditos(filtro='activos'){
   // Actualizar estado mora automáticamente por fechas
   db.creditos.forEach(c => {
-    if(c.estado === 'pagado' || c.estado === 'anulado') return;
+    if(creditoEstaCerrado(c)) return;
     const px = calcularProximaCuota(c);
     if(px.enMora) c.estado = 'mora';
     else if(c.estado === 'mora') c.estado = 'al_dia';
@@ -6704,7 +6718,7 @@ function renderCreditos(filtro='activos'){
   let data=db.creditos;
   if(filtro==='mora')data=data.filter(c=>c.estado==='mora');
   else if(filtro==='pagados')data=data.filter(c=>c.estado==='pagado');
-  else if(filtro==='anulados')data=data.filter(c=>c.estado==='anulado');
+  else if(filtro==='anulados')data=data.filter(c=>c.estado==='anulado'||creditoCerradoPorCambio(c));
   else if(filtro==='reportados')data=data.filter(c=>c.reportado);
   else data=data.filter(c=>c.estado==='al_dia'||c.estado==='mora');
 
@@ -6750,7 +6764,7 @@ function renderCreditos(filtro='activos'){
         <div class="cc-monto">
           <div class="cc-total">${fmt(c.saldo)}</div>
           <div class="cc-saldo">saldo restante</div>
-          <span class="badge ${c.estado==='mora'?'badge-red':'badge-green'}" style="margin-top:4px;">${c.estado}</span>
+          <span class="badge ${creditoCerradoPorCambio(c)?'badge-pink':c.estado==='mora'?'badge-red':'badge-green'}" style="margin-top:4px;">${creditoCerradoPorCambio(c)?'🔄 CAMBIO DE EQUIPO':c.estado}</span>
         </div>
       </div>
       <div class="cc-progress">
@@ -6861,7 +6875,7 @@ async function filtrarCreditosPorIMEI(q) {
   let filtrada = data;
   if(tabCurrent==='mora') filtrada=data.filter(c=>c.estado==='mora');
   else if(tabCurrent==='pagados') filtrada=data.filter(c=>c.estado==='pagado');
-  else if(tabCurrent==='anulados') filtrada=data.filter(c=>c.estado==='anulado');
+  else if(tabCurrent==='anulados') filtrada=data.filter(c=>c.estado==='anulado'||creditoCerradoPorCambio(c));
   else filtrada=data.filter(c=>c.estado==='al_dia'||c.estado==='mora');
   if(!filtrada.length) filtrada = data; // Si el tab filtra todo, mostrar todos
 
@@ -6879,7 +6893,7 @@ async function filtrarCreditosPorIMEI(q) {
         <div class="cc-monto">
           <div class="cc-total">${fmt(c.saldo)}</div>
           <div class="cc-saldo">saldo restante</div>
-          <span class="badge ${c.estado==='mora'?'badge-red':'badge-green'}" style="margin-top:4px;">${c.estado}</span>
+          <span class="badge ${creditoCerradoPorCambio(c)?'badge-pink':c.estado==='mora'?'badge-red':'badge-green'}" style="margin-top:4px;">${creditoCerradoPorCambio(c)?'🔄 CAMBIO DE EQUIPO':c.estado}</span>
         </div>
       </div>
       <div class="cc-progress">
