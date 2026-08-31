@@ -2979,7 +2979,7 @@
         <div class="form-group">
           <label class="form-label">Sede de Ingreso</label>
           <select class="form-control" id="cmpSede">
-            <option>LOCAL PEREIRA</option><option>LOCAL ARMENIA LA 15</option>
+            <option>LOCAL PEREIRA</option><option>LOCAL ARMENIA</option><option>LOCAL MANIZALES</option>
           </select>
         </div>
         <div class="form-group">
@@ -4779,9 +4779,12 @@
       <button class="modal-close" onclick="closeModal('modalDetalleVenta')">✕</button>
     </div>
     <div id="detalleVentaContenido"></div>
-    <div style="display:flex;gap:10px;justify-content:space-between;align-items:center;margin-top:16px;">
-      <button class="btn btn-sm btn-ghost" id="btnAnularVentaDetalle" style="color:#dc2626;border:1px solid #dc2626;" onclick="abrirNovedadVenta()">⚠️ Cambiar estado</button>
-      <button class="btn btn-sm btn-outline" id="btnVerFacturaDetalle" onclick="verFacturaVenta()">🧾 Ver Factura</button>
+    <div style="display:flex;gap:10px;justify-content:space-between;align-items:center;margin-top:16px;flex-wrap:wrap;">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-sm btn-ghost" id="btnAnularVentaDetalle" style="color:#dc2626;border:1px solid #dc2626;" onclick="abrirNovedadVenta()">⚠️ Cambiar estado</button>
+        <button class="btn btn-sm btn-ghost" id="btnCambioEquipoDetalle" style="color:#6B2D8B;border:1px solid #6B2D8B;" onclick="abrirCambioEquipoVenta()">🔄 Cambio de equipo</button>
+        <button class="btn btn-sm btn-outline" id="btnVerFacturaDetalle" onclick="verFacturaVenta()">🧾 Ver Factura</button>
+      </div>
       <!-- Visibilidad controlada por JS según rol -->
       <div style="display:flex;gap:10px;">
         <button class="btn btn-ghost" onclick="closeModal('modalDetalleVenta')">Cerrar</button>
@@ -5174,6 +5177,39 @@ function mapProveedor(p) {
   };
 }
 
+// ── Sedes: traducción nombre <-> id ─────────────────────────
+// Las sedes reales viven en la tabla `sedes` (dbAdmin.sedes). Antes estaban
+// escritas a mano como "Pereira o Armenia", así que MANIZALES (id 3) se
+// guardaba y se mostraba mal. Estos dos helpers resuelven siempre contra la
+// tabla; el mapa de respaldo solo cubre el arranque, cuando el login mapea los
+// productos antes de que `cargarSedes()` termine.
+const SEDES_RESPALDO = { 1: 'LOCAL PEREIRA', 2: 'LOCAL ARMENIA', 3: 'LOCAL MANIZALES' };
+
+// "PEREIRA" -> "LOCAL PEREIRA" (los nombres en la tabla van sin el prefijo)
+function nombreSedeLargo(nombre) {
+  const n = (nombre || '').toUpperCase().trim();
+  if (!n) return '';
+  return n.startsWith('LOCAL ') ? n : 'LOCAL ' + n;
+}
+
+function sedeNombrePorId(id, porDefecto = '') {
+  if (!id) return porDefecto;
+  const s = (dbAdmin?.sedes || []).find(x => Number(x.id) === Number(id));
+  if (s) return nombreSedeLargo(s.nombre);
+  return SEDES_RESPALDO[Number(id)] || porDefecto;
+}
+
+function sedeIdPorNombre(nombre, porDefecto = 1) {
+  const n = (nombre || '').toUpperCase();
+  if (!n) return porDefecto;
+  const s = (dbAdmin?.sedes || []).find(x => x.nombre && n.includes(x.nombre.toUpperCase()));
+  if (s) return Number(s.id);
+  for (const [id, nom] of Object.entries(SEDES_RESPALDO)) {
+    if (n.includes(nom.replace('LOCAL ', ''))) return Number(id);
+  }
+  return porDefecto;
+}
+
 function mapProductoACompra(p) {
   return {
     id: p.id,
@@ -5194,7 +5230,7 @@ function mapProductoACompra(p) {
     facturaProv: p.factura_prov || '',
     valorCompra: parseFloat(p.valor_compra) || 0,
     formaPago: p.forma_pago || 'EFECTIVO',
-    sede: p.sede_id === 1 ? 'LOCAL PEREIRA' : p.sede_id === 2 ? 'LOCAL ARMENIA' : '',
+    sede: sedeNombrePorId(p.sede_id),
     garantiaMeses: p.garantia_meses || 0,
     estado: p.estado,
     obs: p.observaciones || ''
@@ -5223,7 +5259,7 @@ function mapProductoAInventario(p) {
     garantiaMeses: p.garantia_meses || 0,
     formaPago: p.forma_pago || '',
     obs: p.observaciones || '',
-    sede: p.sede_id === 1 ? 'LOCAL PEREIRA' : p.sede_id === 2 ? 'LOCAL ARMENIA' : '',
+    sede: sedeNombrePorId(p.sede_id),
     sede_id: p.sede_id,
     estado: p.estado
   };
@@ -5364,7 +5400,7 @@ function mapCredito(c) {
     valorCuota: parseFloat(c.valor_cuota) || 0,
     estado: c.estado || 'al_dia',
     reportado: false,
-    sede: c.sede_id === 1 ? 'LOCAL PEREIRA' : 'LOCAL ARMENIA',
+    sede: sedeNombrePorId(c.sede_id),
     docCedFront:  c.doc_cedula_frente  || null,
     docCedBack:   c.doc_cedula_reverso || null,
     docFoto:      c.doc_foto_entrega   || null,
@@ -5482,7 +5518,7 @@ async function guardarCompraDB(datos) {
         const err = new Error('IMEI duplicado'); err.handled = true; throw err;
       }
     }
-    const sedeId = datos.sede && datos.sede.includes('ARMENIA') ? 2 : 1;
+    const sedeId = sedeIdPorNombre(datos.sede);
     const row = {
       tipo: datos.tipo,
       producto: datos.producto,
@@ -5525,7 +5561,7 @@ async function guardarCompraDB(datos) {
 async function guardarVentaDB(datos) {
   showLoader('Registrando venta...');
   try {
-    const sedeId = datos.sede && datos.sede.includes('ARMENIA') ? 2 : 1;
+    const sedeId = sedeIdPorNombre(datos.sede);
     const row = {
       producto: datos.equipo || null,
       imei: datos.imei || null,
@@ -5573,7 +5609,7 @@ async function guardarVentaDB(datos) {
 async function guardarCreditoDB(datos) {
   showLoader('Registrando crédito...');
   try {
-    const sedeId = datos.sede && datos.sede.includes('ARMENIA') ? 2 : 1;
+    const sedeId = sedeIdPorNombre(datos.sede);
     const row = {
       cliente: datos.cliente,
       cedula_cliente: datos.cedula || null,
@@ -6154,7 +6190,7 @@ function showModule(name) {
   else if(name==='ventas') renderVentas();
   else if(name==='creditos') renderCreditos();
   else if(name==='contabilidad') { renderContabilidad(); }
-  else if(name==='compras') { renderCompras(); renderTablaProveedores(db.proveedores); poblarSelectProveedores(); }
+  else if(name==='compras') { renderCompras(); renderTablaProveedores(db.proveedores); poblarSelectProveedores(); poblarSelectSedes(); }
   else if(name==='tareas') { cargarTareasSupabase().then(()=>renderTareas()); }
   else if(name==='clientes') { cargarClientes(); }
   else if(name==='proveedores') { renderProveedoresMod(); }
@@ -9141,10 +9177,7 @@ function igFmtHora(createdAt) {
 }
 
 function igFmtSede(sedeId) {
-  if(sedeId === 1) return 'LOCAL PEREIRA';
-  if(sedeId === 2) return 'LOCAL ARMENIA';
-  if(sedeId === 3) return 'LOCAL MANIZALES';
-  return '—';
+  return sedeNombrePorId(sedeId, '—');
 }
 
 async function renderInformeGerencial() {
@@ -10309,7 +10342,7 @@ async function actualizarProducto() {
       p.producto=row.producto; p.marca=row.marca||'';
       p.imei=row.imei1||''; p.costo=row.valor_compra;
       p.estado=row.estado; p.sede_id=sedeId;
-      p.sede=sedeObj?sedeObj.nombre.toUpperCase():'';
+      p.sede=sedeObj?nombreSedeLargo(sedeObj.nombre):'';
     }
     hideLoader();
     closeModal('modalEditarProducto');
@@ -10388,7 +10421,7 @@ async function guardarVentaContado(){
       cliente, cedula_cliente: cedula, telefono_cliente: telefono,
       asesor, valor_venta: precioFinal, valor_compra: totalCosto,
       ganancia, financiera: finSel, forma_pago: 'Contado',
-      comision_asesor: 0, sede_id: sedeActual.includes('ARMENIA')?2:1,
+      comision_asesor: 0, sede_id: sedeIdPorNombre(sedeActual),
       observaciones: obs + (nMulti>1 ? ` | Venta con ${nMulti} productos` : ''),
       estado: 'activa',
       fecha_venta: fechaColombia()
@@ -10592,7 +10625,7 @@ async function guardarCredito(){
       cliente: datos.cliente, cedula_cliente: datos.cedula||null, telefono_cliente: datos.telefono||null,
       asesor: datos.asesor, valor_venta: precioFinal, valor_compra: costo,
       ganancia, financiera: finSel, forma_pago: 'Credito',
-      comision_asesor: 0, sede_id: sedeActual.includes('ARMENIA')?2:1,
+      comision_asesor: 0, sede_id: sedeIdPorNombre(sedeActual),
       observaciones: (datos.obs||'') + (nProdC>1 ? ` | Venta con ${nProdC} productos` : ''),
       estado: 'activa',
       fecha_venta: fechaColombia()
@@ -10859,6 +10892,13 @@ async function verDetalleVenta(id) {
   const btnFactura = document.getElementById('btnVerFacturaDetalle');
   if(btnFactura) {
     btnFactura.style.display = ventaEsRevertida(v) ? 'none' : 'inline-flex';
+  }
+  // El cambio de equipo aplica a cualquier venta viva, sea de contado o a
+  // credito (en las de credito el modal redirige al flujo del credito para
+  // que el saldo y las cuotas no se queden apuntando al equipo viejo).
+  const btnCambioEq = document.getElementById('btnCambioEquipoDetalle');
+  if(btnCambioEq) {
+    btnCambioEq.style.display = (!ventaEsRevertida(v) && sesionActiva?.rol === 'admin') ? 'inline-flex' : 'none';
   }
 
   // Datos de la anulación, para auditoría a la vista del usuario
@@ -11494,7 +11534,7 @@ async function confirmarTraslado() {
     // Actualizar en memoria
     if(prod) {
       prod.sede_id = sedeDestinoId;
-      prod.sede    = sedeDestino?.nombre?.toUpperCase() || '';
+      prod.sede    = nombreSedeLargo(sedeDestino?.nombre);
     }
     hideLoader();
     closeModal('modalTrasladoEquipo');
@@ -12330,7 +12370,7 @@ async function buscarIMEIModalProd(val) {
       setMoneyValue('mpCosto',  costo);
       setMoneyValue('mpPrecio', Math.round(costo/0.55));
       document.getElementById('mpProdId').value = p.id;
-      const sedeNom = p.sede_id===1?'PEREIRA':p.sede_id===2?'ARMENIA':'—';
+      const sedeNom = sedeNombrePorId(p.sede_id, '—');
       const prov    = db.proveedores.find(x=>x.id===p.proveedor_id);
       const infoEl  = document.getElementById('mpIMEIInfo');
       if(infoEl) {
@@ -12405,7 +12445,7 @@ async function buscarIMEIVenta(val){
   const infoEl = $('vcIMEIInfo');
   if(found){
     const prov = db.proveedores.find(p=>p.id===found.proveedorId);
-    const sedeNom = found.sede || (found.sede_id===1?'LOCAL PEREIRA':found.sede_id===2?'LOCAL ARMENIA':'—');
+    const sedeNom = found.sede || sedeNombrePorId(found.sede_id, '—');
     if(infoEl) infoEl.style.display='block';
     const set = (id,v) => { const e=$(id); if(e) e.textContent=v; };
     set('vcInfoProducto', found.producto);
@@ -12463,7 +12503,7 @@ async function buscarIMEICredito(val){
     if(rows && rows.length > 0) {
       const p = rows[0];
       const costo = parseFloat(p.valor_compra) || 0;
-      const sedeNombre = p.sede_id===1 ? 'LOCAL PEREIRA' : p.sede_id===2 ? 'LOCAL ARMENIA' : '—';
+      const sedeNombre = sedeNombrePorId(p.sede_id, '—');
       const prov = db.proveedores.find(x => x.id === p.proveedor_id);
 
       $('crdIMEIInfo').style.display = 'block';
@@ -13206,6 +13246,7 @@ function pintarComparativoCambio(nuevo){
   const costoNue  = parseFloat(nuevo.valor_compra) || 0;
   const dif       = costoNue - costoAnt;
   const verCostos = puedeVerCostos();
+  const desdeVenta = document.getElementById('anularTipo')?.value === 'cambio_venta';
 
   const filaDif = !verCostos ? '' : !ant
     ? `<div style="margin-top:6px;color:#92400e;">El equipo que sale no se ubicó en inventario: la diferencia se calculará al confirmar, con el costo que quedó registrado en la venta.</div>`
@@ -13222,7 +13263,7 @@ function pintarComparativoCambio(nuevo){
       <div>🏭 Proveedor: <strong>${escapeHtml(provAnt)}</strong> → <strong>${escapeHtml(provNue)}</strong></div>
       ${verCostos && ant ? `<div class="solo-costo">💰 Valor de compra: <strong>${fmt(costoAnt)}</strong> → <strong>${fmt(costoNue)}</strong></div>` : ''}
       ${filaDif}
-      <div style="margin-top:6px;color:#78716c;">Se actualizan el crédito, la venta y su detalle, el inventario de ambos equipos y, por consiguiente, contabilidad y comisiones. El valor cobrado al cliente no cambia.</div>
+      <div style="margin-top:6px;color:#78716c;">Se actualizan ${desdeVenta ? '' : 'el crédito, '}la venta y su detalle, el inventario de ambos equipos y, por consiguiente, contabilidad y comisiones. El valor cobrado al cliente no cambia.</div>
     </div>`;
 }
 
@@ -13331,7 +13372,7 @@ async function ejecutarAnulacion() {
   if(tipo === 'anular' && !esUsuarioAdmin()) {
     toast('Solo el usuario administrador puede anular ventas','error'); closeModal('modalAnularVenta'); return;
   }
-  if(tipo === 'cambio' && sesionActiva?.rol !== 'admin') {
+  if((tipo === 'cambio' || tipo === 'cambio_venta') && sesionActiva?.rol !== 'admin') {
     toast('Solo un administrador puede hacer cambios de equipo','error'); closeModal('modalAnularVenta'); return;
   }
   if(tipo === 'cambio_refin') {
@@ -13391,14 +13432,16 @@ async function ejecutarAnulacion() {
       console.error(e);
     }
 
-  } else if(tipo === 'cambio') {
+  } else if(tipo === 'cambio' || tipo === 'cambio_venta') {
     const nuevoId = parseInt(document.getElementById('cambioNuevoProductoId').value);
     const obs = document.getElementById('cambioObs')?.value || '';
     const motivoSel = document.getElementById('cambioMotivo');
     const motivoTxt = motivoSel ? (motivoSel.options[motivoSel.selectedIndex]?.text || motivoSel.value) : '';
+    if(!nuevoId) { toast('Busca y selecciona el nuevo equipo por IMEI (debe estar en inventario)', 'error'); return; }
+    if(tipo === 'cambio_venta') return ejecutarCambioEquipoVenta(id, nuevoId, motivoTxt, obs);
+
     const credito = db.creditos.find(c => c.id === id);
     if(!credito) { toast('Crédito no encontrado', 'error'); return; }
-    if(!nuevoId) { toast('Busca y selecciona el nuevo equipo por IMEI (debe estar en inventario)', 'error'); return; }
     // Datos del equipo anterior (para sincronizar la venta vinculada)
     const oldImei   = credito.imei || '';
     const oldEquipo = credito.equipo || '';
@@ -13406,58 +13449,21 @@ async function ejecutarAnulacion() {
 
     try {
       showLoader('Procesando cambio...');
-      const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH };
-      const base = SUPABASE_URL + '/rest/v1/productos';
 
-      // Obtener datos completos del nuevo equipo (revalidar que sigue DISPONIBLE)
-      const selProd = 'id,producto,imei1,imei2,serial,estado,valor_compra,proveedor_id,observaciones';
-      const resNuevo = await fetch(`${base}?select=${selProd}&id=eq.${nuevoId}`, {headers});
-      const nuevoEquipo = await resNuevo.json();
-      if(!nuevoEquipo.length) { hideLoader(); toast('Equipo no encontrado', 'error'); return; }
-      const nuevo = nuevoEquipo[0];
-      if(nuevo.estado !== 'DISPONIBLE') { hideLoader(); toast('El equipo ya no está disponible en inventario (estado: ' + nuevo.estado + ')', 'error'); return; }
+      // Revalidar que el equipo nuevo sigue DISPONIBLE
+      const nuevo = await traerEquipoDisponible(nuevoId);
+      if(!nuevo) { hideLoader(); return; }
       const costoNuevo = parseFloat(nuevo.valor_compra) || 0;
 
       // Ubicar el equipo anterior: id exacto; fallback por IMEI; fallback por nombre
-      let anteriorId = credito.productoId || null;
-      if(!anteriorId && credito.imei) {
-        let rA = await fetch(`${base}?select=id&imei1=eq.${encodeURIComponent(credito.imei)}&estado=eq.VENDIDO&limit=1`, {headers});
-        let aRows = await rA.json();
-        if(!aRows.length) { rA = await fetch(`${base}?select=id&imei2=eq.${encodeURIComponent(credito.imei)}&estado=eq.VENDIDO&limit=1`, {headers}); aRows = await rA.json(); }
-        if(aRows.length) anteriorId = aRows[0].id;
-      }
-      if(!anteriorId && credito.equipo) {
-        const resAnterior = await fetch(`${base}?select=id&producto=eq.${encodeURIComponent(credito.equipo)}&estado=eq.VENDIDO&limit=1`, {headers});
-        const anterior = await resAnterior.json();
-        if(anterior.length > 0) anteriorId = anterior[0].id;
-      }
-
+      const anteriorId = await ubicarEquipoVendido(credito.productoId, oldImei, oldEquipo);
       // Costo real del equipo que sale: manda el inventario, no lo que quedó en la venta
-      let anteriorProd = null;
-      if(anteriorId) {
-        const rAnt = await sbFetch(`productos?select=${selProd}&id=eq.${anteriorId}`);
-        anteriorProd = rAnt && rAnt[0] ? rAnt[0] : null;
-      }
+      const anteriorProd = anteriorId ? await traerProductoCambio(anteriorId) : null;
       // null = no se pudo ubicar el equipo que sale; el costo se toma del detalle de la venta
       const costoAnteriorInv = anteriorProd ? (parseFloat(anteriorProd.valor_compra)||0) : null;
 
-      // Trazabilidad en ambos equipos, sin pisar sus observaciones previas
-      const notaProd = (prev, nota) => ((prev||'').trim() ? prev.trim() + ' | ' : '') + nota;
       const selloCambio = 'CAMBIO CRÉDITO #' + id + ' (' + (motivoTxt||'sin motivo') + ') ' + fechaColombia();
-
-      // Devolver equipo anterior al inventario
-      if(anteriorId) {
-        await sbFetch(`productos?id=eq.${anteriorId}`, {
-          method: 'PATCH',
-          body: { estado: 'DISPONIBLE', observaciones: notaProd(anteriorProd?.observaciones, 'DEVUELTO POR ' + selloCambio) }
-        });
-      }
-
-      // Marcar nuevo equipo como vendido
-      await sbFetch(`productos?id=eq.${nuevoId}`, {
-        method: 'PATCH',
-        body: { estado: 'VENDIDO', observaciones: notaProd(nuevo.observaciones, 'ENTREGADO POR ' + selloCambio) }
-      });
+      await moverInventarioPorCambio(anteriorId, anteriorProd, nuevo, selloCambio);
 
       // Actualizar crédito con el nuevo equipo (nombre + id + imei) y registrar el cambio
       const detalleCambio = 'CAMBIO EQUIPO (' + (motivoTxt||'sin motivo') + '): ' + (credito.equipo||'—') + ' → ' + nuevo.producto + (obs ? '. ' + obs : '');
@@ -13477,76 +13483,18 @@ async function ejecutarAnulacion() {
       let ventasTocadas = 0;
       let deltaAplicado = 0;
       try {
-        const nuevoImei = nuevo.imei1 || nuevo.serial || '';
-        let ventaIds = [];
-        if(credito.ventaId) ventaIds = [credito.ventaId];
-        if(!ventaIds.length && oldImei) {
-          const det = await sbFetch(`ventas_detalle?select=venta_id&imei=eq.${encodeURIComponent(oldImei)}`);
-          ventaIds = [...new Set((det||[]).map(d => d.venta_id).filter(Boolean))];
-        }
-        if(!ventaIds.length && oldImei) {
-          const vs = await sbFetch(`ventas?select=id&imei=eq.${encodeURIComponent(oldImei)}`);
-          ventaIds = (vs||[]).map(v => v.id);
-        }
-        if(!ventaIds.length && oldEquipo) {
-          const filtroCed = oldCedula ? `&cedula_cliente=eq.${encodeURIComponent(oldCedula)}` : '';
-          const vs = await sbFetch(`ventas?select=id&producto=eq.${encodeURIComponent(oldEquipo)}${filtroCed}`);
-          ventaIds = (vs||[]).map(v => v.id);
-        }
-
+        const ventaIds = await ubicarVentasDelCredito(credito, oldImei, oldEquipo, oldCedula);
         for(const vid of ventaIds) {
-          const mRows = await sbFetch(`ventas?select=id,producto,imei,valor_compra,ganancia,observaciones,estado&id=eq.${vid}`);
-          const m = mRows && mRows[0];
-          if(!m) continue;
-          if(normalizarEstadoVenta(m) !== 'activa') continue; // una venta anulada/devuelta no se recalcula
-
-          // Línea del equipo anterior en el detalle (fuente del costo si el
-          // equipo que sale ya no se ubica en inventario)
-          const filtroDet = oldImei
-            ? `ventas_detalle?venta_id=eq.${vid}&imei=eq.${encodeURIComponent(oldImei)}`
-            : `ventas_detalle?venta_id=eq.${vid}&producto=eq.${encodeURIComponent(oldEquipo)}`;
-          const dRows = await sbFetch(`${filtroDet}&select=id,valor_compra,ganancia`);
-
-          let costoSale = costoAnteriorInv;
-          if(costoSale === null && dRows && dRows.length) costoSale = parseFloat(dRows[0].valor_compra)||0;
-          if(costoSale === null && m.producto === oldEquipo) costoSale = parseFloat(m.valor_compra)||0;
-          const delta = costoSale === null ? null : (costoNuevo - costoSale);
-
-          // Maestro: imei solo si el equipo cambiado era el principal; nombre solo
-          // si la venta era de un único equipo. El costo se ajusta por diferencia
-          // para no dañar las ventas multi-producto.
-          const body = {};
-          if(delta !== null) {
-            body.valor_compra = Math.max(0, (parseFloat(m.valor_compra)||0) + delta);
-            body.ganancia     =             (parseFloat(m.ganancia)||0)     - delta;
-            deltaAplicado = delta;
-          }
-          if(oldImei && m.imei === oldImei) body.imei = nuevoImei;
-          if(m.producto === oldEquipo) { body.producto = nuevo.producto; body.producto_id = nuevo.id; }
-          if(Object.keys(body).length) await sbFetch(`ventas?id=eq.${vid}`, { method: 'PATCH', body });
+          const r = await sincronizarVentaPorCambio(vid, { oldImei, oldEquipo, nuevo, costoNuevo, costoAnteriorInv });
+          if(!r) continue;
           ventasTocadas++;
-
-          // Detalle: solo la línea del equipo anterior, con su costo real
-          for(const d of (dRows||[])) {
-            const costoLinea = parseFloat(d.valor_compra)||0;
-            await sbFetch(`ventas_detalle?id=eq.${d.id}`, {
-              method: 'PATCH',
-              body: {
-                producto: nuevo.producto,
-                imei: nuevoImei,
-                producto_id: nuevo.id,
-                valor_compra: costoNuevo,
-                ganancia: (parseFloat(d.ganancia)||0) + (costoLinea - costoNuevo)
-              }
-            });
-          }
+          deltaAplicado = r.delta;
         }
       } catch(eV) { console.warn('No se pudo sincronizar la venta vinculada al cambio de equipo:', eV); }
 
       hideLoader();
       closeModal('modalAnularVenta');
-      window._cambioNuevoEquipo = null;
-      window._cambioEquipoAnterior = null;
+      limpiarEstadoCambio();
       await cargarDatosPorSede(sesionActiva);
       renderCreditos(tabCreditosActual);
       renderVentas();
@@ -13562,6 +13510,321 @@ async function ejecutarAnulacion() {
       }
     } catch(e) { hideLoader(); toast('Error: ' + e.message, 'error'); }
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// NÚCLEO COMPARTIDO DEL CAMBIO SIMPLE DE EQUIPO
+// ═══════════════════════════════════════════════════════════════════════════
+// Un cambio simple mueve siempre las mismas tres cosas: el equipo que sale
+// vuelve al inventario, el que entra se marca VENDIDO, y la venta (maestro +
+// detalle) se recalcula por la diferencia de costo. Lo usan por igual el
+// cambio desde Créditos y el cambio desde una venta de contado.
+
+const SEL_PROD_CAMBIO = 'id,producto,imei1,imei2,serial,estado,valor_compra,proveedor_id,observaciones';
+
+async function traerProductoCambio(prodId) {
+  const r = await sbFetch(`productos?select=${SEL_PROD_CAMBIO}&id=eq.${prodId}`);
+  return (r && r[0]) || null;
+}
+
+// Trae el equipo que entra y avisa si ya no se puede entregar.
+async function traerEquipoDisponible(prodId) {
+  const p = await traerProductoCambio(prodId);
+  if(!p) { toast('Equipo no encontrado', 'error'); return null; }
+  if(p.estado !== 'DISPONIBLE') {
+    toast('El equipo ya no está disponible en inventario (estado: ' + p.estado + ')', 'error');
+    return null;
+  }
+  return p;
+}
+
+// Ubica en `productos` el equipo que sale: id exacto, luego IMEI, luego nombre.
+async function ubicarEquipoVendido(productoId, imei, nombre) {
+  if(productoId) return productoId;
+  if(imei) {
+    let r = await sbFetch(`productos?select=id&imei1=eq.${encodeURIComponent(imei)}&estado=eq.VENDIDO&limit=1`);
+    if(!r.length) r = await sbFetch(`productos?select=id&imei2=eq.${encodeURIComponent(imei)}&estado=eq.VENDIDO&limit=1`);
+    if(r.length) return r[0].id;
+  }
+  if(nombre) {
+    const r = await sbFetch(`productos?select=id&producto=eq.${encodeURIComponent(nombre)}&estado=eq.VENDIDO&limit=1`);
+    if(r.length) return r[0].id;
+  }
+  return null;
+}
+
+// Trazabilidad en los equipos, sin pisar sus observaciones previas
+function notaProducto(prev, nota) {
+  return ((prev||'').trim() ? prev.trim() + ' | ' : '') + nota;
+}
+
+async function moverInventarioPorCambio(anteriorId, anteriorProd, nuevo, sello) {
+  if(anteriorId) {
+    await sbFetch(`productos?id=eq.${anteriorId}`, {
+      method: 'PATCH',
+      body: { estado: 'DISPONIBLE', observaciones: notaProducto(anteriorProd?.observaciones, 'DEVUELTO POR ' + sello) }
+    });
+  }
+  await sbFetch(`productos?id=eq.${nuevo.id}`, {
+    method: 'PATCH',
+    body: { estado: 'VENDIDO', observaciones: notaProducto(nuevo.observaciones, 'ENTREGADO POR ' + sello) }
+  });
+}
+
+// Un crédito debería traer su venta_id; si no lo tiene se busca por el IMEI del
+// equipo que sale (detalle y maestro) y, como último recurso, por nombre+cédula.
+async function ubicarVentasDelCredito(credito, oldImei, oldEquipo, oldCedula) {
+  if(credito.ventaId) return [credito.ventaId];
+  if(oldImei) {
+    const det = await sbFetch(`ventas_detalle?select=venta_id&imei=eq.${encodeURIComponent(oldImei)}`);
+    const ids = [...new Set((det||[]).map(d => d.venta_id).filter(Boolean))];
+    if(ids.length) return ids;
+    const vs = await sbFetch(`ventas?select=id&imei=eq.${encodeURIComponent(oldImei)}`);
+    if(vs && vs.length) return vs.map(v => v.id);
+  }
+  if(oldEquipo) {
+    const filtroCed = oldCedula ? `&cedula_cliente=eq.${encodeURIComponent(oldCedula)}` : '';
+    const vs = await sbFetch(`ventas?select=id&producto=eq.${encodeURIComponent(oldEquipo)}${filtroCed}`);
+    return (vs||[]).map(v => v.id);
+  }
+  return [];
+}
+
+// Recalcula una venta tras sustituir un equipo por otro.
+// Devuelve { delta } con el ajuste de costo aplicado, o null si la venta no
+// existe o ya no está activa (una venta anulada/devuelta no se recalcula).
+//
+// Maestro: el imei solo se toca si el equipo cambiado era el principal, y el
+// nombre solo si la venta era de un único equipo. El costo se ajusta por
+// diferencia para no dañar las ventas multi-producto.
+async function sincronizarVentaPorCambio(vid, opts) {
+  const { oldImei, oldEquipo, detalleId, nuevo, costoNuevo, costoAnteriorInv, nota } = opts;
+  const mRows = await sbFetch(`ventas?select=id,producto,imei,valor_compra,ganancia,observaciones,estado&id=eq.${vid}`);
+  const m = mRows && mRows[0];
+  if(!m) return null;
+  if(normalizarEstadoVenta(m) !== 'activa') return null;
+
+  const nuevoImei = nuevo.imei1 || nuevo.serial || '';
+
+  // Línea del equipo anterior en el detalle (fuente del costo si el equipo que
+  // sale ya no se ubica en inventario). Con detalleId se ataca la fila exacta,
+  // que es lo que hace falta en una venta de varios equipos iguales.
+  const filtroDet = detalleId
+    ? `ventas_detalle?id=eq.${detalleId}`
+    : (oldImei
+        ? `ventas_detalle?venta_id=eq.${vid}&imei=eq.${encodeURIComponent(oldImei)}`
+        : `ventas_detalle?venta_id=eq.${vid}&producto=eq.${encodeURIComponent(oldEquipo)}`);
+  const dRows = await sbFetch(`${filtroDet}&select=id,valor_compra,ganancia`);
+
+  let costoSale = costoAnteriorInv;
+  if(costoSale === null && dRows && dRows.length) costoSale = parseFloat(dRows[0].valor_compra)||0;
+  if(costoSale === null && m.producto === oldEquipo) costoSale = parseFloat(m.valor_compra)||0;
+  const delta = costoSale === null ? null : (costoNuevo - costoSale);
+
+  const body = {};
+  if(delta !== null) {
+    body.valor_compra = Math.max(0, (parseFloat(m.valor_compra)||0) + delta);
+    body.ganancia     =             (parseFloat(m.ganancia)||0)     - delta;
+  }
+  if(oldImei && m.imei === oldImei) body.imei = nuevoImei;
+  if(m.producto === oldEquipo) { body.producto = nuevo.producto; body.producto_id = nuevo.id; }
+  if(nota) body.observaciones = notaProducto(m.observaciones, nota);
+  if(Object.keys(body).length) await sbFetch(`ventas?id=eq.${vid}`, { method: 'PATCH', body });
+
+  // Detalle: solo la línea del equipo anterior, con su costo real
+  for(const d of (dRows||[])) {
+    const costoLinea = parseFloat(d.valor_compra)||0;
+    await sbFetch(`ventas_detalle?id=eq.${d.id}`, {
+      method: 'PATCH',
+      body: {
+        producto: nuevo.producto,
+        imei: nuevoImei,
+        producto_id: nuevo.id,
+        valor_compra: costoNuevo,
+        ganancia: (parseFloat(d.ganancia)||0) + (costoLinea - costoNuevo)
+      }
+    });
+  }
+  return { delta: delta || 0 };
+}
+
+function limpiarEstadoCambio() {
+  window._cambioNuevoEquipo = null;
+  window._cambioEquipoAnterior = null;
+  window._cambioLineasVenta = null;
+  window._cambioLineaVenta = null;
+  window._cambioVentaId = null;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CAMBIO DE EQUIPO DESDE UNA VENTA DE CONTADO
+// ═══════════════════════════════════════════════════════════════════════════
+// El cambio nació atado a Créditos, así que una venta de contado no tenía por
+// dónde hacerlo. Aquí se abre el mismo modal partiendo de la venta: se elige
+// cuál de sus equipos sale (una venta puede tener varios) y se sustituye por
+// otro del inventario. El valor cobrado al cliente NO cambia: si el equipo
+// nuevo vale distinto para el cliente, eso es anular y volver a vender.
+async function abrirCambioEquipoVenta(ventaId) {
+  const id = ventaId || ventaDetalleActualId;
+  const v = db.ventas.find(x => x.id === id);
+  if(!v) { toast('Venta no encontrada','error'); return; }
+  if(sesionActiva?.rol !== 'admin') { toast('Solo un administrador puede hacer cambios de equipo','error'); return; }
+  if(ventaEsRevertida(v)) { toast('Esta venta está ' + infoEstadoVenta(v.estado).label + ': no admite cambio de equipo','error'); return; }
+
+  // Si la venta tiene crédito vivo, el cambio debe pasar por el crédito para que
+  // el contrato, el saldo y las cuotas no queden apuntando al equipo viejo.
+  const cred = db.creditos.find(c => c.ventaId === id && !creditoEstaCerrado(c));
+  if(cred) {
+    closeModal('modalDetalleVenta');
+    toast('Esta venta tiene el crédito #' + cred.id + ': el cambio se hace sobre el crédito');
+    abrirCambioEquipo(cred.id, 'simple');
+    return;
+  }
+
+  // Equipos de la venta: el detalle manda; las ventas viejas (anteriores a
+  // ventas_detalle) solo tienen el equipo del maestro.
+  showLoader('Cargando equipos de la venta...');
+  let lineas = [];
+  try {
+    const det = await sbFetch(`ventas_detalle?venta_id=eq.${id}&select=id,producto,imei,serial,valor_compra,producto_id&order=id.asc`);
+    lineas = (det||[]).map(d => ({
+      detalleId: d.id,
+      productoId: d.producto_id || null,
+      producto:   d.producto || '—',
+      imei:       d.imei || d.serial || '',
+      costo:      parseFloat(d.valor_compra) || 0
+    }));
+  } catch(e) { console.warn('Venta sin detalle, se usa el maestro:', e); }
+  hideLoader();
+  if(!lineas.length) {
+    lineas = [{ detalleId:null, productoId:null, producto:v.equipo||'—', imei:v.imei||'', costo:v.costo||0 }];
+  }
+
+  window._cambioLineasVenta = lineas;
+  window._cambioVentaId     = id;
+  window._cambioNuevoEquipo = null;
+
+  closeModal('modalDetalleVenta');
+  document.getElementById('anularCreditoId').value = id;
+  document.getElementById('anularTipo').value = 'cambio_venta';
+  document.getElementById('anularTitulo').textContent = '🔄 Cambio de Equipo';
+  document.getElementById('anularConfirmarBtn').style.background = '#6B2D8B';
+  const caja = document.querySelector('#modalAnularVenta .modal');
+  if(caja) caja.style.maxWidth = '500px';
+
+  const selector = lineas.length > 1 ? `
+    <div class="form-group">
+      <label class="form-label">Equipo que sale *</label>
+      <select class="form-control" id="cambioLineaVenta" onchange="seleccionarLineaCambioVenta(this.value)">
+        ${lineas.map((l,i) => `<option value="${i}">${escapeHtml(l.producto)}${l.imei ? ' · ' + escapeHtml(l.imei) : ''}</option>`).join('')}
+      </select>
+    </div>` : '';
+
+  document.getElementById('anularContenido').innerHTML = `
+    <div style="background:#f7f5fb;border-radius:10px;padding:14px;margin-bottom:14px;font-size:13px;">
+      <div>🧾 Venta <strong>#${v.id}</strong> · ${escapeHtml(v.fecha||'')} · <span class="badge badge-blue">CONTADO</span></div>
+      <div>👤 Cliente: <strong>${escapeHtml(v.cliente||'—')}</strong></div>
+      <div id="cambioVentaEquipoActual"></div>
+    </div>
+    ${selector}
+    <div class="form-group">
+      <label class="form-label">IMEI del nuevo equipo *</label>
+      <input type="text" class="form-control" id="cambioNuevoIMEI" placeholder="Busca por IMEI del equipo a entregar (debe estar en inventario)" oninput="buscarNuevoEquipoCambio(this.value)">
+      <div id="cambioNuevoInfo" style="margin-top:8px;display:none;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px;font-size:13px;"></div>
+      <div id="cambioComparativo" style="margin-top:8px;display:none;"></div>
+    </div>
+    <input type="hidden" id="cambioNuevoProductoId">
+    <input type="hidden" id="cambioNuevoImei1">
+    <input type="hidden" id="cambioNuevoImei2">
+    <div class="form-group">
+      <label class="form-label">Motivo del cambio</label>
+      <select class="form-control" id="cambioMotivo">
+        <option value="falla_tecnica">Falla técnica del equipo original</option>
+        <option value="cliente_prefiere">Cliente prefiere otro equipo</option>
+        <option value="garantia">Garantía</option>
+        <option value="otro">Otro</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Observaciones</label>
+      <textarea class="form-control" id="cambioObs" rows="2" placeholder="Detalle del cambio..."></textarea>
+    </div>`;
+  seleccionarLineaCambioVenta(0);
+  openModal('modalAnularVenta');
+}
+
+// Fija cuál de los equipos de la venta es el que sale y repinta el comparativo.
+function seleccionarLineaCambioVenta(idx) {
+  const lineas = window._cambioLineasVenta || [];
+  const l = lineas[parseInt(idx) || 0];
+  if(!l) return;
+  window._cambioLineaVenta = l;
+
+  // El equipo que sale, visto desde el inventario: de ahí salen el proveedor y
+  // el costo real (la venta puede traer un costo ya ajustado por otro cambio).
+  let ant = l.productoId ? db.inventario.find(x => x.id === l.productoId) : null;
+  if(!ant && l.imei)     ant = db.inventario.find(x => x.imei1===l.imei || x.imei2===l.imei || x.serial===l.imei);
+  if(!ant && l.producto) ant = db.inventario.find(x => x.producto === l.producto);
+  window._cambioEquipoAnterior = ant || null;
+
+  const box = document.getElementById('cambioVentaEquipoActual');
+  if(box) box.innerHTML = `
+    <div>📱 Equipo que sale: <strong>${escapeHtml(l.producto)}</strong></div>
+    ${l.imei ? `<div>🔢 IMEI: <strong>${escapeHtml(l.imei)}</strong></div>` : ''}
+    ${ant ? `<div>🏭 Proveedor: <strong>${escapeHtml(ant.proveedor||'—')}</strong></div>`
+          : `<div style="color:#d97706;">⚠️ El equipo actual no se encontró en inventario; se buscará al confirmar.</div>`}
+    ${ant && puedeVerCostos() ? `<div class="solo-costo">💰 Valor de compra actual: <strong>${fmt(ant.costo||0)}</strong></div>` : ''}`;
+  pintarComparativoCambio(window._cambioNuevoEquipo || null);
+}
+
+async function ejecutarCambioEquipoVenta(ventaId, nuevoId, motivoTxt, obs) {
+  const v = db.ventas.find(x => x.id === ventaId);
+  if(!v) { toast('Venta no encontrada','error'); return; }
+  const linea = window._cambioLineaVenta || (window._cambioLineasVenta || [])[0];
+  if(!linea) { toast('No se pudo determinar el equipo que sale','error'); return; }
+
+  try {
+    showLoader('Procesando cambio...');
+    const nuevo = await traerEquipoDisponible(nuevoId);
+    if(!nuevo) { hideLoader(); return; }
+    if(linea.productoId && nuevo.id === linea.productoId) {
+      hideLoader(); toast('El equipo nuevo es el mismo que ya tiene la venta','error'); return;
+    }
+    const costoNuevo = parseFloat(nuevo.valor_compra) || 0;
+
+    const anteriorId   = await ubicarEquipoVendido(linea.productoId, linea.imei, linea.producto);
+    const anteriorProd = anteriorId ? await traerProductoCambio(anteriorId) : null;
+    const costoAnteriorInv = anteriorProd ? (parseFloat(anteriorProd.valor_compra)||0) : null;
+
+    const sello = 'CAMBIO VENTA #' + ventaId + ' (' + (motivoTxt||'sin motivo') + ') ' + fechaColombia();
+    await moverInventarioPorCambio(anteriorId, anteriorProd, nuevo, sello);
+
+    // Sin crédito de por medio, la traza del cambio vive en la propia venta.
+    const nota = 'CAMBIO EQUIPO (' + (motivoTxt||'sin motivo') + '): ' +
+                 (linea.producto||'—') + ' → ' + nuevo.producto + (obs ? '. ' + obs : '');
+    const r = await sincronizarVentaPorCambio(ventaId, {
+      oldImei: linea.imei, oldEquipo: linea.producto, detalleId: linea.detalleId,
+      nuevo, costoNuevo, costoAnteriorInv, nota
+    });
+
+    hideLoader();
+    closeModal('modalAnularVenta');
+    limpiarEstadoCambio();
+    await cargarDatosPorSede(sesionActiva);
+    renderVentas();
+    renderInventario();
+    renderContabilidad();
+    renderComisiones();
+    renderDashboard();
+
+    if(!r) {
+      toast('El inventario se movió, pero la venta #' + ventaId + ' ya no está activa y no se recalculó. Revísala.', 'error');
+    } else if(r.delta !== 0) {
+      toast('Cambio realizado ✅ — ' + nuevo.producto + ' · costo ajustado ' + (r.delta>0?'+':'−') + fmt(Math.abs(r.delta)));
+    } else {
+      toast('Cambio de equipo realizado ✅ — ' + nuevo.producto);
+    }
+  } catch(e) { hideLoader(); toast('Error: ' + e.message, 'error'); }
 }
 
 async function ejecutarSalidaInventario() {
@@ -14316,6 +14579,21 @@ function poblarSelectSedes() {
     if(!sel) return;
     sel.innerHTML = activas.map(s => `<option value="${s.nombre}">${s.nombre}</option>`).join('');
   });
+  // Sede de ingreso en compras: se guarda con el nombre largo ("LOCAL X")
+  // porque guardarCompraDB traduce el nombre al id con sedeIdPorNombre.
+  const cmpSedeSel = document.getElementById('cmpSede');
+  if(cmpSedeSel) {
+    const previa = cmpSedeSel.value;
+    cmpSedeSel.innerHTML = activas.map(s => {
+      const largo = nombreSedeLargo(s.nombre);
+      return `<option value="${largo}">${largo}</option>`;
+    }).join('');
+    // Mantener lo elegido; si no, la sede del usuario (los asesores solo ven la suya)
+    const porDefecto = previa || window.SEDE_ACTIVA || '';
+    if(porDefecto && [...cmpSedeSel.options].some(o => o.value === porDefecto)) {
+      cmpSedeSel.value = porDefecto;
+    }
+  }
 }
 
 // ============================================================
@@ -15682,8 +15960,7 @@ async function activarSesion(user) {
   sesionActiva = user;
 
   // Nombres de sedes
-  const sedes = { 1: 'LOCAL PEREIRA', 2: 'LOCAL ARMENIA', null: 'Todas las sedes' };
-  const sedeNombre = sedes[user.sede_id] || 'Todas las sedes';
+  const sedeNombre = sedeNombrePorId(user.sede_id, 'Todas las sedes');
 
   // Actualizar UI topbar
   const initiales = user.nombre.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
@@ -15703,8 +15980,11 @@ async function activarSesion(user) {
   // Ocultar pantalla de login
   document.getElementById('loginScreen').classList.add('hidden');
 
-  // Cargar datos filtrados por sede si no es admin
+  // Las sedes se cargan primero: los mapeos de productos/ventas/creditos
+  // traducen sede_id -> nombre con sedeNombrePorId y necesitan la tabla lista.
   showLoader('Cargando datos...');
+  await cargarSedes();
+  poblarSelectSedes();
   await cargarDatosPorSede(user);
   hideLoader();
 
@@ -15713,7 +15993,6 @@ async function activarSesion(user) {
 
   // Cargar datos en segundo plano
   cargarFinancieras().then(() => poblarSelectFinancieras());
-  cargarSedes().then(() => poblarSelectSedes());
   cargarAsesoresActivos();
   cargarClientes(); // Necesario para búsqueda en modales de venta
   cargarTareasSupabase().then(() => actualizarBadgeTareas()); // Tareas compartidas
@@ -15752,7 +16031,7 @@ async function cargarDatosPorSede(user) {
 
     // Aplicar sede por defecto al registrar si es asesor/bodega
     if (user.sede_id) {
-      window.SEDE_ACTIVA = user.sede_id === 1 ? 'LOCAL PEREIRA' : 'LOCAL ARMENIA';
+      window.SEDE_ACTIVA = sedeNombrePorId(user.sede_id);
       window.SEDE_ID_ACTIVA = user.sede_id;
     } else {
       window.SEDE_ACTIVA = null;
