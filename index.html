@@ -3517,42 +3517,80 @@
             <div class="form-group">
               <label class="form-label" id="crdLblPlazo">Plazo (quincenas)</label>
               <select class="form-control" id="crdPlazoQuincenas" onchange="recalcCredito()">
+                <option value="1">1 quincena (0.5 meses)</option>
                 <option value="2">2 quincenas (1 mes)</option>
+                <option value="3">3 quincenas (1.5 meses)</option>
                 <option value="4">4 quincenas (2 meses)</option>
+                <option value="5">5 quincenas (2.5 meses)</option>
                 <option value="6">6 quincenas (3 meses)</option>
+                <option value="7">7 quincenas (3.5 meses)</option>
                 <option value="8">8 quincenas (4 meses)</option>
+                <option value="9">9 quincenas (4.5 meses)</option>
                 <option value="10">10 quincenas (5 meses)</option>
+                <option value="11">11 quincenas (5.5 meses)</option>
                 <option value="12" selected>12 quincenas (6 meses)</option>
+                <option value="13">13 quincenas (6.5 meses)</option>
                 <option value="14">14 quincenas (7 meses)</option>
+                <option value="15">15 quincenas (7.5 meses)</option>
                 <option value="16">16 quincenas (8 meses)</option>
+                <option value="17">17 quincenas (8.5 meses)</option>
                 <option value="18">18 quincenas (9 meses)</option>
+                <option value="19">19 quincenas (9.5 meses)</option>
                 <option value="20">20 quincenas (10 meses)</option>
+                <option value="21">21 quincenas (10.5 meses)</option>
                 <option value="22">22 quincenas (11 meses)</option>
+                <option value="23">23 quincenas (11.5 meses)</option>
                 <option value="24">24 quincenas (12 meses)</option>
+                <option value="25">25 quincenas (12.5 meses)</option>
                 <option value="26">26 quincenas (13 meses)</option>
+                <option value="27">27 quincenas (13.5 meses)</option>
                 <option value="28">28 quincenas (14 meses)</option>
+                <option value="29">29 quincenas (14.5 meses)</option>
                 <option value="30">30 quincenas (15 meses)</option>
+                <option value="31">31 quincenas (15.5 meses)</option>
                 <option value="32">32 quincenas (16 meses)</option>
+                <option value="33">33 quincenas (16.5 meses)</option>
                 <option value="34">34 quincenas (17 meses)</option>
+                <option value="35">35 quincenas (17.5 meses)</option>
                 <option value="36">36 quincenas (18 meses)</option>
+                <option value="37">37 quincenas (18.5 meses)</option>
                 <option value="38">38 quincenas (19 meses)</option>
+                <option value="39">39 quincenas (19.5 meses)</option>
                 <option value="40">40 quincenas (20 meses)</option>
+                <option value="41">41 quincenas (20.5 meses)</option>
                 <option value="42">42 quincenas (21 meses)</option>
+                <option value="43">43 quincenas (21.5 meses)</option>
                 <option value="44">44 quincenas (22 meses)</option>
+                <option value="45">45 quincenas (22.5 meses)</option>
                 <option value="46">46 quincenas (23 meses)</option>
+                <option value="47">47 quincenas (23.5 meses)</option>
                 <option value="48">48 quincenas (24 meses)</option>
+                <option value="49">49 quincenas (24.5 meses)</option>
                 <option value="50">50 quincenas (25 meses)</option>
+                <option value="51">51 quincenas (25.5 meses)</option>
                 <option value="52">52 quincenas (26 meses)</option>
+                <option value="53">53 quincenas (26.5 meses)</option>
                 <option value="54">54 quincenas (27 meses)</option>
+                <option value="55">55 quincenas (27.5 meses)</option>
                 <option value="56">56 quincenas (28 meses)</option>
+                <option value="57">57 quincenas (28.5 meses)</option>
                 <option value="58">58 quincenas (29 meses)</option>
+                <option value="59">59 quincenas (29.5 meses)</option>
                 <option value="60">60 quincenas (30 meses)</option>
+                <option value="61">61 quincenas (30.5 meses)</option>
                 <option value="62">62 quincenas (31 meses)</option>
+                <option value="63">63 quincenas (31.5 meses)</option>
                 <option value="64">64 quincenas (32 meses)</option>
+                <option value="65">65 quincenas (32.5 meses)</option>
                 <option value="66">66 quincenas (33 meses)</option>
+                <option value="67">67 quincenas (33.5 meses)</option>
                 <option value="68">68 quincenas (34 meses)</option>
+                <option value="69">69 quincenas (34.5 meses)</option>
                 <option value="70">70 quincenas (35 meses)</option>
+                <option value="71">71 quincenas (35.5 meses)</option>
                 <option value="72">72 quincenas (36 meses)</option>
+                <option value="73">73 quincenas (36.5 meses)</option>
+                <option value="74">74 quincenas (37 meses)</option>
               </select>
             </div>
           </div>
@@ -12570,7 +12608,7 @@ function crdEsMensual() {
 function crdCambiarFrecuencia() {
   const esMensual = crdEsMensual();
 
-  // Plazo: meses (1 a 36) o quincenas (2 a 72, de dos en dos)
+  // Plazo: meses (1 a 36) o quincenas (1 a 74, de una en una)
   const sel = document.getElementById('crdPlazoQuincenas');
   if(sel) {
     const anterior = parseInt(sel.value)||0;
@@ -12578,13 +12616,13 @@ function crdCambiarFrecuencia() {
     if(esMensual) {
       for(let i=1; i<=36; i++) opciones += `<option value="${i}">${i} ${i===1?'mes':'meses'}</option>`;
     } else {
-      for(let i=2; i<=72; i+=2) {
-        const m = i/2;
-        opciones += `<option value="${i}">${i} quincenas (${m} ${m===1?'mes':'meses'})</option>`;
+      for(let i=1; i<=74; i++) {
+        const m = (i/2).toFixed(1).replace('.0','');
+        opciones += `<option value="${i}">${i} ${i===1?'quincena':'quincenas'} (${m} ${i===2?'mes':'meses'})</option>`;
       }
     }
     sel.innerHTML = opciones;
-    const sirve = esMensual ? (anterior>=1 && anterior<=36) : (anterior>=2 && anterior<=72 && anterior%2===0);
+    const sirve = esMensual ? (anterior>=1 && anterior<=36) : (anterior>=1 && anterior<=74);
     sel.value = sirve ? anterior : (esMensual ? 6 : 12);
   }
 
