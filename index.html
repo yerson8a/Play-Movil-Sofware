@@ -1868,7 +1868,7 @@
           <div class="form-row">
             <div class="form-group">
               <label class="form-label">Sede</label>
-              <select class="form-control" id="gfSede">
+              <select class="form-control" id="gfSede" onchange="gfAutoNitEmpresa()">
                 <option value="LOCAL PEREIRA">Pereira</option>
                 <option value="LOCAL ARMENIA LA 15">Armenia La 15</option>
                 <option value="LOCAL ARMENIA LA 19">Armenia La 19</option>
@@ -1877,13 +1877,28 @@
             </div>
             <div class="form-group">
               <label class="form-label">N° Factura</label>
-              <input type="text" class="form-control" id="gfNumero" placeholder="Auto" style="text-transform:uppercase;">
+              <input type="text" class="form-control" id="gfNumero" placeholder="Calculando..." readonly
+                     style="text-transform:uppercase;background:#f2f0f7;color:#6B2D8B;font-weight:700;cursor:not-allowed;">
+              <div style="font-size:10px;color:#888899;margin-top:4px;">Consecutivo automático, no se puede editar.</div>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Fecha de la Factura</label>
+              <input type="date" class="form-control" id="gfFecha">
+            </div>
+            <div class="form-group">
+              <label class="form-label">NIT Play Móvil</label>
+              <input type="text" class="form-control" id="gfNitEmpresa" placeholder="Ej: 1088303360-1">
+              <div style="font-size:10px;color:#888899;margin-top:4px;">Sale en el encabezado de la factura. Se llena con el NIT de la sede y puedes editarlo.</div>
             </div>
           </div>
 
           <div class="form-group">
-            <label class="form-label">Fecha de la Factura</label>
-            <input type="date" class="form-control" id="gfFecha">
+            <label class="form-label">Representante Legal</label>
+            <input type="text" class="form-control" id="gfRepLegal" placeholder="Nombre completo" style="text-transform:uppercase;">
+            <div style="font-size:10px;color:#888899;margin-top:4px;">En la factura sale solo el nombre, justo encima del NIT.</div>
           </div>
 
           <!-- Cliente -->
@@ -8663,14 +8678,80 @@ const GF_SEDE_IDS = {
   'LOCAL MANIZALES': 3
 };
 
+// ── Consecutivo de la factura ───────────────────────────────────────
+// El numero no se escribe a mano: se calcula del historial. El formato nuevo
+// es PM-000001 (6 digitos con ceros). Los numeros viejos venian del reloj
+// (PM-482913, sin ceros al inicio) y por eso no cuentan para el consecutivo,
+// pero si se revisan para no repetir ninguno.
+const GF_NUM_PREFIJO = 'PM-';
+const GF_NUM_FORMATO = /^PM-0\d{5}$/;   // solo el consecutivo nuevo
+let gfNumerosUsados  = new Set();
+let gfPromesaNumero  = null;   // carga en curso, para no pedir el consecutivo dos veces
+
+function gfFormatearNumero(n) {
+  return GF_NUM_PREFIJO + String(n).padStart(6, '0');
+}
+
+// Busca el consecutivo siguiente que no choque con ninguno ya usado
+function gfSiguienteNumero(numeros) {
+  let max = 0;
+  numeros.forEach(n => {
+    if(GF_NUM_FORMATO.test(n)) max = Math.max(max, parseInt(n.slice(GF_NUM_PREFIJO.length), 10) || 0);
+  });
+  let sig = max + 1;
+  while(numeros.has(gfFormatearNumero(sig))) sig++;
+  return gfFormatearNumero(sig);
+}
+
+function gfCargarProximoNumero() {
+  if(gfPromesaNumero) return gfPromesaNumero;
+  gfPromesaNumero = (async () => {
+    const inp = document.getElementById('gfNumero');
+    if(!inp) return;
+    try {
+      const res = await sbFetch('facturas_generadas?select=numero');
+      gfNumerosUsados = new Set((Array.isArray(res) ? res : []).map(f => (f.numero||'').toUpperCase()));
+      inp.value = gfSiguienteNumero(gfNumerosUsados);
+    } catch(e) {
+      console.error('No se pudo calcular el consecutivo de factura:', e);
+      // Sin historial a la mano se arranca en el primero
+      if(!inp.value) inp.value = gfFormatearNumero(1);
+    }
+  })().finally(() => { gfPromesaNumero = null; });
+  return gfPromesaNumero;
+}
+
+// NIT de Play Movil que sale en el encabezado. Se toma de la sede escogida
+// (tabla sedes) pero queda editable: si el usuario lo cambia a mano, no se pisa.
+let gfNitAuto = '';
+
+function gfNitDeSede(nombreSede) {
+  const id = GF_SEDE_IDS[nombreSede];
+  if(!id) return '';
+  const s = (dbAdmin?.sedes || []).find(x => Number(x.id) === Number(id));
+  return (s && s.nit) ? String(s.nit) : '';
+}
+
+function gfAutoNitEmpresa() {
+  const inp = document.getElementById('gfNitEmpresa');
+  if(!inp) return;
+  const actual = (inp.value || '').trim();
+  // Solo se rellena si esta vacio o si aun tiene el NIT puesto automaticamente
+  if(actual && actual !== gfNitAuto) return;
+  const nit = gfNitDeSede(document.getElementById('gfSede')?.value || '');
+  inp.value = nit;
+  gfNitAuto = nit;
+}
+
 function gfInicializar() {
   // Resetear campos solo la primera vez
   if(gfProductos.length === 0) {
-    const elNumero = document.getElementById('gfNumero');
-    if(elNumero && !elNumero.value) elNumero.value = 'PM-' + Date.now().toString().slice(-6);
     const elFecha = document.getElementById('gfFecha');
     if(elFecha && !elFecha.value) elFecha.value = fechaColombia();
   }
+  const elNumero = document.getElementById('gfNumero');
+  if(elNumero && !elNumero.value) gfCargarProximoNumero();
+  gfAutoNitEmpresa();
   gfActualizarUI();
   if(gfTabActual === 'historial') gfCargarHistorial();
 }
@@ -8751,16 +8832,19 @@ function gfActualizarTotales() {
   // Solo recalcula visual, el total se ve en la vista previa
 }
 
-function gfGenerarVistaPrevia() {
+async function gfGenerarVistaPrevia() {
   if(gfProductos.length === 0) {
     toast('Agrega al menos un producto','error');
     return;
   }
 
+  // El consecutivo se vuelve a mirar aqui por si otro usuario facturo antes
+  await gfCargarProximoNumero();
+
   // Recopilar datos
   const tipo       = document.getElementById('gfTipo')?.value || 'contado';
   const sede       = document.getElementById('gfSede')?.value || 'PLAY MOVIL';
-  const numero     = document.getElementById('gfNumero')?.value || ('PM-' + Date.now().toString().slice(-6));
+  const numero     = (document.getElementById('gfNumero')?.value || '').trim() || gfFormatearNumero(1);
   const cliente    = (document.getElementById('gfCliente')?.value || '').toUpperCase();
   const cedula     = document.getElementById('gfCedula')?.value || '';
   const telefono   = document.getElementById('gfTelefono')?.value || '';
@@ -8774,6 +8858,8 @@ function gfGenerarVistaPrevia() {
   const cuotas     = parseInt(document.getElementById('gfCuotas')?.value) || 0;
   const valorCuota = getMoneyValue('gfValorCuota');
   const periodicidad = document.getElementById('gfPeriodicidad')?.value || 'quincenal';
+  const nitEmpresa = (document.getElementById('gfNitEmpresa')?.value || '').trim();
+  const repLegal   = (document.getElementById('gfRepLegal')?.value || '').trim().toUpperCase();
 
   if(!cliente) { toast('Falta el nombre del cliente','error'); return; }
 
@@ -8789,6 +8875,9 @@ function gfGenerarVistaPrevia() {
     equipo: gfProductos[0]?.producto || '',
     imei:   gfProductos[0]?.imei || '',
     asesor, sede, financiera,
+    nitEmpresa,
+    repLegal,
+    sloganEje: true,   // el "del eje" del logo solo va en el generador
     numContrato: (document.getElementById('gfNumContrato')?.value||'').trim().toUpperCase(),
     precioBase: subtotal,
     precioFinal: total,
@@ -8913,6 +9002,10 @@ async function gfGuardarEnHistorial(datos) {
       gfHistorial.unshift(guardada);
       if(gfHistorialCargado) gfRenderHistorial();
     }
+    // El numero ya quedo usado: el formulario pasa al siguiente
+    gfNumerosUsados.add((fila.numero||'').toUpperCase());
+    const inpNum = document.getElementById('gfNumero');
+    if(inpNum) inpNum.value = gfSiguienteNumero(gfNumerosUsados);
     toast('Factura guardada en el historial ✅');
   } catch(e) {
     console.error('No se pudo guardar la factura en el historial:', e);
@@ -9015,6 +9108,7 @@ function gfDatosDeFila(f) {
     tipo: f.tipo, cliente: f.cliente, cedula: f.cedula, telefono: f.telefono, correo: f.correo,
     equipo: prods[0]?.producto || '', imei: prods[0]?.imei || '',
     asesor: f.asesor, sede: f.sede_nombre, financiera: f.financiera, numContrato: f.num_contrato,
+    nitEmpresa: '', repLegal: '', sloganEje: true,
     precioBase: f.subtotal, precioFinal: f.total, descuento: f.descuento,
     iva: f.iva, ivaPct: f.iva_pct, comision: f.comision, comisionPct: f.comision_pct,
     comisionAsesor: 0, productosList: prods,
@@ -14339,8 +14433,11 @@ function generarHTMLFactura(d) {
     <!-- Header -->
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:20px;border-bottom:2px solid #6B2D8B;">
       <div>
-        <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:28px;color:#6B2D8B;">Play Móvil</div>
-        <div style="font-size:12px;color:#888;margin-top:2px;">${d.sede}</div>
+        <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:28px;color:#6B2D8B;line-height:1.1;">Play Móvil</div>
+        ${d.sloganEje ? `<div style="font-family:'Syne',sans-serif;font-weight:700;font-size:12px;color:#6B2D8B;letter-spacing:3px;margin-top:1px;">del eje</div>` : ''}
+        <div style="font-size:12px;color:#888;margin-top:4px;">${d.sede}</div>
+        ${d.repLegal ? `<div style="font-size:12px;color:#555;margin-top:2px;">${escapeHtml(d.repLegal)}</div>` : ''}
+        ${d.nitEmpresa ? `<div style="font-size:12px;color:#555;margin-top:2px;">NIT: ${escapeHtml(d.nitEmpresa)}</div>` : ''}
       </div>
       <div style="text-align:right;">
         <div style="font-size:22px;font-weight:700;color:#111;">Factura de Venta</div>
