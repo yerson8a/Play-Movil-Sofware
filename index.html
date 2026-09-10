@@ -656,6 +656,9 @@
       <span class="icon">🤝</span> Créditos
       <span class="nav-badge" id="creditoBadge" style="display:none;">0</span>
     </div>
+    <div class="nav-item solo-admin sa-flex" onclick="showModule('cartera')">
+      <span class="icon">💰</span> Cartera Crediplay
+    </div>
     <div class="nav-item" onclick="showModule('genfactura')">
       <span class="icon">🧾</span> Generador Factura
     </div>
@@ -1385,17 +1388,131 @@
       <div id="creditosGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;"></div>
     </div>
 
+    <!-- ==================== CARTERA CREDIPLAY ==================== -->
+    <div id="mod-cartera" class="module">
+      <div class="section-header">
+        <div>
+          <div class="section-title">💰 Cartera Crediplay — Financiera Propia</div>
+          <div class="section-sub">Seguimiento de la plata prestada, recuperada y en mora · Solo administradores</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="renderCarteraCrediplay(true)">🔄 Actualizar</button>
+      </div>
+
+      <!-- KPIs -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:22px;" id="ccKpis">
+        <div class="stat-card purple">
+          <div class="stat-label">💜 Total Prestado</div>
+          <div class="stat-value purple" id="ccKpiPrestado">$ 0</div>
+          <div class="stat-sub" id="ccKpiPrestadoSub">0 créditos activos</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-label">💚 Ya Recuperado</div>
+          <div class="stat-value green" id="ccKpiRecuperado">$ 0</div>
+          <div class="stat-sub">Iniciales + abonos</div>
+        </div>
+        <div class="stat-card orange">
+          <div class="stat-label">🧡 Saldo Activo</div>
+          <div class="stat-value orange" id="ccKpiSaldo">$ 0</div>
+          <div class="stat-sub">Por cobrar</div>
+        </div>
+        <div class="stat-card red">
+          <div class="stat-label">🔴 En Mora</div>
+          <div class="stat-value red" id="ccKpiMora">$ 0</div>
+          <div class="stat-sub" id="ccKpiMoraSub">0 créditos</div>
+        </div>
+        <div class="stat-card blue">
+          <div class="stat-label">📈 % Recuperación</div>
+          <div class="stat-value blue" id="ccKpiPctRec">0%</div>
+          <div class="stat-sub">Recuperado / prestado</div>
+        </div>
+        <div class="stat-card red">
+          <div class="stat-label">⚠️ % Mora</div>
+          <div class="stat-value red" id="ccKpiPctMora">0%</div>
+          <div class="stat-sub">Créditos en mora / activos</div>
+        </div>
+      </div>
+
+      <!-- Filtros -->
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center;">
+        <div class="search-wrap" style="flex:1;min-width:220px;">
+          <span class="search-icon">🔍</span>
+          <input type="text" class="form-control" id="ccBuscar" placeholder="Buscar por cliente, cédula o teléfono..." oninput="ccRenderTabla()">
+        </div>
+        <select class="form-control" style="width:170px;" id="ccFiltroEstado" onchange="ccRenderTabla()">
+          <option value="todos">Todos los estados</option>
+          <option value="al_dia">Al día</option>
+          <option value="mora">Mora</option>
+          <option value="pagado">Pagados</option>
+        </select>
+        <select class="form-control" style="width:190px;" id="ccFiltroAsesor" onchange="ccRenderTabla()">
+          <option value="">Todos los asesores</option>
+        </select>
+        <select class="form-control" style="width:190px;" id="ccFiltroSede" onchange="ccRenderTabla()">
+          <option value="">Todas las sedes</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" onclick="ccLimpiarFiltros()">✕ Limpiar</button>
+      </div>
+
+      <!-- Grafica -->
+      <div class="card" style="margin-bottom:18px;">
+        <div class="card-title">📊 Evolución mensual — últimos 6 meses</div>
+        <div style="height:280px;position:relative;"><canvas id="ccChart"></canvas></div>
+      </div>
+
+      <!-- Tabla -->
+      <div class="card">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>📋 Créditos Crediplay</span>
+          <span style="font-size:11px;color:#888899;font-weight:500;text-transform:none;letter-spacing:0;" id="ccTablaResumen">—</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Cliente</th><th>Cédula</th><th>Teléfono</th><th>Producto</th>
+                <th>Asesor</th><th>Sede</th>
+                <th style="cursor:pointer;" onclick="ccOrdenar('fecha')">Fecha inicio <span id="ccOrdFecha"></span></th>
+                <th style="cursor:pointer;text-align:right;" onclick="ccOrdenar('total')">Monto total <span id="ccOrdTotal"></span></th>
+                <th style="text-align:right;">Ya pagado</th>
+                <th style="cursor:pointer;text-align:right;" onclick="ccOrdenar('saldo')">Saldo <span id="ccOrdSaldo">▼</span></th>
+                <th style="text-align:center;">Cuotas</th>
+                <th style="text-align:center;">Estado</th>
+                <th style="text-align:center;">Detalle</th>
+              </tr>
+            </thead>
+            <tbody id="ccTbody"></tbody>
+          </table>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;padding-top:14px;border-top:1px solid #f0ecf8;">
+          <button class="btn btn-outline btn-sm" onclick="ccExportarExcel()">📊 Exportar cartera a Excel</button>
+          <button class="btn btn-outline btn-sm" style="color:#dc2626;border-color:#dc2626;" onclick="ccMoraCritica()">📞 Ver mora crítica</button>
+        </div>
+      </div>
+    </div>
+
     <!-- ==================== SIMULADOR ==================== -->
     <div id="mod-simulador" class="module">
       <div class="section-header">
         <div>
-          <div class="section-title">🧮 Simulador de Ventas</div>
-          <div class="section-sub">Calcula precio de venta, inicial, intereses y cuotas quincenales o mensuales</div>
+          <div class="section-title" id="simTitulo">🧮 Simulador de Ventas</div>
+          <div class="section-sub" id="simSub">Calcula precio de venta, inicial, intereses y cuotas quincenales o mensuales</div>
         </div>
       </div>
 
+      <!-- Modo del simulador: basico (el de siempre) o Crediplay (financiera propia) -->
+      <div style="display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap;">
+        <button type="button" id="simBtnBasico" onclick="simSetModo('basico')"
+          style="flex:1;min-width:180px;padding:14px 18px;border-radius:12px;border:2px solid #6B2D8B;background:#6B2D8B;color:#fff;font-family:'Syne',sans-serif;font-weight:800;font-size:15px;cursor:pointer;transition:.15s;">
+          🧮 Modo Básico
+        </button>
+        <button type="button" id="simBtnCrediplay" onclick="simSetModo('crediplay')"
+          style="flex:1;min-width:180px;padding:14px 18px;border-radius:12px;border:2px solid #ece8f5;background:#fff;color:#6B2D8B;font-family:'Syne',sans-serif;font-weight:800;font-size:15px;cursor:pointer;transition:.15s;">
+          💜 Modo Crediplay
+        </button>
+      </div>
+
       <div class="grid-2">
-        <div class="card">
+        <div class="card" id="simBloqueBasico">
           <div class="card-title">Configurar Simulación</div>
 
           <div class="form-group">
@@ -1566,6 +1683,71 @@
 
           <button class="btn btn-primary" style="width:100%;margin-top:8px;" onclick="calcularSim()">
             ⚡ Calcular
+          </button>
+        </div>
+
+        <!-- ===== Modo Crediplay: financiera propia (modelo hibrido) ===== -->
+        <div class="card" id="simBloqueCrediplay" style="display:none;background:linear-gradient(160deg,#faf7ff,#f3ecfb);border:1px solid #d9c9ee;">
+          <div class="card-title" style="color:#6B2D8B;">💜 Configurar Crédito Crediplay</div>
+          <div style="font-size:11px;color:#7c5aa0;background:#fff;border:1px solid #e4d8f5;border-radius:8px;padding:8px 10px;margin-bottom:12px;">
+            Precio contado = costo + margen · Precio a crédito = contado + sobreprecio por plazo · Interés 2% mensual (1% quincenal) sobre el saldo.
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Costo del equipo (V.Compra) *</label>
+            <div class="input-money-wrap"><input type="text" class="form-control" id="simCpCosto" placeholder="0" oninput="fmtMoneyInput(this);calcularSimCrediplay()" inputmode="numeric"></div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Margen contado (%)</label>
+            <select class="form-control" id="simCpMargen" onchange="calcularSimCrediplay()">
+              <option value="20">20%</option>
+              <option value="25">25%</option>
+              <option value="30" selected>30%</option>
+              <option value="35">35%</option>
+              <option value="40">40%</option>
+            </select>
+            <div style="font-size:10px;color:#888899;margin-top:4px;">Precio contado = costo × (1 + margen)</div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Plazo (cuotas quincenales)</label>
+            <select class="form-control" id="simCpPlazo" onchange="calcularSimCrediplay()"></select>
+            <div style="font-size:10px;color:#888899;margin-top:4px;">Sobreprecio aplicado: <strong id="simCpSobreLbl" style="color:#6B2D8B;">—</strong></div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Inicial (%)</label>
+            <select class="form-control" id="simCpInicialPct" onchange="calcularSimCrediplay()">
+              <option value="20">20%</option>
+              <option value="25">25%</option>
+              <option value="30" selected>30%</option>
+              <option value="35">35%</option>
+              <option value="40">40%</option>
+              <option value="50">50%</option>
+            </select>
+          </div>
+
+          <div style="background:#fff;border:1px solid #e4d8f5;border-radius:10px;padding:12px;margin-bottom:12px;">
+            <div style="font-size:12px;font-weight:700;color:#6B2D8B;margin-bottom:8px;">📊 Tasa de interés</div>
+            <div class="form-row" style="margin-bottom:0;">
+              <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label" style="font-size:10px;">% mensual</label>
+                <select class="form-control" id="simCpTasaMensual" onchange="simCpTasaDesdeMensual()"></select>
+              </div>
+              <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label" style="font-size:10px;">% quincenal</label>
+                <select class="form-control" id="simCpTasaQuincenal" onchange="simCpTasaDesdeQuincenal()"></select>
+              </div>
+            </div>
+            <div style="font-size:10px;color:#888899;margin-top:6px;">
+              La cuota se calcula con la tasa quincenal. Efectivo anual: <strong id="simCpEA" style="color:#6B2D8B;">—</strong>
+              <span id="simCpAvisoUsura" style="display:none;color:#dc2626;font-weight:700;"> · ⚠️ revisa el tope de usura vigente</span>
+            </div>
+          </div>
+
+          <button class="btn btn-primary" style="width:100%;" onclick="simAplicarANuevaVenta()">
+            📤 Aplicar a nueva venta
           </button>
         </div>
 
@@ -3523,6 +3705,62 @@
               <option value="CONTADO:0">💵 CONTADO (0%)</option>
             </select>
           </div>
+
+          <!-- Modelo hibrido: solo aparece con la financiera propia CREDIPLAY -->
+          <div id="crdHibridoBox" style="display:none;background:linear-gradient(160deg,#faf7ff,#f3ecfb);border:1px solid #d9c9ee;border-radius:10px;padding:12px;margin-bottom:12px;">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:700;color:#6B2D8B;">
+              <input type="checkbox" id="crdHibrido" onchange="crdToggleHibrido()" style="width:16px;height:16px;accent-color:#6B2D8B;">
+              💜 Aplicar modelo híbrido
+            </label>
+            <div style="font-size:11px;color:#7c5aa0;margin-top:4px;">Precio contado + sobreprecio por plazo, con interés sobre el saldo.</div>
+
+            <div id="crdHibridoCampos" style="display:none;margin-top:12px;">
+              <div class="form-group">
+                <label class="form-label">% de contado (sobre el costo)</label>
+                <select class="form-control" id="crdHibPctContado" onchange="crdHibAplicarPctContado()"></select>
+                <div style="font-size:10px;color:#888899;margin-top:4px;" id="crdHibPctContadoNota">Costo del equipo: <strong id="crdHibCostoRef">$0</strong></div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Precio Contado ($) *</label>
+                <div class="input-money-wrap"><input type="text" class="form-control" id="crdHibPrecioContado" placeholder="0" oninput="fmtMoneyInput(this);crdCalcHibrido()" inputmode="numeric"></div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">Plazo (quincenas)</label>
+                  <select class="form-control" id="crdHibPlazo" onchange="crdCalcHibrido()"></select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Inicial (%)</label>
+                  <select class="form-control" id="crdHibInicialPct" onchange="crdCalcHibrido()">
+                    <option value="20">20%</option>
+                    <option value="25">25%</option>
+                    <option value="30" selected>30%</option>
+                    <option value="35">35%</option>
+                    <option value="40">40%</option>
+                    <option value="50">50%</option>
+                  </select>
+                </div>
+              </div>
+              <div style="background:#fff;border:1px solid #e4d8f5;border-radius:8px;padding:10px;">
+                <div style="font-size:11px;font-weight:700;color:#6B2D8B;margin-bottom:6px;">📊 Tasa de interés</div>
+                <div class="form-row" style="margin-bottom:0;">
+                  <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label" style="font-size:10px;">% mensual</label>
+                    <select class="form-control" id="crdHibTasaMensual" onchange="crdHibTasaDesdeMensual()"></select>
+                  </div>
+                  <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label" style="font-size:10px;">% quincenal</label>
+                    <select class="form-control" id="crdHibTasaQuincenal" onchange="crdHibTasaDesdeQuincenal()"></select>
+                  </div>
+                </div>
+                <div style="font-size:10px;color:#888899;margin-top:6px;">
+                  La cuota se calcula con la tasa quincenal. Efectivo anual: <strong id="crdHibEA" style="color:#6B2D8B;">—</strong>
+                  <span id="crdHibAvisoUsura" style="display:none;color:#dc2626;font-weight:700;"> · ⚠️ revisa el tope de usura vigente</span>
+                </div>
+              </div>
+              <div id="crdHibPreview" style="margin-top:10px;"></div>
+            </div>
+          </div>
           <div class="form-group">
             <label class="form-label">Frecuencia de cuotas</label>
             <select class="form-control" id="crdFrecuencia" onchange="crdCambiarFrecuencia()">
@@ -4703,6 +4941,7 @@
         <strong style="color:#6B2D8B;">Cuota # <span id="abonoNroCuota">1</span> — <span id="abonoCuotaInfo">$0</span></strong>
       </div>
       <div id="abonoParcialInfo" style="display:none;margin-top:8px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:8px;font-size:12px;color:#92400e;"></div>
+      <div id="abonoHibridoInfo" style="display:none;margin-top:8px;background:#faf7ff;border:1px solid #d9c9ee;border-radius:8px;padding:8px;font-size:12px;color:#6B2D8B;"></div>
     </div>
     <div class="form-group">
       <label class="form-label">Valor del Abono ($) *</label>
@@ -4765,6 +5004,21 @@
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
       <button class="btn btn-ghost" onclick="closeModal('modalHistorialCredito')">Cerrar</button>
       <button class="btn btn-outline" onclick="imprimirReciboHistorial()">🖨️ Imprimir recibo</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Detalle de Cartera Crediplay -->
+<div class="modal-overlay" id="modalCarteraDetalle">
+  <div class="modal" style="max-width:700px;">
+    <div class="modal-header">
+      <div class="modal-title" id="ccDetalleTitulo">💰 Detalle del crédito</div>
+      <button class="modal-close" onclick="closeModal('modalCarteraDetalle')">✕</button>
+    </div>
+    <div id="ccDetalleContenido" style="max-height:64vh;overflow:auto;padding-right:8px;"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+      <button class="btn btn-ghost" onclick="closeModal('modalCarteraDetalle')">Cerrar</button>
+      <button class="btn btn-primary" id="ccDetalleBtnAbono" onclick="ccRegistrarAbonoDesdeDetalle()">+ Registrar abono</button>
     </div>
   </div>
 </div>
@@ -5476,7 +5730,15 @@ function mapCredito(c) {
     diaPago2:         c.dia_pago_2 || null,
     esMixto:          c.es_mixto || false,
     valorFinanciero:  parseFloat(c.valor_financiera) || 0,
-    valorEfectivo:    parseFloat(c.valor_efectivo)   || 0
+    valorEfectivo:    parseFloat(c.valor_efectivo)   || 0,
+    // Modelo hibrido Crediplay (creditos nuevos; los viejos vienen en null)
+    esHibrido:           c.es_hibrido || false,
+    precioContado:       parseFloat(c.precio_contado)      || 0,
+    precioCredito:       parseFloat(c.precio_credito)      || 0,
+    sobreprecioCredito:  parseFloat(c.sobreprecio_credito) || 0,
+    capitalFinanciado:   parseFloat(c.capital_financiado)  || 0,
+    interesesPactados:   parseFloat(c.intereses_pactados)  || 0,
+    tasaMensual:         parseFloat(c.tasa_mensual)        || 0
   };
 }
 
@@ -5723,7 +5985,15 @@ async function guardarCreditoDB(datos) {
       numero_contrato:    datos.numContrato  || null,
       es_mixto:           datos.esMixto      || false,
       valor_financiera:   datos.valorFinanciero || 0,
-      valor_efectivo:     datos.valorEfectivo   || 0
+      valor_efectivo:     datos.valorEfectivo   || 0,
+      // Modelo hibrido Crediplay (los creditos normales van en null/false)
+      es_hibrido:           datos.esHibrido || false,
+      precio_contado:       datos.precioContado      ?? null,
+      precio_credito:       datos.precioCredito      ?? null,
+      sobreprecio_credito:  datos.sobreprecioCredito || 0,
+      capital_financiado:   datos.capitalFinanciado  ?? null,
+      intereses_pactados:   datos.interesesPactados  || 0,
+      tasa_mensual:         datos.tasaMensual        ?? null
     };
     const res = await sbFetch('creditos', { method: 'POST', body: row });
     const nuevo = mapCredito(res[0]);
@@ -5737,6 +6007,49 @@ async function guardarCreditoDB(datos) {
   }
 }
 
+// ── ABONOS DEL MODELO HIBRIDO ───────────────────────────────
+// En un credito hibrido cada cuota paga primero el interes del periodo
+// (1% quincenal sobre el saldo) y el resto abona capital. El saldo solo
+// baja por el capital, por eso el ultimo pago siempre es mayor al saldo.
+function interesQuincenalHibrido(credito) {
+  if(!credito || !credito.esHibrido) return 0;
+  // Cada credito guarda su propia tasa mensual; la quincenal es la mitad.
+  // Si la fila no la trae (creditos viejos) se usa la del modelo: 2% mensual.
+  const tasaMensual = parseFloat(credito.tasaMensual) || (CREDIPLAY_TASA_QUINCENAL * 200);
+  return Math.round((credito.saldo || 0) * (tasaMensual / 200));
+}
+
+// Tasa quincenal del credito en porcentaje, para mostrarla
+function tasaQuincenalCreditoPct(credito) {
+  const tasaMensual = parseFloat(credito?.tasaMensual) || (CREDIPLAY_TASA_QUINCENAL * 200);
+  return tasaMensual / 2;
+}
+
+// Reparte un abono entre interes y capital
+function repartirAbonoHibrido(credito, valor) {
+  const interes = interesQuincenalHibrido(credito);
+  if(!interes) return { capital: Math.round(valor), interes: 0 };
+  const int = Math.min(Math.round(interes), Math.round(valor));
+  return { capital: Math.max(0, Math.round(valor) - int), interes: int };
+}
+
+// Lo maximo que se puede abonar: el saldo, mas el interes del periodo
+// si el credito es hibrido (los demas creditos siguen topados al saldo)
+function topeAbonoCredito(credito) {
+  return Math.round((credito?.saldo || 0) + interesQuincenalHibrido(credito));
+}
+
+// Valor sugerido del abono. En la ultima cuota se propone la liquidacion
+// completa (capital + interes): el redondeo del interes de cada quincena
+// dejaria si no unos pesos sueltos y el credito no cerraria.
+function abonoSugerido(credito) {
+  const tope  = topeAbonoCredito(credito);
+  const cuota = Math.round(credito?.valorCuota || 0);
+  if(!cuota) return tope;
+  if(tope <= Math.round(cuota * 1.02)) return tope;   // ya es la ultima cuota
+  return Math.min(cuota, tope);
+}
+
 // ── REGISTRAR ABONO A CRÉDITO ───────────────────────────────
 async function registrarAbonoDB(creditoId, valor, metodo = 'Efectivo', extra = {}) {
   showLoader('Registrando abono...');
@@ -5744,12 +6057,18 @@ async function registrarAbonoDB(creditoId, valor, metodo = 'Efectivo', extra = {
     const credito = db.creditos.find(c => c.id === creditoId);
     if (!credito) throw new Error('Crédito no encontrado');
 
-    // Un abono nunca puede superar el saldo: se rechaza para que abonos y saldo
-    // sigan cuadrando (no existe "saldo a favor" en el modelo de datos)
+    // Un abono nunca puede superar el tope: el saldo, o el saldo mas el
+    // interes del periodo cuando el credito es hibrido (ahi el cliente paga
+    // capital + interes). Asi abonos y saldo siguen cuadrando.
     const saldoActual = Math.round(credito.saldo || 0);
-    if (Math.round(valor) > saldoActual) {
-      throw new Error(`El abono (${fmt(valor)}) supera el saldo pendiente (${fmt(saldoActual)}). Registra máximo ${fmt(saldoActual)}.`);
+    const tope        = topeAbonoCredito(credito);
+    if (Math.round(valor) > tope) {
+      throw new Error(`El abono (${fmt(valor)}) supera el máximo permitido (${fmt(tope)}). Registra máximo ${fmt(tope)}.`);
     }
+    // Reparto capital/interes (en creditos no hibridos todo es capital)
+    const reparto = credito.esHibrido
+      ? repartirAbonoHibrido(credito, valor)
+      : { capital: Math.round(valor), interes: 0 };
 
     // Guardar abono (con datos para reimprimir el recibo: ref, obs, asesor)
     const insRes = await sbFetch('abonos', {
@@ -5761,7 +6080,9 @@ async function registrarAbonoDB(creditoId, valor, metodo = 'Efectivo', extra = {
         nro_transferencia: extra.transf || null,
         notas: extra.obs || null,
         asesor: extra.asesor || (typeof sesionActiva !== 'undefined' && sesionActiva ? sesionActiva.nombre : null),
-        fecha_abono: fechaColombia()
+        fecha_abono: fechaColombia(),
+        capital: reparto.capital,
+        interes: reparto.interes
       }
     });
     const abonoRow = Array.isArray(insRes) ? insRes[0] : insRes;
@@ -5772,7 +6093,8 @@ async function registrarAbonoDB(creditoId, valor, metodo = 'Efectivo', extra = {
     // excedente queda como abono parcial de la siguiente. El saldo siempre
     // baja por el valor exacto abonado. Siempre se relee la suma real de la
     // tabla abonos para no depender de un contador incremental.
-    const nuevoSaldo = Math.max(0, saldoActual - Math.round(valor));
+    // El saldo solo baja por el capital: el interes es ingreso del periodo
+    const nuevoSaldo = Math.max(0, saldoActual - reparto.capital);
     let totalAbonado;
     try {
       const abonosRows = await sbFetch(`abonos?select=valor&credito_id=eq.${creditoId}&limit=100000`);
@@ -5804,7 +6126,7 @@ async function registrarAbonoDB(creditoId, valor, metodo = 'Efectivo', extra = {
     credito.abonado = totalAbonado;
 
     hideLoader();
-    return { credito, abono: abonoRow, calc };
+    return { credito, abono: abonoRow, calc, reparto };
   } catch(e) {
     hideLoader();
     toast('Error registrando abono: ' + e.message, 'error');
@@ -6248,6 +6570,10 @@ function showModule(name) {
   if(name === 'informe-gerencial' && (!sesionActiva || sesionActiva.rol !== 'admin')) {
     toast('Solo administradores pueden ver el Informe Gerencial','error'); return;
   }
+  // Cartera Crediplay: solo admin
+  if(name === 'cartera' && (!sesionActiva || sesionActiva.rol !== 'admin')) {
+    toast('Solo administradores pueden ver la Cartera Crediplay','error'); return;
+  }
   // Bloquear acceso a módulos sin permiso
   if(sesionActiva && sesionActiva.rol !== 'admin' && name !== 'dashboard') {
     let permisos = [];
@@ -6265,12 +6591,14 @@ function showModule(name) {
     'dashboard':'Dashboard','informe-gerencial':'Informe Gerencial','compras':'Compras y Proveedores',
     'inventario':'Inventario de Equipos','ventas':'Registro de Ventas',
     'creditos':'Gestión de Créditos','simulador':'Simulador de Ventas','genfactura':'Generador de Facturas',
+    'cartera':'Cartera Crediplay',
     'contabilidad':'Contabilidad','asesores':'Asesores Comerciales','garantias':'Garantías'
   }[name]||name;
   if(name==='dashboard') renderDashboard();
   else if(name==='inventario') renderInventario();
   else if(name==='ventas') renderVentas();
   else if(name==='creditos') renderCreditos();
+  else if(name==='cartera') renderCarteraCrediplay();
   else if(name==='contabilidad') { renderContabilidad(); }
   else if(name==='compras') { renderCompras(); renderTablaProveedores(db.proveedores); poblarSelectProveedores(); poblarSelectSedes(); }
   else if(name==='tareas') { cargarTareasSupabase().then(()=>renderTareas()); }
@@ -10722,16 +11050,31 @@ async function guardarCredito(){
   const comValFactura  = esMixto ? Math.round(precioFinal * comPct/100) : comVal;
   const sinInicial   = document.getElementById('crdSinInicial')?.checked || false;
   const inicialManualG = getMoneyValue('crdInicialManual');
-  const ini = sinInicial ? 0 : (inicialManualG > 0 ? inicialManualG : (crdInicialSeleccionada > 0 ? crdInicialSeleccionada : Math.round(precioFinal * 0.20)));
+  const hib = crdDatosHibrido();   // null si no es venta con modelo hibrido
+  const ini = hib ? hib.inicial
+                  : (sinInicial ? 0 : (inicialManualG > 0 ? inicialManualG : (crdInicialSeleccionada > 0 ? crdInicialSeleccionada : Math.round(precioFinal * 0.20))));
   const saldoFinanciar = precioFinal - ini;
-  const totalIntereses = aplicaInt ? Math.round(saldoFinanciar * (tasaInt/100) * quincenas) : 0;
-  const totalFinanciar = saldoFinanciar + totalIntereses;
-  const valorCuota   = quincenas > 0 ? Math.round(totalFinanciar / quincenas) : 0;
+  const totalIntereses = hib ? hib.intereses : (aplicaInt ? Math.round(saldoFinanciar * (tasaInt/100) * quincenas) : 0);
+  // En hibrido el saldo del credito es el CAPITAL: los intereses se cobran
+  // cuota a cuota sobre el saldo, no se suman de una al saldo inicial
+  const totalFinanciar = hib ? hib.capital : (saldoFinanciar + totalIntereses);
+  const valorCuota   = hib ? hib.cuota : (quincenas > 0 ? Math.round(totalFinanciar / quincenas) : 0);
   const sedeActual   = window.SEDE_ACTIVA || 'LOCAL PEREIRA';
 
   // Validar productos y cliente
   if(!productosVentaCrd || productosVentaCrd.length === 0) {
     toast('Agrega al menos un producto antes de guardar','error'); return;
+  }
+
+  // Modelo hibrido: el precio lo define la tabla, no admite descuentos ni adicionales
+  if(crdHibridoActivo()) {
+    if(!hib) { toast('Ingresa el precio de contado del modelo híbrido','error'); return; }
+    if(desc > 0 || prodAdicVal > 0) {
+      toast('El modelo híbrido no admite descuento ni producto adicional. Ajusta el precio de contado.','error'); return;
+    }
+    if(!crdEsCrediplaySeleccionada()) {
+      toast('El modelo híbrido solo aplica con la financiera CREDIPLAY','error'); return;
+    }
   }
   if(!$U('crdCliente')) { toast('Selecciona un cliente','error'); return; }
   // Validar asesor
@@ -10797,9 +11140,17 @@ async function guardarCredito(){
     telefono: $U('crdTelefono')||'',
     correo: $U('crdCorreo')||'',
     asesor: ($U('crdAsesorSelect')||$U('crdAsesor')||sesionActiva?.nombre||'').toUpperCase(),
-    total: precioFinal, inicial: ini,
-    saldo: totalFinanciar, cuotas: quincenas, valorCuota,
-    frecuencia: esMensualG ? 'Mensual' : 'Quincenal', sede: sedeActual,
+    total: hib ? hib.precioCredito : precioFinal, inicial: ini,
+    saldo: totalFinanciar, cuotas: hib ? hib.plazo : quincenas, valorCuota,
+    frecuencia: (hib || !esMensualG) ? 'Quincenal' : 'Mensual', sede: sedeActual,
+    // Modelo hibrido Crediplay
+    esHibrido:          !!hib,
+    precioContado:      hib ? hib.precioContado : null,
+    precioCredito:      hib ? hib.precioCredito : null,
+    sobreprecioCredito: hib ? hib.sobreprecio   : 0,
+    capitalFinanciado:  hib ? hib.capital       : null,
+    interesesPactados:  hib ? hib.intereses     : 0,
+    tasaMensual:        hib ? hib.tasaMensualPct : null,
     esMixto,
     valorFinanciero: esMixto ? valorFinanciero : 0,
     valorEfectivo:   esMixto ? getMoneyValue('crdValorEfectivo') : 0,
@@ -10828,6 +11179,9 @@ async function guardarCredito(){
       cliente: datos.cliente, cedula_cliente: datos.cedula||null, telefono_cliente: datos.telefono||null,
       asesor: datos.asesor, valor_venta: precioFinal, valor_compra: costo,
       ganancia, financiera: finSel, forma_pago: 'Credito',
+      // Con el modelo hibrido queda guardado tambien el precio de contado
+      precio_contado:       hib ? hib.precioContado : null,
+      es_crediplay_hibrido: !!hib,
       comision_asesor: 0, sede_id: sedeIdPorNombre(sedeActual),
       observaciones: (datos.obs||'') + (nProdC>1 ? ` | Venta con ${nProdC} productos` : ''),
       estado: 'activa',
@@ -10920,7 +11274,25 @@ function registrarPago(id) {
       infoParcial.innerHTML = '';
     }
   }
-  setMoneyValue('abonoValor', Math.min(credito.valorCuota || 0, credito.saldo || 0));
+  const topePago = topeAbonoCredito(credito);
+  setMoneyValue('abonoValor', abonoSugerido(credito));
+
+  // Aviso del reparto capital/interes en creditos hibridos
+  const infoHib = document.getElementById('abonoHibridoInfo');
+  if(infoHib) {
+    if(credito.esHibrido) {
+      const rep = repartirAbonoHibrido(credito, credito.valorCuota || 0);
+      infoHib.style.display = 'block';
+      const esUltima = abonoSugerido(credito) === topePago;
+      infoHib.innerHTML = `💜 <strong>Crédito híbrido:</strong> de una cuota de ${fmt(credito.valorCuota||0)} van `
+        + `<strong>${fmt(rep.interes)}</strong> a interés (${tasaQuincenalCreditoPct(credito)}% quincenal) y <strong>${fmt(rep.capital)}</strong> a capital. `
+        + `El saldo baja solo por el capital. Máximo a abonar hoy: <strong>${fmt(topePago)}</strong>.`
+        + (esUltima ? `<br>✅ <strong>Última cuota:</strong> con ${fmt(topePago)} queda cancelado.` : '');
+    } else {
+      infoHib.style.display = 'none';
+      infoHib.innerHTML = '';
+    }
+  }
   document.getElementById('abonoMetodo').value            = 'Efectivo';
   document.getElementById('abonoNroTransf').value         = '';
   document.getElementById('abonoObs').value               = '';
@@ -10932,13 +11304,19 @@ async function pagarTotalCredito() {
   const id      = parseInt(document.getElementById('abonoCredId').value);
   const credito = db.creditos.find(c => c.id === id);
   if(!credito || credito.saldo <= 0) { toast('No hay saldo pendiente','error'); return; }
+  // En hibrido la liquidacion total es capital + interes del periodo
+  const totalLiquidar = topeAbonoCredito(credito);
+  const detalleHib = credito.esHibrido
+    ? `
+(Capital ${fmt(credito.saldo)} + interés del período ${fmt(interesQuincenalHibrido(credito))})`
+    : '';
   if(!confirm(`¿Registrar el PAGO TOTAL del crédito de ${credito.cliente}?
 
-Saldo completo: ${fmt(credito.saldo)}
+Total a pagar: ${fmt(totalLiquidar)}${detalleHib}
 
 Esta acción cancelará el crédito como PAGADO.`)) return;
-  // Llenar el campo con el saldo total y confirmar
-  setMoneyValue('abonoValor', credito.saldo);
+  // Llenar el campo con el total y confirmar
+  setMoneyValue('abonoValor', totalLiquidar);
   setTimeout(() => confirmarAbono(), 100);
 }
 
@@ -10955,18 +11333,21 @@ async function confirmarAbono() {
   if(valor <= 0) { toast('El valor del abono debe ser mayor a 0','error'); return; }
   const credito = db.creditos.find(c => c.id === id);
   if(!credito) return;
-  // El abono no puede pasarse del saldo: se rechaza en vez de dejar saldo a favor
-  if(Math.round(valor) > Math.round(credito.saldo || 0)) {
-    toast(`El abono (${fmt(valor)}) supera el saldo pendiente (${fmt(credito.saldo||0)}). Registra máximo ${fmt(credito.saldo||0)}.`,'error');
+  // El abono no puede pasarse del tope (saldo, o saldo + interés en híbrido)
+  const topeConfirm = topeAbonoCredito(credito);
+  if(Math.round(valor) > topeConfirm) {
+    toast(`El abono (${fmt(valor)}) supera el máximo permitido (${fmt(topeConfirm)}). Registra máximo ${fmt(topeConfirm)}.`,'error');
     return;
   }
   const calcPrevio = calcularCuotasCredito(credito);
   const nroCuota = Math.min(calcPrevio.pagadas + 1, calcPrevio.cuotasTotal || (calcPrevio.pagadas + 1));
   _guardandoAbono = true;
   try {
-    const { abono, calc } = await registrarAbonoDB(id, valor, metodo, { transf, obs });
+    const { abono, calc, reparto } = await registrarAbonoDB(id, valor, metodo, { transf, obs });
     closeModal('modalRegistrarAbono');
     renderCreditos(tabCreditosActual);
+    // La cartera vuelve a pedir los abonos la proxima vez que se abra
+    if(typeof ccAbonosCargados !== 'undefined') ccAbonosCargados = false;
     // Mostrar recibo
     mostrarReciboAbono({
       cliente:   credito.cliente,
@@ -12282,6 +12663,8 @@ function simCambiarFrecuencia(){
 }
 
 function calcularSim(){
+  // En modo Crediplay manda el otro calculador
+  if(typeof simEsModoCrediplay === 'function' && simEsModoCrediplay()) { calcularSimCrediplay(); return; }
   const costo     = getMoneyValue('simCosto');
   const modo      = document.querySelector('input[name="simModoPrecio"]:checked')?.value || 'margen';
   const margen    = parseFloat($('simMargen').value) || 0.45;
@@ -12412,6 +12795,684 @@ function calcularSim(){
   }).join('');
 }
 
+// ============================================================
+// CARTERA CREDIPLAY — seguimiento de la financiera propia
+// ------------------------------------------------------------
+// Modulo solo para admin. Trabaja sobre db.creditos (ya cargado en el
+// login) filtrando la financiera CREDIPLAY, y pide los abonos de esos
+// creditos para la grafica y el detalle. No escribe nada: solo lee.
+// ============================================================
+let ccAbonos       = [];      // abonos de los creditos Crediplay
+let ccAbonosCargados = false;
+let ccOrden        = { col: 'saldo', dir: 'desc' };
+let ccSoloMoraCritica = false;
+let ccChart        = null;
+let ccCreditoAbierto = null;
+
+// Un credito es de la financiera propia si la financiera dice CREDIPLAY
+function esCreditoCrediplay(c) {
+  return (c?.financiera || '').toUpperCase().includes('CREDIPLAY');
+}
+
+// Creditos de la cartera: Crediplay, sin anulados ni cerrados por cambio
+function ccCreditosBase() {
+  return (db.creditos || []).filter(c =>
+    esCreditoCrediplay(c) &&
+    c.estado !== 'anulado' &&
+    !creditoCerradoPorCambio(c)
+  );
+}
+
+// Plata prestada por un credito = capital financiado + inicial.
+// Los creditos viejos no tienen capital_financiado: se deduce del monto total.
+function ccCapital(c) {
+  return c.capitalFinanciado > 0 ? c.capitalFinanciado : Math.max(0, (c.total||0) - (c.inicial||0));
+}
+function ccPrestado(c) { return ccCapital(c) + (c.inicial||0); }
+// Recuperado = inicial que ya pago + todos sus abonos
+function ccRecuperado(c) { return (c.inicial||0) + (c.abonado||0); }
+
+function ccEsActivo(c) { return c.estado === 'al_dia' || c.estado === 'mora'; }
+
+// Dias de atraso de la proxima cuota (0 si esta al dia)
+function ccDiasMora(c) {
+  const px = calcularProximaCuota(c);
+  return px.enMora ? (px.diasAtraso || 0) : 0;
+}
+
+async function ccCargarAbonos(forzar) {
+  if(ccAbonosCargados && !forzar) return;
+  const ids = ccCreditosBase().map(c => c.id);
+  if(!ids.length) { ccAbonos = []; ccAbonosCargados = true; return; }
+  try {
+    const res = await sbFetch(`abonos?select=id,credito_id,valor,capital,interes,fecha_abono,metodo_pago,notas&credito_id=in.(${ids.join(',')})&order=fecha_abono.asc&limit=100000`);
+    ccAbonos = Array.isArray(res) ? res : [];
+    ccAbonosCargados = true;
+  } catch(e) {
+    console.error('No se pudieron cargar los abonos de la cartera:', e);
+    toast('No se pudieron cargar los abonos de la cartera','error');
+  }
+}
+
+async function renderCarteraCrediplay(forzar) {
+  if(!esUsuarioAdmin()) return;
+  ccSoloMoraCritica = false;
+  await ccCargarAbonos(forzar);
+  ccPoblarFiltros();
+  ccKPIs();
+  ccGrafica();
+  ccRenderTabla();
+}
+
+// Asesores y sedes que aparecen en la cartera
+function ccPoblarFiltros() {
+  const base = ccCreditosBase();
+  const llenar = (id, valores) => {
+    const sel = document.getElementById(id);
+    if(!sel) return;
+    const actual = sel.value;
+    const primera = sel.options[0] ? sel.options[0].outerHTML : '';
+    sel.innerHTML = primera + valores.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+    if(actual) sel.value = actual;
+  };
+  llenar('ccFiltroAsesor', [...new Set(base.map(c => c.asesor).filter(Boolean))].sort());
+  llenar('ccFiltroSede',   [...new Set(base.map(c => c.sede).filter(Boolean))].sort());
+}
+
+function ccKPIs() {
+  const base    = ccCreditosBase();
+  const activos = base.filter(ccEsActivo);
+  const enMora  = base.filter(c => c.estado === 'mora');
+
+  const prestado   = activos.reduce((a,c) => a + ccPrestado(c), 0);
+  const recuperado = base.reduce((a,c) => a + ccRecuperado(c), 0);
+  const saldo      = activos.reduce((a,c) => a + (c.saldo||0), 0);
+  const saldoMora  = enMora.reduce((a,c) => a + (c.saldo||0), 0);
+  // El % de recuperacion se mide contra todo lo prestado (incluidos los ya pagados)
+  const prestadoTotal = base.reduce((a,c) => a + ccPrestado(c), 0);
+  const pctRec  = prestadoTotal > 0 ? (recuperado / prestadoTotal) * 100 : 0;
+  const pctMora = activos.length > 0 ? (enMora.length / activos.length) * 100 : 0;
+
+  const setEl = (id,v) => { const e = document.getElementById(id); if(e) e.textContent = v; };
+  setEl('ccKpiPrestado',    fmt(prestado));
+  setEl('ccKpiPrestadoSub', `${activos.length} crédito(s) activo(s) · ${base.length} en total`);
+  setEl('ccKpiRecuperado',  fmt(recuperado));
+  setEl('ccKpiSaldo',       fmt(saldo));
+  setEl('ccKpiMora',        fmt(saldoMora));
+  setEl('ccKpiMoraSub',     `${enMora.length} crédito(s)`);
+  setEl('ccKpiPctRec',      pctRec.toFixed(1) + '%');
+  setEl('ccKpiPctMora',     pctMora.toFixed(1) + '%');
+}
+
+// Ultimos 6 meses: prestado nuevo (por fecha de inicio) vs recuperado (abonos)
+function ccGrafica() {
+  const canvas = document.getElementById('ccChart');
+  if(!canvas || typeof Chart === 'undefined') return;
+
+  const meses = [];
+  const hoy = new Date();
+  for(let i = 5; i >= 0; i--) {
+    const d = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
+    meses.push({
+      clave: d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'),
+      label: d.toLocaleDateString('es-CO', { month:'short', year:'2-digit' })
+    });
+  }
+  const mesDe = f => (f || '').toString().slice(0,7);
+
+  const base = ccCreditosBase();
+  const prestado = meses.map(m => base
+    .filter(c => mesDe(c.fechaInicio) === m.clave)
+    .reduce((a,c) => a + ccPrestado(c), 0));
+  const recuperado = meses.map(m => ccAbonos
+    .filter(a => mesDe(a.fecha_abono) === m.clave)
+    .reduce((a,x) => a + (parseFloat(x.valor)||0), 0));
+
+  if(ccChart) { ccChart.destroy(); ccChart = null; }
+  ccChart = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: meses.map(m => m.label),
+      datasets: [
+        { label:'Prestado nuevo',     data: prestado,   backgroundColor:'#6B2D8B', borderRadius:6 },
+        { label:'Recuperado del mes', data: recuperado, backgroundColor:'#16a34a', borderRadius:6 }
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{ position:'bottom' },
+        tooltip:{ callbacks:{ label: ctx => ctx.dataset.label + ': ' + fmt(ctx.parsed.y) } }
+      },
+      scales:{ y:{ beginAtZero:true, ticks:{ callback: v => fmt(v) } } }
+    }
+  });
+}
+
+function ccOrdenar(col) {
+  if(ccOrden.col === col) ccOrden.dir = ccOrden.dir === 'desc' ? 'asc' : 'desc';
+  else ccOrden = { col, dir:'desc' };
+  ccRenderTabla();
+}
+
+function ccLimpiarFiltros() {
+  ['ccBuscar','ccFiltroAsesor','ccFiltroSede'].forEach(id => { const e = document.getElementById(id); if(e) e.value = ''; });
+  const est = document.getElementById('ccFiltroEstado'); if(est) est.value = 'todos';
+  ccSoloMoraCritica = false;
+  ccRenderTabla();
+}
+
+// Aplica busqueda, filtros y orden
+function ccCreditosFiltrados() {
+  let data = ccCreditosBase();
+  const txt    = (document.getElementById('ccBuscar')?.value || '').toLowerCase().trim();
+  const estado = document.getElementById('ccFiltroEstado')?.value || 'todos';
+  const asesor = document.getElementById('ccFiltroAsesor')?.value || '';
+  const sede   = document.getElementById('ccFiltroSede')?.value || '';
+
+  if(txt) data = data.filter(c =>
+    (c.cliente||'').toLowerCase().includes(txt) ||
+    (c.cedula||'').toLowerCase().includes(txt) ||
+    (c.telefono||'').toLowerCase().includes(txt)
+  );
+  if(estado !== 'todos') data = data.filter(c => c.estado === estado);
+  if(asesor) data = data.filter(c => c.asesor === asesor);
+  if(sede)   data = data.filter(c => c.sede === sede);
+  if(ccSoloMoraCritica) data = data.filter(c => c.estado === 'mora' && ccDiasMora(c) > 15);
+
+  const dir = ccOrden.dir === 'asc' ? 1 : -1;
+  data = [...data].sort((a,b) => {
+    if(ccOrden.col === 'fecha') return dir * (new Date(a.fechaInicio||0) - new Date(b.fechaInicio||0));
+    if(ccOrden.col === 'total') return dir * ((a.total||0) - (b.total||0));
+    return dir * ((a.saldo||0) - (b.saldo||0));
+  });
+  return data;
+}
+
+function ccRenderTabla() {
+  const tbody = document.getElementById('ccTbody');
+  if(!tbody) return;
+
+  // Flechitas de orden
+  const flecha = ccOrden.dir === 'asc' ? '▲' : '▼';
+  ['Fecha','Total','Saldo'].forEach(c => {
+    const e = document.getElementById('ccOrd' + c);
+    if(e) e.textContent = ccOrden.col === c.toLowerCase() ? flecha : '';
+  });
+
+  const data = ccCreditosFiltrados();
+  const badge = c => {
+    if(c.estado === 'pagado') return '<span class="badge" style="background:#e5e5ea;color:#555;">pagado</span>';
+    if(c.estado === 'mora')   return `<span class="badge badge-red">mora ${ccDiasMora(c)}d</span>`;
+    return '<span class="badge badge-green">al día</span>';
+  };
+
+  tbody.innerHTML = data.length ? data.map(c => `
+    <tr>
+      <td style="font-weight:600;">${escapeHtml(c.cliente||'—')}
+        ${c.esHibrido ? '<span class="badge" style="background:#6B2D8B;color:#fff;margin-left:4px;font-size:9px;">HÍBRIDO</span>' : ''}
+      </td>
+      <td>${escapeHtml(c.cedula||'—')}</td>
+      <td>${escapeHtml(c.telefono||'—')}</td>
+      <td style="max-width:200px;">${escapeHtml((c.equipo||'—').substring(0,40))}</td>
+      <td>${escapeHtml(c.asesor||'—')}</td>
+      <td style="font-size:12px;">${escapeHtml(c.sede||'—')}</td>
+      <td style="font-size:12px;">${fmtFechaCorta(c.fechaInicio)}</td>
+      <td style="text-align:right;">${fmt(c.total||0)}</td>
+      <td style="text-align:right;color:#16a34a;font-weight:600;">${fmt(ccRecuperado(c))}</td>
+      <td style="text-align:right;font-weight:700;color:#d97706;">${fmt(c.saldo||0)}</td>
+      <td style="text-align:center;">${c.pagadas||0}/${c.cuotas||0}</td>
+      <td style="text-align:center;">${badge(c)}</td>
+      <td style="text-align:center;">
+        <button class="btn btn-sm btn-ghost" style="font-size:11px;color:#6B2D8B;" onclick="ccVerDetalle(${c.id})">👁️ Ver</button>
+      </td>
+    </tr>`).join('')
+    : '<tr><td colspan="13" style="text-align:center;padding:20px;color:#888899;">No hay créditos Crediplay con esos filtros</td></tr>';
+
+  const resumen = document.getElementById('ccTablaResumen');
+  if(resumen) {
+    const saldo = data.reduce((a,c) => a + (c.saldo||0), 0);
+    resumen.textContent = `${data.length} crédito(s) · saldo ${fmt(saldo)}`
+      + (ccSoloMoraCritica ? ' · solo mora crítica (+15 días)' : '');
+  }
+}
+
+function ccMoraCritica() {
+  ccSoloMoraCritica = !ccSoloMoraCritica;
+  if(ccSoloMoraCritica) {
+    const est = document.getElementById('ccFiltroEstado');
+    if(est) est.value = 'mora';
+  }
+  ccRenderTabla();
+  const n = ccCreditosFiltrados().length;
+  toast(ccSoloMoraCritica ? `${n} crédito(s) con más de 15 días de mora` : 'Filtro de mora crítica quitado');
+}
+
+// ── Detalle del credito con su historial de abonos ────────────
+function ccVerDetalle(id) {
+  const c = db.creditos.find(x => x.id === id);
+  if(!c) { toast('Crédito no encontrado','error'); return; }
+  ccCreditoAbierto = id;
+
+  const abonos = ccAbonos.filter(a => a.credito_id === id);
+  const px     = calcularProximaCuota(c);
+  const dato   = (l,v,color) => `
+    <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #f0ecf8;">
+      <span style="font-size:12px;color:#888899;">${l}</span>
+      <strong style="font-size:13px;${color?'color:'+color+';':''}">${v}</strong>
+    </div>`;
+
+  const filas = abonos.length ? abonos.map((a,i) => {
+    const cap = parseFloat(a.capital)||0, int = parseFloat(a.interes)||0;
+    return `<tr>
+      <td style="padding:6px 8px;border-bottom:1px solid #f0ecf8;">${i+1}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #f0ecf8;">${fmtFechaCorta(a.fecha_abono)}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #f0ecf8;">${escapeHtml(a.metodo_pago||'—')}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #f0ecf8;text-align:right;font-weight:600;">${fmt(parseFloat(a.valor)||0)}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #f0ecf8;text-align:right;color:#6B2D8B;">${cap>0?fmt(cap):'—'}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #f0ecf8;text-align:right;color:#dc2626;">${int>0?fmt(int):'—'}</td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="6" style="padding:14px;text-align:center;color:#888899;">Sin abonos registrados</td></tr>';
+
+  const tit = document.getElementById('ccDetalleTitulo');
+  if(tit) tit.textContent = `💰 ${c.cliente || 'Crédito'} · #${c.id}`;
+
+  const btn = document.getElementById('ccDetalleBtnAbono');
+  if(btn) btn.style.display = (c.saldo > 0 && ccEsActivo(c)) ? '' : 'none';
+
+  document.getElementById('ccDetalleContenido').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px;">
+      <div>
+        ${dato('Cliente', escapeHtml(c.cliente||'—'))}
+        ${dato('Cédula', escapeHtml(c.cedula||'—'))}
+        ${dato('Teléfono', escapeHtml(c.telefono||'—'))}
+        ${dato('Producto', escapeHtml((c.equipo||'—').substring(0,40)))}
+        ${dato('Asesor', escapeHtml(c.asesor||'—'))}
+        ${dato('Sede', escapeHtml(c.sede||'—'))}
+      </div>
+      <div>
+        ${dato('Fecha inicio', fmtFechaCorta(c.fechaInicio))}
+        ${dato('Monto total', fmt(c.total||0))}
+        ${dato('Inicial', fmt(c.inicial||0), '#16a34a')}
+        ${dato('Capital financiado', fmt(ccCapital(c)))}
+        ${dato('Ya pagado', fmt(ccRecuperado(c)), '#16a34a')}
+        ${dato('Saldo pendiente', fmt(c.saldo||0), '#d97706')}
+        ${dato('Cuotas', `${c.pagadas||0} / ${c.cuotas||0} · ${fmt(c.valorCuota||0)} c/u`)}
+      </div>
+    </div>
+
+    ${c.esHibrido ? `
+    <div style="background:#faf7ff;border:1px solid #d9c9ee;border-radius:10px;padding:12px;margin-bottom:14px;">
+      <div style="font-size:12px;font-weight:800;color:#6B2D8B;margin-bottom:6px;">💜 CRÉDITO HÍBRIDO</div>
+      ${dato('Precio contado', fmt(c.precioContado||0))}
+      ${dato('Precio a crédito', fmt(c.precioCredito||0), '#6B2D8B')}
+      ${dato('Sobreprecio', fmt(c.sobreprecioCredito||0), '#d97706')}
+      ${dato('Intereses pactados', fmt(c.interesesPactados||0), '#dc2626')}
+      ${dato('Tasa', (c.tasaMensual||2) + '% mensual')}
+    </div>` : ''}
+
+    <div style="background:${px.enMora?'#fee2e2':'#f0fdf4'};border-radius:10px;padding:10px 12px;margin-bottom:14px;font-size:12px;font-weight:600;color:${px.enMora?'#dc2626':'#16a34a'};">
+      ${!px.fecha ? '📅 Sin fechas de pago configuradas'
+        : px.enMora ? `⚠️ EN MORA · cuota del ${px.fecha} · ${px.diasAtraso} día(s) de atraso`
+        : `📅 Próxima cuota: ${px.fecha} · en ${-px.diasAtraso} día(s)`}
+    </div>
+
+    <div style="font-size:12px;font-weight:700;color:#6B2D8B;margin-bottom:6px;">📜 Historial de abonos (${abonos.length})</div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <thead><tr style="background:#f7f5fb;color:#6B2D8B;">
+        <th style="padding:8px;text-align:left;">#</th>
+        <th style="padding:8px;text-align:left;">Fecha</th>
+        <th style="padding:8px;text-align:left;">Método</th>
+        <th style="padding:8px;text-align:right;">Abono</th>
+        <th style="padding:8px;text-align:right;">Capital</th>
+        <th style="padding:8px;text-align:right;">Interés</th>
+      </tr></thead>
+      <tbody>${filas}</tbody>
+    </table>
+    <div style="display:flex;justify-content:space-between;margin-top:10px;padding-top:8px;border-top:2px solid #6B2D8B;">
+      <strong>Total abonado</strong>
+      <strong style="color:#6B2D8B;">${fmt(abonos.reduce((s,a)=>s+(parseFloat(a.valor)||0),0))}</strong>
+    </div>`;
+
+  const cont = document.getElementById('ccDetalleContenido');
+  if(cont) cont.scrollTop = 0;
+  openModal('modalCarteraDetalle');
+}
+
+// Usa el modal de abonos que ya existe en Creditos
+function ccRegistrarAbonoDesdeDetalle() {
+  if(!ccCreditoAbierto) return;
+  closeModal('modalCarteraDetalle');
+  registrarPago(ccCreditoAbierto);
+}
+
+function ccExportarExcel() {
+  try {
+    const data = ccCreditosFiltrados();
+    if(!data.length) { toast('No hay créditos para exportar','error'); return; }
+
+    const headers = ['ID','Cliente','Cédula','Teléfono','Producto','Asesor','Sede','Fecha inicio',
+      'Monto total','Inicial','Capital financiado','Ya pagado','Saldo','Cuotas pagadas','Cuotas total',
+      'Valor cuota','Estado','Días mora','Híbrido'];
+    const rows = data.map(c => [
+      c.id||0, c.cliente||'', c.cedula||'', c.telefono||'', c.equipo||'', c.asesor||'', c.sede||'',
+      c.fechaInicio ? String(c.fechaInicio).slice(0,10) : '',
+      c.total||0, c.inicial||0, ccCapital(c), ccRecuperado(c), c.saldo||0,
+      c.pagadas||0, c.cuotas||0, c.valorCuota||0,
+      c.estado||'', ccDiasMora(c), c.esHibrido ? 'SI' : 'NO'
+    ]);
+
+    const escapeXML = s => String(s??'').replace(/[<>&"']/g, ch => ({
+      '<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&apos;'
+    })[ch]);
+
+    let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
+    xml += '<?mso-application progid="Excel.Sheet"?>\n';
+    xml += '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"';
+    xml += ' xmlns:o="urn:schemas-microsoft-com:office:office"';
+    xml += ' xmlns:x="urn:schemas-microsoft-com:office:excel"';
+    xml += ' xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"';
+    xml += ' xmlns:html="http://www.w3.org/TR/REC-html40">\n';
+    xml += '<Styles>\n';
+    xml += '<Style ss:ID="Header"><Font ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#6B2D8B" ss:Pattern="Solid"/></Style>\n';
+    xml += '<Style ss:ID="Money"><NumberFormat ss:Format="#,##0"/></Style>\n';
+    xml += '</Styles>\n';
+    xml += '<Worksheet ss:Name="Cartera Crediplay">\n<Table>\n';
+    [50,190,110,110,200,140,130,90,100,100,120,100,100,80,80,100,90,80,70].forEach(w => xml += `<Column ss:Width="${w}"/>\n`);
+    xml += '<Row>';
+    headers.forEach(h => xml += `<Cell ss:StyleID="Header"><Data ss:Type="String">${escapeXML(h)}</Data></Cell>`);
+    xml += '</Row>\n';
+    rows.forEach(r => {
+      xml += '<Row>';
+      r.forEach((val,i) => {
+        if(typeof val === 'number') {
+          const money = i >= 8 && i <= 15;
+          xml += `<Cell${money ? ' ss:StyleID="Money"' : ''}><Data ss:Type="Number">${val}</Data></Cell>`;
+        } else {
+          xml += `<Cell><Data ss:Type="String">${escapeXML(val)}</Data></Cell>`;
+        }
+      });
+      xml += '</Row>\n';
+    });
+    xml += '</Table>\n</Worksheet>\n</Workbook>';
+
+    const blob = new Blob([xml], { type:'application/vnd.ms-excel;charset=utf-8' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    a.download = 'Cartera_Crediplay_' + fechaColombia() + '.xls';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast('Cartera exportada: ' + data.length + ' crédito(s)');
+  } catch(e) {
+    toast('Error al exportar: ' + e.message,'error');
+  }
+}
+
+// ============================================================
+// SIMULADOR CREDIPLAY — financiera propia (modelo hibrido)
+// ------------------------------------------------------------
+// Precio contado = costo + margen comercial normal.
+// Precio a credito = precio contado + sobreprecio segun el plazo.
+// Sobre el capital financiado se cobra 1% quincenal (2% mensual),
+// con cuota fija (amortizacion francesa). Todo dentro de usura.
+// ============================================================
+
+// Sobreprecio del credito segun el plazo en quincenas
+function getSobreprecio(plazo) {
+  if(plazo <= 6)  return 8;
+  if(plazo <= 10) return 14;
+  if(plazo <= 14) return 21;
+  if(plazo <= 18) return 27;
+  if(plazo <= 22) return 34;
+  if(plazo <= 26) return 42;
+  if(plazo <= 36) return 50;
+  return 58;
+}
+
+// Tasa del modelo: 2% mensual = 1% quincenal
+const CREDIPLAY_TASA_QUINCENAL = 0.01;
+const CREDIPLAY_TASA_MENSUAL   = 2.0;
+
+// Cuota fija (amortizacion francesa)
+function cuotaFrancesa(capital, tasa, plazo) {
+  if(!capital || plazo <= 0) return 0;
+  if(!tasa) return capital / plazo;
+  const f = Math.pow(1 + tasa, plazo);
+  return capital * tasa * f / (f - 1);
+}
+
+// Todos los numeros del modelo a partir de costo, margen, plazo e inicial
+function calcularCrediplay(costo, margenPct, plazo, inicialPct, tasaQuincenal) {
+  const tasaQ = (tasaQuincenal === undefined || tasaQuincenal === null) ? CREDIPLAY_TASA_QUINCENAL : tasaQuincenal;
+  const precioContado = Math.round(costo * (1 + margenPct/100));
+  const sobrePct      = getSobreprecio(plazo);
+  const precioCredito = Math.round(precioContado * (1 + sobrePct/100));
+  const sobreprecio   = precioCredito - precioContado;
+  const inicial       = Math.round(precioCredito * inicialPct/100);
+  const capital       = precioCredito - inicial;
+  const cuota         = Math.round(cuotaFrancesa(capital, tasaQ, plazo));
+  const totalCuotas   = cuota * plazo;
+  const totalPagar    = inicial + totalCuotas;
+  const intereses     = totalCuotas - capital;
+  const ganComercial  = precioContado - costo;
+  const gananciaTotal = ganComercial + sobreprecio + intereses;
+  return {
+    costo, margenPct, plazo, inicialPct,
+    precioContado, sobrePct, precioCredito, sobreprecio,
+    inicial, capital, cuota, totalCuotas, totalPagar, intereses,
+    ganComercial, gananciaTotal,
+    tasaQuincenalPct: tasaQ * 100,
+    tasaMensualPct:   tasaQ * 200,
+    eaPct: (Math.pow(1 + tasaQ, 24) - 1) * 100,
+    margenSobreCosto: costo > 0 ? (gananciaTotal / costo) * 100 : 0
+  };
+}
+
+// ── Tasa de interes del simulador ────────────────────────────
+// Dos listas de uno en uno: mensual de 1 a 20 y quincenal de 1 a 19.
+// La cuota siempre se calcula con la quincenal; al mover una lista se
+// acomoda la otra (mensual = quincenal x 2) cuando el valor existe.
+function simCpLlenarTasas() {
+  const mens = $('simCpTasaMensual');
+  const quin = $('simCpTasaQuincenal');
+  if(mens && !mens.options.length) {
+    // La primera opcion queda vacia: se usa cuando la tasa quincenal escogida
+    // pasa de 10% y su equivalente mensual (mas de 20%) no esta en la lista
+    let ops = '<option value="">—</option>';
+    for(let i = 1; i <= 20; i++) ops += `<option value="${i}"${i===2?' selected':''}>${i}% mensual</option>`;
+    mens.innerHTML = ops;
+    mens.value = '2';
+  }
+  if(quin && !quin.options.length) {
+    let ops = '';
+    for(let i = 1; i <= 19; i++) ops += `<option value="${i}"${i===1?' selected':''}>${i}% quincenal</option>`;
+    quin.innerHTML = ops;
+  }
+}
+
+// Tasa quincenal que manda en el calculo (en decimal).
+// Se llama simCpTasaQ y no simCpTasaQuincenal para no chocar con el id
+// del desplegable, que el navegador tambien expone como variable global.
+function simCpTasaQ() {
+  simCpLlenarTasas();
+  const q = parseFloat($('simCpTasaQuincenal')?.value) || 1;
+  return q / 100;
+}
+
+// Al escoger la mensual, la quincenal queda en la mitad (si esa opcion existe)
+function simCpTasaDesdeMensual() {
+  const valor = $('simCpTasaMensual')?.value || '';
+  if(valor === '') { calcularSimCrediplay(); return; }   // "—": manda la quincenal
+  const mens = parseFloat(valor) || 2;
+  const quin = $('simCpTasaQuincenal');
+  const mitad = Math.max(1, Math.round(mens / 2));
+  if(quin && mitad <= 19) quin.value = String(mitad);
+  calcularSimCrediplay();
+}
+
+// Al escoger la quincenal, la mensual queda al doble (si esa opcion existe)
+function simCpTasaDesdeQuincenal() {
+  const quin = parseFloat($('simCpTasaQuincenal')?.value) || 1;
+  const mens = $('simCpTasaMensual');
+  const doble = quin * 2;
+  // Arriba de 10% quincenal el equivalente mensual se sale de la lista:
+  // el desplegable queda en "—" para no mostrar un numero que no es
+  if(mens) mens.value = doble <= 20 ? String(doble) : '';
+  calcularSimCrediplay();
+}
+
+// El plazo del modo Crediplay va de 4 a 60 quincenas, de una en una
+function simCpLlenarPlazos() {
+  const sel = $('simCpPlazo');
+  if(!sel || sel.options.length) return;
+  let ops = '';
+  for(let i = 4; i <= 60; i++) {
+    const m = (i/2).toFixed(1).replace('.0','');
+    ops += `<option value="${i}"${i===12?' selected':''}>${i} quincenas (${m} ${i===2?'mes':'meses'}) · +${getSobreprecio(i)}%</option>`;
+  }
+  sel.innerHTML = ops;
+}
+
+// Cambia entre el simulador de siempre y el de Crediplay
+function simSetModo(modo) {
+  const esCp    = modo === 'crediplay';
+  const basico  = $('simBloqueBasico');
+  const credi   = $('simBloqueCrediplay');
+  if(basico) basico.style.display = esCp ? 'none' : '';
+  if(credi)  credi.style.display  = esCp ? '' : 'none';
+
+  const btnB = $('simBtnBasico'), btnC = $('simBtnCrediplay');
+  if(btnB) {
+    btnB.style.background  = esCp ? '#fff' : '#6B2D8B';
+    btnB.style.color       = esCp ? '#6B2D8B' : '#fff';
+    btnB.style.borderColor = esCp ? '#ece8f5' : '#6B2D8B';
+  }
+  if(btnC) {
+    btnC.style.background  = esCp ? '#6B2D8B' : '#fff';
+    btnC.style.color       = esCp ? '#fff' : '#6B2D8B';
+    btnC.style.borderColor = esCp ? '#6B2D8B' : '#ece8f5';
+  }
+
+  const tit = $('simTitulo'), sub = $('simSub');
+  if(tit) tit.textContent = esCp ? '💜 Simulador Crediplay — Financiera Play Móvil' : '🧮 Simulador de Ventas';
+  if(sub) sub.textContent = esCp
+    ? 'Precio contado, sobreprecio por plazo, cuota fija al 2% mensual y ganancia desglosada'
+    : 'Calcula precio de venta, inicial, intereses y cuotas quincenales o mensuales';
+
+  if(esCp) {
+    simCpLlenarPlazos();
+    simCpLlenarTasas();
+    const tabla = $('simTablaWrap');
+    if(tabla) tabla.style.display = 'none';
+    calcularSimCrediplay();
+  } else {
+    calcularSim();
+  }
+}
+
+function simEsModoCrediplay() {
+  return ($('simBloqueCrediplay')?.style.display || 'none') !== 'none';
+}
+
+function calcularSimCrediplay() {
+  simCpLlenarPlazos();
+  simCpLlenarTasas();
+  const costo      = getMoneyValue('simCpCosto');
+  const margenPct  = parseFloat($('simCpMargen')?.value) || 30;
+  const plazo      = parseInt($('simCpPlazo')?.value) || 12;
+  const inicialPct = parseFloat($('simCpInicialPct')?.value) || 30;
+  const tasaQ      = simCpTasaQ();
+
+  // Efectivo anual de la tasa escogida (24 quincenas). El tope de usura lo
+  // publica la Superfinanciera cada mes, asi que aqui no se afirma un numero:
+  // solo se marca en rojo lo que se sale claramente del orden del modelo
+  // (1% quincenal = 26,97% EA, que es la tasa aprobada de Crediplay).
+  const eaPct = (Math.pow(1 + tasaQ, 24) - 1) * 100;
+  const elEA  = $('simCpEA');
+  if(elEA) elEA.textContent = eaPct.toFixed(2) + '% EA';
+  const pasaUsura  = eaPct > 30;
+  const avisoUsura = $('simCpAvisoUsura');
+  if(avisoUsura) avisoUsura.style.display = pasaUsura ? '' : 'none';
+  if(elEA) elEA.style.color = pasaUsura ? '#dc2626' : '#6B2D8B';
+
+  const lblSobre = $('simCpSobreLbl');
+  if(lblSobre) lblSobre.textContent = `+${getSobreprecio(plazo)}%`;
+
+  const tabla = $('simTablaWrap');
+  if(tabla) tabla.style.display = 'none';
+
+  if(!costo) {
+    $('simResultado').innerHTML = '<div class="empty-state"><div class="empty-icon">💜</div><div class="empty-text">Ingresa el costo del equipo para ver el plan Crediplay</div></div>';
+    return;
+  }
+
+  const r = calcularCrediplay(costo, margenPct, plazo, inicialPct, tasaQ);
+  const meses = (plazo/2).toFixed(1).replace('.0','');
+  const fila = (label, valor, color, fuerte) => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(0,0,0,.05);">
+      <span style="font-size:12px;color:#555577;">${label}</span>
+      <strong style="font-size:${fuerte?'15px':'13px'};${color?'color:'+color+';':''}">${valor}</strong>
+    </div>`;
+
+  $('simResultado').innerHTML = `
+    <!-- Precios -->
+    <div style="background:#faf7ff;border:1px solid #e4d8f5;border-radius:12px;padding:14px;margin-bottom:12px;">
+      <div style="font-size:12px;font-weight:800;color:#6B2D8B;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">🏷️ Precios</div>
+      ${fila('Costo del equipo', fmt(r.costo), '#888899')}
+      ${fila(`Precio contado (margen ${r.margenPct}%)`, fmt(r.precioContado), '#111', true)}
+      ${fila(`Precio a crédito (+${r.sobrePct}%)`, fmt(r.precioCredito), '#6B2D8B', true)}
+      ${fila('Sobreprecio aplicado', `${r.sobrePct}% · ${fmt(r.sobreprecio)}`, '#d97706')}
+    </div>
+
+    <!-- Plan de pagos -->
+    <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:14px;margin-bottom:12px;">
+      <div style="font-size:12px;font-weight:800;color:#d97706;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">💰 Plan de pagos</div>
+      ${fila(`Inicial (${r.inicialPct}%)`, fmt(r.inicial), '#16a34a', true)}
+      ${fila('Capital a financiar', fmt(r.capital), '#111')}
+      ${fila('Plazo', `${r.plazo} quincenas (${meses} meses)`, '#555577')}
+      <div style="background:#fff;border:1px solid #fed7aa;border-radius:10px;padding:10px 12px;margin:8px 0;display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:12px;font-weight:700;color:#d97706;">Cuota quincenal</span>
+        <strong style="font-size:20px;color:#d97706;">${fmt(r.cuota)}</strong>
+      </div>
+      ${fila(`Total cuotas (${r.plazo} × ${fmt(r.cuota)})`, fmt(r.totalCuotas), '#111')}
+      ${fila('Total a pagar (inicial + cuotas)', fmt(r.totalPagar), '#6B2D8B', true)}
+      ${fila('Intereses cobrados', fmt(r.intereses), '#dc2626')}
+      ${fila('Tasa', `${r.tasaMensualPct % 1 === 0 ? r.tasaMensualPct : r.tasaMensualPct.toFixed(1)}% mensual · ${r.tasaQuincenalPct % 1 === 0 ? r.tasaQuincenalPct : r.tasaQuincenalPct.toFixed(1)}% quincenal · ${r.eaPct.toFixed(2)}% EA`, r.eaPct > 30 ? '#dc2626' : '#555577')}
+    </div>
+
+    <!-- Ganancia desglosada -->
+    <div class="solo-admin" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:14px;">
+      <div style="font-size:12px;font-weight:800;color:#16a34a;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">💚 Ganancia desglosada</div>
+      ${fila('Ganancia comercial (contado − costo)', fmt(r.ganComercial), '#16a34a')}
+      ${fila('Sobreprecio crédito', fmt(r.sobreprecio), '#16a34a')}
+      ${fila('Intereses financieros', fmt(r.intereses), '#16a34a')}
+      <div style="background:#16a34a;color:#fff;border-radius:10px;padding:12px;margin-top:8px;text-align:center;">
+        <div style="font-size:11px;opacity:.85;text-transform:uppercase;letter-spacing:1px;">Total ganancia</div>
+        <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:24px;margin-top:2px;">${fmt(r.gananciaTotal)}</div>
+        <div style="font-size:12px;opacity:.9;margin-top:2px;">Margen sobre costo: ${r.margenSobreCosto.toFixed(1)}%</div>
+      </div>
+    </div>`;
+}
+
+// Guarda la simulacion para pasarla al modal de venta (la logica de precarga
+// del formulario de ventas se implementa aparte)
+let simCrediplayPendiente = null;
+function simAplicarANuevaVenta() {
+  const costo = getMoneyValue('simCpCosto');
+  if(!costo) { toast('Ingresa el costo del equipo primero','error'); return; }
+  simCrediplayPendiente = calcularCrediplay(
+    costo,
+    parseFloat($('simCpMargen')?.value) || 30,
+    parseInt($('simCpPlazo')?.value) || 12,
+    parseFloat($('simCpInicialPct')?.value) || 30,
+    simCpTasaQ()
+  );
+  toast(`Simulación lista: contado ${fmt(simCrediplayPendiente.precioContado)} · crédito ${fmt(simCrediplayPendiente.precioCredito)}`,'success');
+}
+
 function selectInicial(el,pct,ini,saldo){document.querySelectorAll('.inicial-card').forEach(c=>c.classList.remove('selected'));el.classList.add('selected');toast(`Inicial del ${(pct*100).toFixed(0)}%: ${fmt(ini)} — Saldo: ${fmt(saldo)}`,'success');}
 
 let crdInicialSeleccionada=0;
@@ -12509,7 +13570,19 @@ function actualizarTotalesMulti(tipo) {
   if(tipo === 'crd') {
     setMoneyValue('crdCosto',     totalCosto);
     setMoneyValue('crdVentaBase', totalPrecio);
-    recalcCredito();
+    // En modelo hibrido los productos fijan el precio de CONTADO y el modelo
+    // recalcula el precio a credito
+    if(typeof crdHibridoActivo === 'function' && crdHibridoActivo()) {
+      const pctC = parseFloat(document.getElementById('crdHibPctContado')?.value);
+      if(pctC) {
+        crdHibAplicarPctContado();          // el contado sale del costo nuevo
+      } else {
+        setMoneyValue('crdHibPrecioContado', totalPrecio);
+        crdCalcHibrido();
+      }
+    } else {
+      recalcCredito();
+    }
   } else {
     setMoneyValue('vcCompra', totalCosto);
     setMoneyValue('vcVenta',  totalPrecio);
@@ -12750,6 +13823,8 @@ function autoComisionCredito(){
   const sel=$('crdFinanciera').value;
   const pct=parseFloat(sel.split(':')[1])||0;
   $('crdComFinanciera').value=pct;
+  // La caja del modelo hibrido solo se ve con la financiera propia
+  if(typeof crdActualizarCajaHibrido === 'function') crdActualizarCajaHibrido();
   // Marcar N° Contrato como obligatorio si la financiera es BRILLA
   const finName = (sel.split(':')[0]||'').toUpperCase();
   const lbl = document.getElementById('crdNumContratoLabel');
@@ -13020,6 +14095,227 @@ function recalcCredito(){
   } else {
     if(resEl) resEl.style.display = 'none';
   }
+}
+
+// ============================================================
+// VENTA CON CREDIPLAY HIBRIDO
+// ------------------------------------------------------------
+// Con la financiera propia se puede activar el modelo hibrido: el
+// precio a credito sale del precio de contado mas el sobreprecio de
+// la tabla, y sobre el capital financiado corre el 1% quincenal.
+// El resto del modal (resumen, ganancia, factura) sigue trabajando
+// con el precio a credito, que es el que queda como valor de venta.
+// ============================================================
+
+function crdHibridoActivo() {
+  return document.getElementById('crdHibrido')?.checked || false;
+}
+
+// La financiera propia es la unica que permite el modelo hibrido
+function crdEsCrediplaySeleccionada() {
+  const val = document.getElementById('crdFinanciera')?.value || '';
+  return (val.split(':')[0] || '').toUpperCase().includes('CREDIPLAY');
+}
+
+// Muestra u oculta la caja del modelo hibrido segun la financiera
+function crdActualizarCajaHibrido() {
+  const box = document.getElementById('crdHibridoBox');
+  if(!box) return;
+  const aplica = crdEsCrediplaySeleccionada();
+  box.style.display = aplica ? '' : 'none';
+  // Al cambiar a otra financiera se apaga el modelo para no dejar datos colgados
+  if(!aplica && crdHibridoActivo()) {
+    document.getElementById('crdHibrido').checked = false;
+    crdToggleHibrido();
+  }
+}
+
+// El % de contado va de 10% a 60%, de 5 en 5, mas la opcion de escribir
+// el precio a mano. Con un % escogido el precio sale del costo del equipo.
+function crdHibLlenarPctContado() {
+  const sel = document.getElementById('crdHibPctContado');
+  if(!sel || sel.options.length) return;
+  let ops = '<option value="">✍️ Precio manual</option>';
+  for(let p = 10; p <= 60; p += 5) ops += `<option value="${p}"${p===30?' selected':''}>${p}% sobre el costo</option>`;
+  sel.innerHTML = ops;
+  sel.value = '30';
+}
+
+// Tasas de la venta: mensual 1-20 y quincenal 1-19, de uno en uno
+function crdHibLlenarTasas() {
+  const mens = document.getElementById('crdHibTasaMensual');
+  const quin = document.getElementById('crdHibTasaQuincenal');
+  if(mens && !mens.options.length) {
+    let ops = '<option value="">—</option>';
+    for(let i = 1; i <= 20; i++) ops += `<option value="${i}">${i}% mensual</option>`;
+    mens.innerHTML = ops;
+    mens.value = '2';
+  }
+  if(quin && !quin.options.length) {
+    let ops = '';
+    for(let i = 1; i <= 19; i++) ops += `<option value="${i}">${i}% quincenal</option>`;
+    quin.innerHTML = ops;
+    quin.value = '1';
+  }
+}
+
+// Tasa quincenal de la venta, en decimal
+function crdHibTasaQ() {
+  crdHibLlenarTasas();
+  const q = parseFloat(document.getElementById('crdHibTasaQuincenal')?.value) || 1;
+  return q / 100;
+}
+
+function crdHibTasaDesdeMensual() {
+  const valor = document.getElementById('crdHibTasaMensual')?.value || '';
+  if(valor === '') { crdCalcHibrido(); return; }
+  const mens  = parseFloat(valor) || 2;
+  const quin  = document.getElementById('crdHibTasaQuincenal');
+  const mitad = Math.max(1, Math.round(mens / 2));
+  if(quin && mitad <= 19) quin.value = String(mitad);
+  crdCalcHibrido();
+}
+
+function crdHibTasaDesdeQuincenal() {
+  const quin  = parseFloat(document.getElementById('crdHibTasaQuincenal')?.value) || 1;
+  const mens  = document.getElementById('crdHibTasaMensual');
+  const doble = quin * 2;
+  if(mens) mens.value = doble <= 20 ? String(doble) : '';
+  crdCalcHibrido();
+}
+
+// Con un % escogido, el precio de contado sale del costo y se bloquea
+function crdHibAplicarPctContado() {
+  crdHibLlenarPctContado();
+  const sel   = document.getElementById('crdHibPctContado');
+  const campo = document.getElementById('crdHibPrecioContado');
+  const pct   = parseFloat(sel?.value);
+  const costo = getMoneyValue('crdCosto');
+
+  const ref = document.getElementById('crdHibCostoRef');
+  if(ref) ref.textContent = fmt(costo);
+
+  if(campo) {
+    const manual = !pct;
+    campo.readOnly = !manual;
+    campo.style.background = manual ? '' : '#f2f0f7';
+    campo.style.cursor     = manual ? '' : 'not-allowed';
+    if(!manual && costo > 0) setMoneyValue('crdHibPrecioContado', Math.round(costo * (1 + pct/100)));
+  }
+  const nota = document.getElementById('crdHibPctContadoNota');
+  if(nota) nota.innerHTML = pct
+    ? `Costo del equipo: <strong id="crdHibCostoRef">${fmt(costo)}</strong> · contado = costo × (1 + ${pct}%)`
+    : `Costo del equipo: <strong id="crdHibCostoRef">${fmt(costo)}</strong> · escribe el precio de contado a mano`;
+  crdCalcHibrido();
+}
+
+function crdHibLlenarPlazos() {
+  const sel = document.getElementById('crdHibPlazo');
+  if(!sel || sel.options.length) return;
+  let ops = '';
+  for(let i = 4; i <= 60; i++) {
+    const m = (i/2).toFixed(1).replace('.0','');
+    ops += `<option value="${i}"${i===12?' selected':''}>${i} quincenas (${m} meses) · +${getSobreprecio(i)}%</option>`;
+  }
+  sel.innerHTML = ops;
+}
+
+function crdToggleHibrido() {
+  const activo  = crdHibridoActivo();
+  const campos  = document.getElementById('crdHibridoCampos');
+  const base    = document.getElementById('crdVentaBase');
+  if(campos) campos.style.display = activo ? 'block' : 'none';
+
+  if(activo) {
+    crdHibLlenarPlazos();
+    crdHibLlenarPctContado();
+    crdHibLlenarTasas();
+    // Con % escogido el contado sale del costo; en manual arranca con el
+    // precio que traen los productos
+    const pct = parseFloat(document.getElementById('crdHibPctContado')?.value);
+    const contado = document.getElementById('crdHibPrecioContado');
+    if(pct) { crdHibAplicarPctContado(); }
+    else if(contado && !getMoneyValue('crdHibPrecioContado')) setMoneyValue('crdHibPrecioContado', getMoneyValue('crdVentaBase'));
+    // El precio de venta lo manda el modelo: se bloquea para que no se desincronice
+    if(base) { base.readOnly = true; base.style.background = '#f2f0f7'; base.style.cursor = 'not-allowed'; }
+    // Los intereses del modelo van dentro de la cuota, no por el interes simple
+    const chkInt = document.getElementById('crdAplicaIntereses');
+    if(chkInt && chkInt.checked) chkInt.checked = false;
+    crdCalcHibrido();
+  } else {
+    if(base) { base.readOnly = false; base.style.background = ''; base.style.cursor = ''; }
+    const prev = document.getElementById('crdHibPreview');
+    if(prev) prev.innerHTML = '';
+    recalcCredito();
+  }
+}
+
+// Numeros del credito hibrido con lo que hay en el formulario
+function crdDatosHibrido() {
+  if(!crdHibridoActivo()) return null;
+  const contado = getMoneyValue('crdHibPrecioContado');
+  if(!contado) return null;
+  crdHibLlenarPlazos();
+  const plazo      = parseInt(document.getElementById('crdHibPlazo')?.value) || 12;
+  const inicialPct = parseFloat(document.getElementById('crdHibInicialPct')?.value) || 30;
+  // margen 0: el precio de contado ya viene calculado o escrito a mano
+  return calcularCrediplay(contado, 0, plazo, inicialPct, crdHibTasaQ());
+}
+
+function crdCalcHibrido() {
+  const prev = document.getElementById('crdHibPreview');
+  const r    = crdDatosHibrido();
+  if(!r) {
+    if(prev) prev.innerHTML = '<div style="font-size:12px;color:#92400e;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:8px;">Ingresa el precio de contado para ver el plan.</div>';
+    return;
+  }
+
+  // El modelo manda sobre el resto del modal: precio de venta, plazo e inicial
+  setMoneyValue('crdVentaBase', r.precioCredito);
+  const selPlazo = document.getElementById('crdPlazoQuincenas');
+  if(selPlazo) selPlazo.value = String(r.plazo);
+  const sinIni = document.getElementById('crdSinInicial');
+  if(sinIni) sinIni.checked = false;
+  const filaIni = document.getElementById('crdInicialManualRow');
+  if(filaIni) filaIni.style.display = '';
+  setMoneyValue('crdInicialManual', r.inicial);
+  crdInicialSeleccionada = r.inicial;
+  recalcCredito();
+
+  // La cuota del resumen es la del modelo (amortizacion francesa), no total/plazo
+  const elCuota = document.getElementById('crdCuotaValor');
+  const elDet   = document.getElementById('crdCuotaDetalle');
+  const elRes   = document.getElementById('crdCuotaResultado');
+  if(elRes) elRes.style.display = 'block';
+  if(elCuota) elCuota.textContent = fmt(r.cuota);
+  const txtTasa = `${r.tasaMensualPct % 1 === 0 ? r.tasaMensualPct : r.tasaMensualPct.toFixed(1)}% mensual`;
+  if(elDet) elDet.textContent = `Inicial: ${fmt(r.inicial)} · ${r.plazo} quincenas · Capital: ${fmt(r.capital)} · Interés ${txtTasa}`;
+
+  // Efectivo anual de la tasa escogida y aviso cuando se dispara
+  const elEA = document.getElementById('crdHibEA');
+  if(elEA) {
+    elEA.textContent = r.eaPct.toFixed(2) + '% EA';
+    elEA.style.color = r.eaPct > 30 ? '#dc2626' : '#6B2D8B';
+  }
+  const avisoU = document.getElementById('crdHibAvisoUsura');
+  if(avisoU) avisoU.style.display = r.eaPct > 30 ? '' : 'none';
+
+  const desc = getMoneyValue('crdDescuento');
+  const adic = getMoneyValue('crdProdAdicVal');
+  const aviso = (desc > 0 || adic > 0)
+    ? '<div style="margin-top:8px;background:#fee2e2;border:1px solid #fecaca;border-radius:8px;padding:8px;font-size:11px;color:#dc2626;font-weight:600;">⚠️ El modelo híbrido no admite descuento ni producto adicional: déjalos en 0 o ajusta el precio de contado.</div>'
+    : '';
+
+  if(prev) prev.innerHTML = `
+    <div style="background:#fff;border:1px solid #e4d8f5;border-radius:10px;padding:10px 12px;font-size:12px;">
+      <div style="display:flex;justify-content:space-between;padding:4px 0;"><span style="color:#555577;">Sobreprecio (${r.sobrePct}%)</span><strong style="color:#d97706;">${fmt(r.sobreprecio)}</strong></div>
+      <div style="display:flex;justify-content:space-between;padding:4px 0;border-top:1px solid #f0ecf8;"><span style="color:#555577;">Precio a crédito</span><strong style="color:#6B2D8B;font-size:14px;">${fmt(r.precioCredito)}</strong></div>
+      <div style="display:flex;justify-content:space-between;padding:4px 0;border-top:1px solid #f0ecf8;"><span style="color:#555577;">Inicial (${r.inicialPct}%)</span><strong style="color:#16a34a;">${fmt(r.inicial)}</strong></div>
+      <div style="display:flex;justify-content:space-between;padding:4px 0;border-top:1px solid #f0ecf8;"><span style="color:#555577;">Capital financiado</span><strong>${fmt(r.capital)}</strong></div>
+      <div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid #f0ecf8;"><span style="color:#555577;font-weight:700;">Cuota quincenal</span><strong style="color:#d97706;font-size:15px;">${fmt(r.cuota)}</strong></div>
+      <div style="display:flex;justify-content:space-between;padding:4px 0;border-top:1px solid #f0ecf8;"><span style="color:#555577;">Total intereses (${txtTasa})</span><strong style="color:#dc2626;">${fmt(r.intereses)}</strong></div>
+      <div style="display:flex;justify-content:space-between;padding:4px 0;border-top:1px solid #f0ecf8;"><span style="color:#555577;">Total a pagar por el cliente</span><strong>${fmt(r.totalPagar)}</strong></div>
+    </div>${aviso}`;
 }
 
 function seleccionarInicialCredito(ini,saldo,pct){toast(`Inicial ${(pct*100).toFixed(0)}%: ${fmt(ini)} | Saldo: ${fmt(saldo)}`,'success');}
