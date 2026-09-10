@@ -3730,16 +3730,29 @@
                   <select class="form-control" id="crdHibPlazo" onchange="crdCalcHibrido()"></select>
                 </div>
                 <div class="form-group">
-                  <label class="form-label">Inicial (%)</label>
-                  <select class="form-control" id="crdHibInicialPct" onchange="crdCalcHibrido()">
+                  <label class="form-label">Inicial</label>
+                  <select class="form-control" id="crdHibInicialPct" onchange="crdHibCambiarInicial()">
+                    <option value="10">10%</option>
+                    <option value="15">15%</option>
                     <option value="20">20%</option>
                     <option value="25">25%</option>
                     <option value="30" selected>30%</option>
                     <option value="35">35%</option>
                     <option value="40">40%</option>
+                    <option value="45">45%</option>
                     <option value="50">50%</option>
+                    <option value="55">55%</option>
+                    <option value="60">60%</option>
+                    <option value="manual">✍️ Inicial manual</option>
                   </select>
                 </div>
+              </div>
+
+              <!-- Inicial escrita a mano: solo con la opcion "Inicial manual" -->
+              <div class="form-group" id="crdHibInicialManualRow" style="display:none;">
+                <label class="form-label">Valor de la inicial ($)</label>
+                <div class="input-money-wrap"><input type="text" class="form-control" id="crdHibInicialValor" placeholder="0" oninput="fmtMoneyInput(this);crdCalcHibrido()" inputmode="numeric"></div>
+                <div style="font-size:10px;color:#888899;margin-top:4px;" id="crdHibInicialNota">Este valor manda: no se recalcula al mover el plazo ni la tasa.</div>
               </div>
               <div style="background:#fff;border:1px solid #e4d8f5;border-radius:8px;padding:10px;">
                 <div style="font-size:11px;font-weight:700;color:#6B2D8B;margin-bottom:6px;">📊 Tasa de interés</div>
@@ -11072,6 +11085,9 @@ async function guardarCredito(){
     if(desc > 0 || prodAdicVal > 0) {
       toast('El modelo híbrido no admite descuento ni producto adicional. Ajusta el precio de contado.','error'); return;
     }
+    if(hib.capital <= 0) {
+      toast('La inicial es igual o mayor al precio a crédito: no queda saldo por financiar','error'); return;
+    }
     if(!crdEsCrediplaySeleccionada()) {
       toast('El modelo híbrido solo aplica con la financiera CREDIPLAY','error'); return;
     }
@@ -13236,6 +13252,14 @@ function getSobreprecio(plazo) {
 const CREDIPLAY_TASA_QUINCENAL = 0.01;
 const CREDIPLAY_TASA_MENSUAL   = 2.0;
 
+// Porcentaje legible: sin decimales cuando es redondo (30%), con uno
+// cuando no lo es (28,4%). El % de la inicial se deduce del valor, asi
+// que casi nunca cae exacto cuando se escribe a mano.
+function pctBonito(n) {
+  const v = Number(n) || 0;
+  return (Math.abs(v - Math.round(v)) < 0.05) ? String(Math.round(v)) : v.toFixed(1);
+}
+
 // Cuota fija (amortizacion francesa)
 function cuotaFrancesa(capital, tasa, plazo) {
   if(!capital || plazo <= 0) return 0;
@@ -13245,13 +13269,15 @@ function cuotaFrancesa(capital, tasa, plazo) {
 }
 
 // Todos los numeros del modelo a partir de costo, margen, plazo e inicial
-function calcularCrediplay(costo, margenPct, plazo, inicialPct, tasaQuincenal) {
+// inicialFija: valor en pesos escrito a mano. Cuando viene, manda sobre
+// inicialPct (el porcentaje se calcula al reves, solo para mostrarlo).
+function calcularCrediplay(costo, margenPct, plazo, inicialPct, tasaQuincenal, inicialFija) {
   const tasaQ = (tasaQuincenal === undefined || tasaQuincenal === null) ? CREDIPLAY_TASA_QUINCENAL : tasaQuincenal;
   const precioContado = Math.round(costo * (1 + margenPct/100));
   const sobrePct      = getSobreprecio(plazo);
   const precioCredito = Math.round(precioContado * (1 + sobrePct/100));
   const sobreprecio   = precioCredito - precioContado;
-  const inicial       = Math.round(precioCredito * inicialPct/100);
+  const inicial       = (inicialFija > 0) ? Math.round(inicialFija) : Math.round(precioCredito * inicialPct/100);
   const capital       = precioCredito - inicial;
   const cuota         = Math.round(cuotaFrancesa(capital, tasaQ, plazo));
   const totalCuotas   = cuota * plazo;
@@ -13260,7 +13286,9 @@ function calcularCrediplay(costo, margenPct, plazo, inicialPct, tasaQuincenal) {
   const ganComercial  = precioContado - costo;
   const gananciaTotal = ganComercial + sobreprecio + intereses;
   return {
-    costo, margenPct, plazo, inicialPct,
+    costo, margenPct, plazo,
+    inicialPct: precioCredito > 0 ? (inicial / precioCredito) * 100 : inicialPct,
+    inicialManual: inicialFija > 0,
     precioContado, sobrePct, precioCredito, sobreprecio,
     inicial, capital, cuota, totalCuotas, totalPagar, intereses,
     ganComercial, gananciaTotal,
@@ -13430,7 +13458,7 @@ function calcularSimCrediplay() {
     <!-- Plan de pagos -->
     <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:14px;margin-bottom:12px;">
       <div style="font-size:12px;font-weight:800;color:#d97706;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">💰 Plan de pagos</div>
-      ${fila(`Inicial (${r.inicialPct}%)`, fmt(r.inicial), '#16a34a', true)}
+      ${fila(`Inicial (${pctBonito(r.inicialPct)}%)`, fmt(r.inicial), '#16a34a', true)}
       ${fila('Capital a financiar', fmt(r.capital), '#111')}
       ${fila('Plazo', `${r.plazo} quincenas (${meses} meses)`, '#555577')}
       <div style="background:#fff;border:1px solid #fed7aa;border-radius:10px;padding:10px 12px;margin:8px 0;display:flex;justify-content:space-between;align-items:center;">
@@ -14230,6 +14258,8 @@ function crdToggleHibrido() {
     crdHibLlenarPlazos();
     crdHibLlenarPctContado();
     crdHibLlenarTasas();
+    const filaIniHib = document.getElementById('crdHibInicialManualRow');
+    if(filaIniHib) filaIniHib.style.display = (document.getElementById('crdHibInicialPct')?.value === 'manual') ? '' : 'none';
     // Con % escogido el contado sale del costo; en manual arranca con el
     // precio que traen los productos
     const pct = parseFloat(document.getElementById('crdHibPctContado')?.value);
@@ -14244,6 +14274,8 @@ function crdToggleHibrido() {
     crdCalcHibrido();
   } else {
     if(base) { base.readOnly = false; base.style.background = ''; base.style.cursor = ''; }
+    const inpIni = document.getElementById('crdInicialManual');
+    if(inpIni) { inpIni.readOnly = false; inpIni.style.background = ''; inpIni.style.cursor = ''; inpIni.title = ''; }
     const prev = document.getElementById('crdHibPreview');
     if(prev) prev.innerHTML = '';
     recalcCredito();
@@ -14257,9 +14289,25 @@ function crdDatosHibrido() {
   if(!contado) return null;
   crdHibLlenarPlazos();
   const plazo      = parseInt(document.getElementById('crdHibPlazo')?.value) || 12;
-  const inicialPct = parseFloat(document.getElementById('crdHibInicialPct')?.value) || 30;
+  const opcionIni  = document.getElementById('crdHibInicialPct')?.value || '30';
+  const esManual   = opcionIni === 'manual';
+  const inicialPct = esManual ? 0 : (parseFloat(opcionIni) || 30);
+  const inicialFija = esManual ? getMoneyValue('crdHibInicialValor') : 0;
   // margen 0: el precio de contado ya viene calculado o escrito a mano
-  return calcularCrediplay(contado, 0, plazo, inicialPct, crdHibTasaQ());
+  return calcularCrediplay(contado, 0, plazo, inicialPct, crdHibTasaQ(), inicialFija);
+}
+
+// Muestra u oculta el campo de la inicial escrita a mano
+function crdHibCambiarInicial() {
+  const esManual = (document.getElementById('crdHibInicialPct')?.value || '') === 'manual';
+  const fila     = document.getElementById('crdHibInicialManualRow');
+  if(fila) fila.style.display = esManual ? '' : 'none';
+  // Al pasar a manual arranca con la inicial que ya estaba calculada
+  if(esManual && !getMoneyValue('crdHibInicialValor')) {
+    const previa = getMoneyValue('crdInicialManual');
+    if(previa > 0) setMoneyValue('crdHibInicialValor', previa);
+  }
+  crdCalcHibrido();
 }
 
 function crdCalcHibrido() {
@@ -14278,7 +14326,18 @@ function crdCalcHibrido() {
   if(sinIni) sinIni.checked = false;
   const filaIni = document.getElementById('crdInicialManualRow');
   if(filaIni) filaIni.style.display = '';
+  // La inicial la manda la tarjeta del modelo (por % o escrita a mano), asi
+  // que el campo de abajo se llena solo y queda bloqueado: antes se podian
+  // escribir dos iniciales distintas y el modelo pisaba la de abajo al
+  // recalcular por un cambio de plazo o de tasa.
   setMoneyValue('crdInicialManual', r.inicial);
+  const inpIniModal = document.getElementById('crdInicialManual');
+  if(inpIniModal) {
+    inpIniModal.readOnly = true;
+    inpIniModal.style.background = '#f2f0f7';
+    inpIniModal.style.cursor = 'not-allowed';
+    inpIniModal.title = 'La inicial se define en la tarjeta del modelo híbrido';
+  }
   crdInicialSeleccionada = r.inicial;
   recalcCredito();
 
@@ -14302,15 +14361,18 @@ function crdCalcHibrido() {
 
   const desc = getMoneyValue('crdDescuento');
   const adic = getMoneyValue('crdProdAdicVal');
-  const aviso = (desc > 0 || adic > 0)
+  let aviso = (desc > 0 || adic > 0)
     ? '<div style="margin-top:8px;background:#fee2e2;border:1px solid #fecaca;border-radius:8px;padding:8px;font-size:11px;color:#dc2626;font-weight:600;">⚠️ El modelo híbrido no admite descuento ni producto adicional: déjalos en 0 o ajusta el precio de contado.</div>'
     : '';
+  if(r.capital <= 0) {
+    aviso += '<div style="margin-top:8px;background:#fee2e2;border:1px solid #fecaca;border-radius:8px;padding:8px;font-size:11px;color:#dc2626;font-weight:600;">⚠️ La inicial es igual o mayor al precio a crédito: no queda nada por financiar.</div>';
+  }
 
   if(prev) prev.innerHTML = `
     <div style="background:#fff;border:1px solid #e4d8f5;border-radius:10px;padding:10px 12px;font-size:12px;">
       <div style="display:flex;justify-content:space-between;padding:4px 0;"><span style="color:#555577;">Sobreprecio (${r.sobrePct}%)</span><strong style="color:#d97706;">${fmt(r.sobreprecio)}</strong></div>
       <div style="display:flex;justify-content:space-between;padding:4px 0;border-top:1px solid #f0ecf8;"><span style="color:#555577;">Precio a crédito</span><strong style="color:#6B2D8B;font-size:14px;">${fmt(r.precioCredito)}</strong></div>
-      <div style="display:flex;justify-content:space-between;padding:4px 0;border-top:1px solid #f0ecf8;"><span style="color:#555577;">Inicial (${r.inicialPct}%)</span><strong style="color:#16a34a;">${fmt(r.inicial)}</strong></div>
+      <div style="display:flex;justify-content:space-between;padding:4px 0;border-top:1px solid #f0ecf8;"><span style="color:#555577;">Inicial (${pctBonito(r.inicialPct)}%${r.inicialManual?' · manual':''})</span><strong style="color:#16a34a;">${fmt(r.inicial)}</strong></div>
       <div style="display:flex;justify-content:space-between;padding:4px 0;border-top:1px solid #f0ecf8;"><span style="color:#555577;">Capital financiado</span><strong>${fmt(r.capital)}</strong></div>
       <div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid #f0ecf8;"><span style="color:#555577;font-weight:700;">Cuota quincenal</span><strong style="color:#d97706;font-size:15px;">${fmt(r.cuota)}</strong></div>
       <div style="display:flex;justify-content:space-between;padding:4px 0;border-top:1px solid #f0ecf8;"><span style="color:#555577;">Total intereses (${txtTasa})</span><strong style="color:#dc2626;">${fmt(r.intereses)}</strong></div>
