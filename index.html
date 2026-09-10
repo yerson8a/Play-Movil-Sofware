@@ -5538,31 +5538,38 @@ async function guardarProveedorDB(datos) {
   }
 }
 
-// ── GUARDAR PRODUCTO / COMPRA ───────────────────────────────
-// Busca si alguno de los IMEI ya está registrado en productos, sin importar
-// si quedó como imei1 o imei2 (detecta IMEI invertidos entre sí).
-async function buscarIMEIDuplicado(imeis, excluirId) {
-  const lista = [...new Set((imeis || []).map(x => (x || '').trim()).filter(x => x.length >= 5))];
-  if (!lista.length) return null;
-  const conds = [];
-  lista.forEach(v => { conds.push(`imei1.eq.${v}`); conds.push(`imei2.eq.${v}`); });
-  const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH };
-  let url = `${SUPABASE_URL}/rest/v1/productos?select=id,producto,imei1,imei2&or=(${conds.join(',')})&limit=1`;
-  if (excluirId) url += `&id=neq.${excluirId}`;
-  try {
-    const res = await fetch(url, { headers });
-    const rows = await res.json();
-    if (!Array.isArray(rows) || !rows.length) return null;
-    const row = rows[0];
-    const coincide = lista.find(v => v === (row.imei1 || '').trim() || v === (row.imei2 || '').trim());
-    return { ...row, imeiCoincidente: coincide };
-  } catch(e) { return null; }
+// ── RETOMA / TRADE-IN ───────────────────────────────────────
+// Un equipo que Play Móvil ya vendió puede volver a entrar cuando el cliente lo
+// vende de regreso, pero solo si ese ciclo quedó cobrado: venta de contado, o
+// crédito pagado en su totalidad. Con el equipo todavía en inventario, con la
+// venta anulada o con un crédito vivo, el IMEI se sigue rechazando.
+//
+// Quien decide es estado_imei() en PostgreSQL, no el navegador: la RLS le puede
+// ocultar al asesor el crédito de otra sede, y el insert en `productos` es un
+// POST directo que se puede hacer sin pasar por aquí (por eso el trigger
+// productos_validar_reingreso repite la validación en el servidor).
+//
+// Devuelve, sobre el CICLO VIGENTE del IMEI (el último registro en productos y
+// las ventas ligadas a él): reingreso_permitido / venta_permitida, con su motivo
+// y un mensaje ya redactado para el usuario.
+async function estadoIMEI(imei) {
+  const v = (imei || '').trim();
+  if (v.length < 5) return null;
+  return await llamarRPC('estado_imei', { p_imei: v });
 }
+
+// Motivos por los que un IMEI repetido sí puede volver a entrar.
+const MOTIVOS_RETOMA = ['contado_pagado', 'credito_pagado'];
+
+// ── GUARDAR PRODUCTO / COMPRA ───────────────────────────────
 
 async function guardarCompraDB(datos) {
   showLoader('Guardando compra...');
   try {
-    // Validar IMEI duplicado (incluye IMEI invertidos imei1 <-> imei2)
+    // Un IMEI repetido solo pasa si es una retoma: el equipo salió vendido y ese
+    // ciclo quedó cobrado. Se consultan los dos IMEI (detecta también los
+    // invertidos imei1 <-> imei2, que apuntan al mismo equipo).
+    let motivoRetoma = null;
     if (datos.tipo === 'Celular') {
       const im1 = (datos.imei1 || '').trim();
       const im2 = (datos.imei2 || '').trim();
@@ -5571,11 +5578,23 @@ async function guardarCompraDB(datos) {
         toast('⚠️ El IMEI 1 y el IMEI 2 no pueden ser iguales', 'error');
         const err = new Error('IMEI duplicado'); err.handled = true; throw err;
       }
-      const dup = await buscarIMEIDuplicado([im1, im2], datos.id);
-      if (dup) {
-        hideLoader();
-        toast(`⚠️ El IMEI ${dup.imeiCoincidente} ya está registrado en: ${dup.producto}`, 'error');
-        const err = new Error('IMEI duplicado'); err.handled = true; throw err;
+      for (const im of [im1, im2].filter(x => x && x.length >= 5)) {
+        let est;
+        try {
+          est = await estadoIMEI(im);
+        } catch(e) {
+          // Sin veredicto no se guarda: el trigger lo rechazaría igual, pero sin
+          // explicar por qué.
+          hideLoader();
+          toast(`No se pudo verificar el IMEI ${im}: ${mensajeErrorRPC(e)}`, 'error');
+          const err = new Error('IMEI sin verificar'); err.handled = true; throw err;
+        }
+        if (est && est.reingreso_permitido === false) {
+          hideLoader();
+          toast('⚠️ ' + (est.reingreso_mensaje || `El IMEI ${im} ya está registrado`), 'error');
+          const err = new Error('IMEI duplicado'); err.handled = true; throw err;
+        }
+        if (est && MOTIVOS_RETOMA.includes(est.reingreso_motivo)) motivoRetoma = est.reingreso_mensaje;
       }
     }
     const sedeId = sedeIdPorNombre(datos.sede);
@@ -5609,6 +5628,9 @@ async function guardarCompraDB(datos) {
     db.compras.unshift(compra);
     db.inventario.unshift(inv);
     hideLoader();
+    // El registro anterior del equipo no se toca: esta es una compra nueva, con
+    // su propio costo. Se avisa para que quede claro que no fue un duplicado.
+    if (motivoRetoma) toast('♻️ ' + motivoRetoma);
     return compra;
   } catch(e) {
     hideLoader();
@@ -10297,16 +10319,30 @@ function actualizarMarcaCustom(sel) {
   if(div) div.style.display = sel.value === 'otro' ? 'block' : 'none';
 }
 
+// Un IMEI repetido no siempre es un error: si el equipo salió vendido y quedó
+// pagado, se está reingresando por retoma y el aviso es informativo, no un bloqueo.
+let prodIMEIBloqueado = false;
+
 async function validarIMEIProd() {
   const imei = document.getElementById('prodIMEI1')?.value?.trim();
   const errEl = document.getElementById('prodIMEI1Error');
+  prodIMEIBloqueado = false;
   if(!imei || imei.length < 8) { if(errEl) errEl.style.display='none'; return; }
-  const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH };
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/productos?select=id,producto&imei1=eq.${imei}&limit=1`, {headers});
-  const rows = await res.json();
-  if(errEl) errEl.style.display = (rows && rows.length > 0) ? 'block' : 'none';
-  if(rows && rows.length > 0 && errEl) {
-    errEl.textContent = `⚠️ IMEI ya registrado: ${rows[0].producto}`;
+  let est = null;
+  try { est = await estadoIMEI(imei); } catch(e) { est = null; }
+  if(!errEl) return;
+  if(!est) { errEl.style.display='none'; return; }
+  if(est.reingreso_permitido === false) {
+    prodIMEIBloqueado = true;
+    errEl.style.color = '#dc2626';
+    errEl.textContent = '⚠️ ' + (est.reingreso_mensaje || 'Este IMEI ya está registrado');
+    errEl.style.display = 'block';
+  } else if(MOTIVOS_RETOMA.includes(est.reingreso_motivo)) {
+    errEl.style.color = '#16a34a';
+    errEl.textContent = '♻️ ' + est.reingreso_mensaje;
+    errEl.style.display = 'block';
+  } else {
+    errEl.style.display = 'none';
   }
 }
 
@@ -10349,9 +10385,9 @@ async function guardarProductoNuevo() {
   if(!valor)  { toast('El valor de compra es obligatorio','error'); return; }
   if(!sedeNom){ toast('Selecciona la sede','error'); return; }
 
-  // Verificar IMEI duplicado
-  const errEl = document.getElementById('prodIMEI1Error');
-  if(errEl && errEl.style.display !== 'none') {
+  // El aviso verde de retoma no bloquea; solo el rojo. Si la validación en vivo
+  // no alcanzó a responder, guardarCompraDB vuelve a preguntar antes de insertar.
+  if(prodIMEIBloqueado) {
     toast('El IMEI ya está registrado. Corrígelo antes de guardar','error'); return;
   }
 
@@ -11646,10 +11682,10 @@ async function buscarParaTraslado(val) {
   if(val.length < 5) { document.getElementById('trasladoBuscaInfo').style.display='none'; return; }
   const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH };
   const base = SUPABASE_URL + '/rest/v1/productos';
-  let res = await fetch(`${base}?select=id,producto,imei1,estado,sede_id&imei1=eq.${val}`, {headers});
+  let res = await fetch(`${base}?select=id,producto,imei1,estado,sede_id&imei1=eq.${val}&order=id.desc&limit=1`, {headers});
   let rows = await res.json();
   if(!rows.length) {
-    res = await fetch(`${base}?select=id,producto,imei1,estado,sede_id&imei2=eq.${val}`, {headers});
+    res = await fetch(`${base}?select=id,producto,imei1,estado,sede_id&imei2=eq.${val}&order=id.desc&limit=1`, {headers});
     rows = await res.json();
   }
   const info = document.getElementById('trasladoBuscaInfo');
@@ -12524,11 +12560,11 @@ async function buscarIMEIModalProd(val) {
     const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH };
     const base = SUPABASE_URL + '/rest/v1/productos';
     const sel  = 'select=id,producto,imei1,imei2,serial,valor_compra,sede_id,proveedor_id';
-    let res = await fetch(`${base}?${sel}&imei1=eq.${val}`, {headers});
+    let res = await fetch(`${base}?${sel}&imei1=eq.${val}&order=id.desc&limit=1`, {headers});
     let rows = await res.json();
-    if(!rows.length){ res=await fetch(`${base}?${sel}&imei2=eq.${val}`,{headers}); rows=await res.json(); }
-    if(!rows.length){ res=await fetch(`${base}?${sel}&serial=ilike.*${val}*`,{headers}); rows=await res.json(); }
-    if(!rows.length){ res=await fetch(`${base}?${sel}&imei1=ilike.*${val}*`,{headers}); rows=await res.json(); }
+    if(!rows.length){ res=await fetch(`${base}?${sel}&imei2=eq.${val}&order=id.desc&limit=1`,{headers}); rows=await res.json(); }
+    if(!rows.length){ res=await fetch(`${base}?${sel}&serial=ilike.*${val}*&order=id.desc&limit=1`,{headers}); rows=await res.json(); }
+    if(!rows.length){ res=await fetch(`${base}?${sel}&imei1=ilike.*${val}*&order=id.desc&limit=1`,{headers}); rows=await res.json(); }
     if(rows && rows.length > 0) {
       const p = rows[0];
       const costo = parseFloat(p.valor_compra)||0;
@@ -12593,11 +12629,11 @@ async function buscarIMEIVenta(val){
       const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH };
       const base = SUPABASE_URL + '/rest/v1/productos';
       const sel  = 'select=id,producto,imei1,imei2,serial,valor_compra,sede_id,proveedor_id,estado';
-      let res = await fetch(`${base}?${sel}&imei1=eq.${val}`, {headers});
+      let res = await fetch(`${base}?${sel}&imei1=eq.${val}&order=id.desc&limit=1`, {headers});
       let rows = await res.json();
-      if(!rows.length){ res = await fetch(`${base}?${sel}&imei2=eq.${val}`, {headers}); rows = await res.json(); }
-      if(!rows.length){ res = await fetch(`${base}?${sel}&serial=ilike.*${val}*`, {headers}); rows = await res.json(); }
-      if(!rows.length){ res = await fetch(`${base}?${sel}&imei1=ilike.*${val}*`, {headers}); rows = await res.json(); }
+      if(!rows.length){ res = await fetch(`${base}?${sel}&imei2=eq.${val}&order=id.desc&limit=1`, {headers}); rows = await res.json(); }
+      if(!rows.length){ res = await fetch(`${base}?${sel}&serial=ilike.*${val}*&order=id.desc&limit=1`, {headers}); rows = await res.json(); }
+      if(!rows.length){ res = await fetch(`${base}?${sel}&imei1=ilike.*${val}*&order=id.desc&limit=1`, {headers}); rows = await res.json(); }
       if(rows && rows.length > 0) {
         const p = rows[0];
         found = {
@@ -12646,12 +12682,12 @@ async function buscarIMEICredito(val){
     const sel = 'select=id,producto,imei1,imei2,serial,valor_compra,sede_id,proveedor_id';
 
     // Buscar por imei1
-    let res = await fetch(`${base}?${sel}&imei1=eq.${val}`, {headers});
+    let res = await fetch(`${base}?${sel}&imei1=eq.${val}&order=id.desc&limit=1`, {headers});
     let rows = await res.json();
 
     // Si no, buscar por imei2
     if(!rows.length) {
-      res = await fetch(`${base}?${sel}&imei2=eq.${val}`, {headers});
+      res = await fetch(`${base}?${sel}&imei2=eq.${val}&order=id.desc&limit=1`, {headers});
       rows = await res.json();
     }
 
@@ -13358,9 +13394,9 @@ async function buscarNuevoEquipoCambio(val) {
   const base = SUPABASE_URL + '/rest/v1/productos';
   const sel = 'select=id,producto,marca,modelo,color,almacenamiento,ram,condicion,imei1,imei2,serial,estado,valor_compra,proveedor_id,garantia_meses';
   // Buscar por imei1, luego imei2, luego serial — solo equipos en inventario
-  let res = await fetch(`${base}?${sel}&imei1=eq.${encodeURIComponent(val)}`, {headers});
+  let res = await fetch(`${base}?${sel}&imei1=eq.${encodeURIComponent(val)}&order=id.desc&limit=1`, {headers});
   let rows = await res.json();
-  if(!rows.length) { res = await fetch(`${base}?${sel}&imei2=eq.${encodeURIComponent(val)}`, {headers}); rows = await res.json(); }
+  if(!rows.length) { res = await fetch(`${base}?${sel}&imei2=eq.${encodeURIComponent(val)}&order=id.desc&limit=1`, {headers}); rows = await res.json(); }
   if(!rows.length) { res = await fetch(`${base}?${sel}&serial=eq.${encodeURIComponent(val)}`, {headers}); rows = await res.json(); }
 
   if(!infoEl) return;
@@ -13438,10 +13474,10 @@ async function buscarParaSalida(val) {
   if(val.length < 5) { document.getElementById('salidaInfo').style.display='none'; return; }
   const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH };
   const base = SUPABASE_URL + '/rest/v1/productos';
-  let res = await fetch(`${base}?select=id,producto,imei1,valor_compra,estado&imei1=eq.${val}`, {headers});
+  let res = await fetch(`${base}?select=id,producto,imei1,valor_compra,estado&imei1=eq.${val}&order=id.desc&limit=1`, {headers});
   let rows = await res.json();
   if(!rows.length) {
-    res = await fetch(`${base}?select=id,producto,imei1,valor_compra,estado&serial=eq.${val}`, {headers});
+    res = await fetch(`${base}?select=id,producto,imei1,valor_compra,estado&serial=eq.${val}&order=id.desc&limit=1`, {headers});
     rows = await res.json();
   }
   const infoEl = document.getElementById('salidaInfo');
@@ -13709,8 +13745,8 @@ async function traerEquipoDisponible(prodId) {
 async function ubicarEquipoVendido(productoId, imei, nombre) {
   if(productoId) return productoId;
   if(imei) {
-    let r = await sbFetch(`productos?select=id&imei1=eq.${encodeURIComponent(imei)}&estado=eq.VENDIDO&limit=1`);
-    if(!r.length) r = await sbFetch(`productos?select=id&imei2=eq.${encodeURIComponent(imei)}&estado=eq.VENDIDO&limit=1`);
+    let r = await sbFetch(`productos?select=id&imei1=eq.${encodeURIComponent(imei)}&estado=eq.VENDIDO&order=id.desc&limit=1`);
+    if(!r.length) r = await sbFetch(`productos?select=id&imei2=eq.${encodeURIComponent(imei)}&estado=eq.VENDIDO&order=id.desc&limit=1`);
     if(r.length) return r[0].id;
   }
   if(nombre) {
@@ -14032,10 +14068,10 @@ async function marcarProductoVendido(imei, nombreEquipo) {
 
   // Buscar por IMEI primero (más exacto)
   if(imei && imei.length > 5) {
-    let res = await fetch(`${base}?select=id,estado&imei1=eq.${imei}&limit=1`, {headers});
+    let res = await fetch(`${base}?select=id,estado&imei1=eq.${imei}&order=id.desc&limit=1`, {headers});
     let rows = await res.json();
     if(!rows.length) {
-      res = await fetch(`${base}?select=id,estado&imei2=eq.${imei}&limit=1`, {headers});
+      res = await fetch(`${base}?select=id,estado&imei2=eq.${imei}&order=id.desc&limit=1`, {headers});
       rows = await res.json();
     }
     if(rows.length > 0) productoId = rows[0].id;
@@ -14080,69 +14116,41 @@ async function marcarProductoVendido(imei, nombreEquipo) {
 // VALIDACION IMEI / EQUIPO DUPLICADO
 // ============================================================
 async function validarDisponibilidadProducto(imei, nombreEquipo) {
-  // Verificar si ya existe una venta ACTIVA (no anulada) con este IMEI
-  if(imei && imei.length > 5) {
-    try {
-      const headers2 = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH };
-      // El estado manda; observaciones/valor_venta solo cubren filas antiguas.
-      const resV = await fetch(
-        `${SUPABASE_URL}/rest/v1/ventas?select=id,observaciones,valor_venta,estado&imei=eq.${imei}&limit=5`,
-        {headers:headers2}
-      );
-      const ventasExist = await resV.json();
-      const activas = Array.isArray(ventasExist)
-        ? ventasExist.filter(v => normalizarEstadoVenta(v) === 'activa')
-        : [];
-      if(activas.length > 0) {
-        toast('Este IMEI ya tiene una venta ACTIVA registrada. No se puede duplicar.','error');
-        return false;
-      }
-    } catch(e) { console.error(e); }
+  // El veredicto lo da estado_imei() sobre el CICLO VIGENTE del IMEI: el último
+  // registro del equipo en productos y las ventas ligadas a él. Un equipo que
+  // volvió por retoma trae ventas viejas con ese mismo IMEI, y esas ya no cuentan;
+  // por eso la verificación no se hace aquí contra todo el histórico.
+  const v = (imei || '').trim();
+  if(v.length <= 5) return true;
+
+  let est;
+  try {
+    est = await estadoIMEI(v);
+  } catch(e) {
+    console.error(e);
+    // Sin veredicto no se vende: el riesgo de una venta duplicada es peor que
+    // el de pedirle al usuario que reintente.
+    mostrarErrorVenta(
+      '⚠️ No se pudo verificar el IMEI',
+      `No se pudo consultar el estado del IMEI <strong>${v}</strong>. Revisa la conexión e inténtalo de nuevo.`
+    );
+    return false;
   }
-  // Si hay IMEI buscar en Supabase si ya está vendido
-  if(imei && imei.length > 5) {
-    const headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SB_AUTH };
-    const base = SUPABASE_URL + '/rest/v1/productos';
 
-    // Buscar por imei1
-    let res = await fetch(`${base}?select=id,producto,estado,imei1&imei1=eq.${imei}`, {headers});
-    let rows = await res.json();
+  if(!est || est.venta_permitida !== false) return true;
 
-    if(!rows.length) {
-      res = await fetch(`${base}?select=id,producto,estado,imei2&imei2=eq.${imei}`, {headers});
-      rows = await res.json();
-    }
-
-    if(rows.length > 0) {
-      const p = rows[0];
-      if(p.estado === 'VENDIDO') {
-        mostrarErrorVenta(
-          '⚠️ Equipo ya vendido',
-          `El equipo <strong>${p.producto}</strong> con IMEI <strong>${imei}</strong> ya fue vendido anteriormente y no está disponible en inventario.`
-        );
-        return false;
-      }
-      if(p.estado === 'GARANTIA') {
-        mostrarErrorVenta(
-          '⚠️ Equipo en garantía',
-          `El equipo <strong>${p.producto}</strong> con IMEI <strong>${imei}</strong> está actualmente en proceso de garantía.`
-        );
-        return false;
-      }
-      if(p.estado === 'DEVUELTO') {
-        mostrarErrorVenta(
-          '⚠️ Equipo dado de baja',
-          `El equipo <strong>${p.producto}</strong> con IMEI <strong>${imei}</strong> fue dado de baja del inventario.`
-        );
-        return false;
-      }
-    }
-  }
+  const titulos = {
+    venta_viva: '⚠️ Venta duplicada',
+    garantia:   '⚠️ Equipo en garantía',
+    devuelto:   '⚠️ Equipo dado de baja'
+  };
+  mostrarErrorVenta(
+    titulos[est.venta_motivo] || '⚠️ Equipo ya vendido',
+    est.venta_mensaje || `El IMEI <strong>${v}</strong> no está disponible para vender.`
+  );
+  return false;
 
   // Nota: NO se bloquea por nombre de cliente ni equipo — mismo cliente puede recomprar
-  // Solo se bloquea si el IMEI ya está registrado como VENDIDO en inventario (arriba)
-
-  return true; // Todo OK
 }
 
 function mostrarErrorVenta(titulo, mensaje) {
