@@ -1895,10 +1895,17 @@
             </div>
           </div>
 
-          <div class="form-group">
-            <label class="form-label">Representante Legal</label>
-            <input type="text" class="form-control" id="gfRepLegal" placeholder="Nombre completo" style="text-transform:uppercase;">
-            <div style="font-size:10px;color:#888899;margin-top:4px;">En la factura sale solo el nombre, justo encima del NIT.</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Representante Legal</label>
+              <input type="text" class="form-control" id="gfRepLegal" placeholder="Nombre completo" style="text-transform:uppercase;">
+              <div style="font-size:10px;color:#888899;margin-top:4px;">En la factura sale solo el nombre, justo encima del NIT.</div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Direccion Play Movil</label>
+              <input type="text" class="form-control" id="gfDireccionEmpresa" placeholder="Ej: CRA 8 # 20-45 LOCAL 3" style="text-transform:uppercase;">
+              <div style="font-size:10px;color:#888899;margin-top:4px;">Sale debajo del slogan. Se llena con la direccion de la sede y puedes editarla.</div>
+            </div>
           </div>
 
           <!-- Cliente -->
@@ -8725,22 +8732,48 @@ function gfCargarProximoNumero() {
 // (tabla sedes) pero queda editable: si el usuario lo cambia a mano, no se pisa.
 let gfNitAuto = '';
 
-function gfNitDeSede(nombreSede) {
+let gfDireccionAuto = '';
+
+function gfSedeDelGenerador(nombreSede) {
   const id = GF_SEDE_IDS[nombreSede];
-  if(!id) return '';
-  const s = (dbAdmin?.sedes || []).find(x => Number(x.id) === Number(id));
+  if(!id) return null;
+  return (dbAdmin?.sedes || []).find(x => Number(x.id) === Number(id)) || null;
+}
+
+function gfNitDeSede(nombreSede) {
+  const s = gfSedeDelGenerador(nombreSede);
   return (s && s.nit) ? String(s.nit) : '';
 }
 
+function gfDireccionDeSede(nombreSede) {
+  const s = gfSedeDelGenerador(nombreSede);
+  return (s && s.direccion) ? String(s.direccion) : '';
+}
+
 function gfAutoNitEmpresa() {
+  const nombreSede = document.getElementById('gfSede')?.value || '';
+
   const inp = document.getElementById('gfNitEmpresa');
-  if(!inp) return;
-  const actual = (inp.value || '').trim();
-  // Solo se rellena si esta vacio o si aun tiene el NIT puesto automaticamente
-  if(actual && actual !== gfNitAuto) return;
-  const nit = gfNitDeSede(document.getElementById('gfSede')?.value || '');
-  inp.value = nit;
-  gfNitAuto = nit;
+  if(inp) {
+    const actual = (inp.value || '').trim();
+    // Solo se rellena si esta vacio o si aun tiene el NIT puesto automaticamente
+    if(!actual || actual === gfNitAuto) {
+      const nit = gfNitDeSede(nombreSede);
+      inp.value = nit;
+      gfNitAuto = nit;
+    }
+  }
+
+  const inpDir = document.getElementById('gfDireccionEmpresa');
+  if(inpDir) {
+    const actualDir = (inpDir.value || '').trim();
+    // Igual que el NIT: si el usuario la escribio a mano, no se pisa
+    if(!actualDir || actualDir === gfDireccionAuto) {
+      const dir = gfDireccionDeSede(nombreSede);
+      inpDir.value = dir;
+      gfDireccionAuto = dir;
+    }
+  }
 }
 
 function gfInicializar() {
@@ -8860,6 +8893,7 @@ async function gfGenerarVistaPrevia() {
   const periodicidad = document.getElementById('gfPeriodicidad')?.value || 'quincenal';
   const nitEmpresa = (document.getElementById('gfNitEmpresa')?.value || '').trim();
   const repLegal   = (document.getElementById('gfRepLegal')?.value || '').trim().toUpperCase();
+  const direccionEmpresa = (document.getElementById('gfDireccionEmpresa')?.value || '').trim().toUpperCase();
 
   if(!cliente) { toast('Falta el nombre del cliente','error'); return; }
 
@@ -8877,6 +8911,7 @@ async function gfGenerarVistaPrevia() {
     asesor, sede, financiera,
     nitEmpresa,
     repLegal,
+    direccionEmpresa,
     sloganEje: true,   // el "del eje" del logo solo va en el generador
     numContrato: (document.getElementById('gfNumContrato')?.value||'').trim().toUpperCase(),
     precioBase: subtotal,
@@ -14435,6 +14470,7 @@ function generarHTMLFactura(d) {
       <div>
         <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:28px;color:#6B2D8B;line-height:1.1;">Play Móvil</div>
         ${d.sloganEje ? `<div style="font-family:'Syne',sans-serif;font-weight:700;font-size:12px;color:#6B2D8B;letter-spacing:3px;margin-top:1px;">del eje</div>` : ''}
+        ${d.direccionEmpresa ? `<div style="font-size:12px;color:#555;margin-top:4px;">${escapeHtml(d.direccionEmpresa)}</div>` : ''}
         <div style="font-size:12px;color:#888;margin-top:4px;">${d.sede}</div>
         ${d.repLegal ? `<div style="font-size:12px;color:#555;margin-top:2px;">${escapeHtml(d.repLegal)}</div>` : ''}
         ${d.nitEmpresa ? `<div style="font-size:12px;color:#555;margin-top:2px;">NIT: ${escapeHtml(d.nitEmpresa)}</div>` : ''}
