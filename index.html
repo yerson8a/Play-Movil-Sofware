@@ -11260,6 +11260,8 @@ async function guardarCredito(){
       fecha:new Date().toLocaleDateString('es-CO',{timeZone:'America/Bogota'}),
       numero:'PM-'+Date.now().toString().slice(-6)
     };
+    // En el modelo hibrido la factura va sobre el precio de contado
+    ajustarFacturaHibrida(datosFactura, hib);
 
     closeModal('modalNuevoCredito');
     crdInicialSeleccionada = 0;
@@ -14135,6 +14137,45 @@ function recalcCredito(){
 // con el precio a credito, que es el que queda como valor de venta.
 // ============================================================
 
+// ── Factura del modelo hibrido ───────────────────────────────
+// La factura se presenta sobre el PRECIO DE CONTADO: valor del equipo,
+// inicial y saldo a financiar salidos de ese valor, mas el valor de la
+// cuota. El sobreprecio y los intereses no se imprimen (quedan dentro de
+// las cuotas, como advierte la nota de financiacion al pie).
+function productosAlContado(productos, contado) {
+  const lista = Array.isArray(productos) ? productos : [];
+  if(!lista.length) return lista;
+  const total = lista.reduce((s,p) => s + (p.precio||0), 0);
+  let acum = 0;
+  return lista.map((p, i) => {
+    const ultimo = i === lista.length - 1;
+    const val = ultimo ? (contado - acum) : Math.round(contado * ((p.precio||0) / (total || 1)));
+    acum += val;
+    return { ...p, precio: val };
+  });
+}
+
+// Ajusta los datos de la factura cuando la venta es hibrida
+function ajustarFacturaHibrida(datos, hib) {
+  if(!hib) return datos;
+  const contado = hib.precioContado;
+  datos.precioBase    = contado;
+  datos.precioFinal   = contado;
+  datos.inicial       = hib.inicial;
+  datos.saldoFinanciar = Math.max(0, contado - hib.inicial);
+  datos.valorCuota    = hib.cuota;
+  datos.cuotas        = hib.plazo;
+  datos.intereses     = 0;      // no se imprimen en la factura
+  datos.tasaInteres   = 0;
+  datos.descuento     = 0;
+  datos.iva           = 0;
+  datos.ivaPct        = 0;
+  datos.prodAdicVal   = 0;
+  datos.esHibrido     = true;
+  if(datos.productosList) datos.productosList = productosAlContado(datos.productosList, contado);
+  return datos;
+}
+
 function crdHibridoActivo() {
   return document.getElementById('crdHibrido')?.checked || false;
 }
@@ -14442,6 +14483,7 @@ function previsualizarFactura() {
     fecha:new Date().toLocaleDateString('es-CO',{timeZone:'America/Bogota'}),
     numero:'PREVIA-'+Date.now().toString().slice(-4)
   };
+  ajustarFacturaHibrida(datosPreview, crdDatosHibrido());
   mostrarFactura(datosPreview, false);
 }
 
@@ -15766,7 +15808,6 @@ function generarHTMLFactura(d) {
   // Frecuencia de las cuotas: quincenal por defecto (el resto del sistema trabaja en quincenas)
   const cuotaMensual = d.periodicidad === 'mensual';
   const txtPlazo = cuotaMensual ? 'meses' : 'quincenas';
-  const txtTasa  = cuotaMensual ? 'mens' : 'qnal';
 
   // ── Construir filas de productos ─────────────────────────────
   const esMulti = d.productosList && d.productosList.length > 0;
@@ -15902,8 +15943,8 @@ function generarHTMLFactura(d) {
         <div style="background:#f7f5fb;border-radius:8px;padding:12px;margin-top:8px;font-size:13px;">
           <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:#555;">Inicial:</span><span style="font-weight:600;color:#16a34a;">${fmt(d.inicial)}</span></div>
           <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:#555;">Saldo a financiar:</span><span style="font-weight:600;">${fmt(d.saldoFinanciar)}</span></div>
-          ${d.intereses > 0 ? `<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:#555;">Intereses (${d.tasaInteres}% ${txtTasa}):</span><span style="color:#d97706;">${fmt(d.intereses)}</span></div>` : ''}
-          <div style="display:flex;justify-content:space-between;"><span style="color:#555;">Plazo:</span><span style="font-weight:700;color:#6B2D8B;">${d.cuotas} ${txtPlazo}</span></div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:#555;">Plazo:</span><span style="font-weight:700;color:#6B2D8B;">${d.cuotas} ${txtPlazo}</span></div>
+          ${d.valorCuota > 0 ? `<div style="display:flex;justify-content:space-between;border-top:1px solid #ece8f5;padding-top:6px;margin-top:2px;"><span style="color:#555;">${cuotaMensual?'Cuota mensual':'Cuota quincenal'}:</span><span style="font-weight:700;color:#d97706;font-size:15px;">${fmt(d.valorCuota)}</span></div>` : ''}
         </div>` : ''}
       </div>
     </div>
