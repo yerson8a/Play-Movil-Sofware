@@ -3646,6 +3646,14 @@
               <label class="form-label">Descuento ($)</label>
               <input type="number" class="form-control" id="crdDescuento" placeholder="0" oninput="recalcCredito()" min="0">
             </div>
+            <div class="form-group">
+              <label class="form-label">Seguro FGA</label>
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:#555577;background:#f7f5fb;border-radius:8px;padding:9px 10px;">
+                <input type="checkbox" id="crdFGA" onchange="recalcCredito()" style="width:16px;height:16px;accent-color:#6B2D8B;">
+                Incluir FGA en la factura
+              </label>
+              <div style="font-size:11px;color:#888899;margin-top:3px;">FGA: <span id="crdFGAval" style="color:#6B2D8B;font-weight:600;">$0</span> · solo se imprime, no altera ningún total</div>
+            </div>
           </div>
         </div>
 
@@ -11118,6 +11126,7 @@ async function guardarCredito(){
   const aplicaInt    = $('crdAplicaIntereses')?.checked||false;
   const tasaInt      = parseFloat($('crdTasaInteres')?.value)||2.5;
   const enviarFact   = $('crdEnviarFactura')?.checked||false;
+  const fgaActivo    = crdFGAActivo();
   const finSel       = ((($('crdFinanciera')?.value||'CONTADO:0').split(':')[0]).substring(0,50)).substring(0,50);
 
   const ivaVal         = Math.round(base * ivaPct/100);   // Solo informativo
@@ -11275,7 +11284,9 @@ async function guardarCredito(){
       comision_asesor: 0, sede_id: sedeIdPorNombre(sedeActual),
       observaciones: (datos.obs||'') + (nProdC>1 ? ` | Venta con ${nProdC} productos` : ''),
       estado: 'activa',
-      fecha_venta: fechaColombia()
+      fecha_venta: fechaColombia(),
+      // FGA: solo para imprimirlo en la factura, no entra en ningun total
+      fga_valor: fgaActivo ? calcularFGA(precioFinal) : 0
     };
     const resVM = await sbFetch('ventas', { method:'POST', body:rowVM });
     const ventaMaestraCred = mapVenta(resVM[0]);
@@ -11329,6 +11340,7 @@ async function guardarCredito(){
       periodicidad: esMensualG ? 'mensual' : 'quincenal',
       valorCuota, financiera:finSel, numContrato:datos.numContrato||'',
       intereses:totalIntereses, tasaInteres:aplicaInt?tasaInt:0,
+      fga: fgaActivo ? calcularFGA(precioFinal) : 0,
       // Lista de productos para la factura desglosada: el precio de la venta
       // repartido entre los equipos (en credito no traen precio propio)
       productosList: productosAlContado(
@@ -11782,6 +11794,7 @@ async function verFacturaVenta() {
     valorCuota:    cred ? (cred.valorCuota||0): 0,
     intereses:     cred ? (cred.intereses||0) : 0,
     tasaInteres:   0,
+    fga:             parseFloat(ventaCompleta.fga_valor) || 0,
     esMixto:         cred ? (cred.esMixto||false)      : false,
     valorFinanciero: cred ? (cred.valorFinanciero||0)  : 0,
     valorEfectivo:   cred ? (cred.valorEfectivo||0)    : 0,
@@ -12044,6 +12057,9 @@ function abrirModalCredito() {
   // Limpiar lista de productos
   productosVentaCrd = []; _idxProdCrd = 0;
   renderListaProductos('crd');
+  // El FGA arranca apagado en cada venta nueva
+  const chkFGA = document.getElementById('crdFGA');
+  if(chkFGA) chkFGA.checked = false;
   // Rehacer plazo, etiquetas y fechas con la frecuencia ya reseteada
   crdCambiarFrecuencia();
   openModal('modalNuevoCredito');
@@ -14475,6 +14491,8 @@ function recalcCredito(){
   if(prodAdicVal>0){ const lbl=$('crdProdAdicDesc')?.value||'Producto adicional'; setEl('crdAdicLabel',lbl); setEl('crdAdicResumen','+'+fmt(prodAdicVal)); }
   showRow('crdRowCom', comVal > 0);
   if(comVal>0) setEl('crdComResumen', fmt(comVal));
+  // FGA: solo informativo, no toca ningun total
+  setEl('crdFGAval', fmt(crdFGAActivo() ? calcularFGA(precioFinal) : 0));
 
   // Iniciales predefinidas
   const pcts = tipo==='reportado' ? [0.30,0.40,0.50] : [0.20,0.30,0.40];
@@ -14537,6 +14555,20 @@ function recalcCredito(){
 // con el precio a credito, que es el que queda como valor de venta.
 // ============================================================
 
+// ── Seguro FGA ───────────────────────────────────────────────
+// Es 10% del precio total de la venta y SOLO se imprime en la factura,
+// para justificarle los valores al cliente (igual que la linea del IVA).
+// No entra en valor_venta, ganancia, comisiones ni en ningun informe.
+const FGA_PCT = 10;
+
+function crdFGAActivo() {
+  return document.getElementById('crdFGA')?.checked || false;
+}
+
+function calcularFGA(precioVenta) {
+  return Math.round((precioVenta || 0) * FGA_PCT / 100);
+}
+
 // ── Factura del modelo hibrido ───────────────────────────────
 // La factura se presenta sobre el PRECIO DE CONTADO: valor del equipo,
 // inicial y saldo a financiar salidos de ese valor, mas el valor de la
@@ -14577,21 +14609,17 @@ function productosAlContado(productos, contado) {
 // Ajusta los datos de la factura cuando la venta es hibrida
 function ajustarFacturaHibrida(datos, hib) {
   if(!hib) return datos;
-  const contado = hib.precioContado;
-  datos.precioBase    = contado;
-  datos.precioFinal   = contado;
-  datos.inicial       = hib.inicial;
-  datos.saldoFinanciar = Math.max(0, contado - hib.inicial);
-  datos.valorCuota    = hib.cuota;
-  datos.cuotas        = hib.plazo;
-  datos.intereses     = 0;      // no se imprimen en la factura
-  datos.tasaInteres   = 0;
-  datos.descuento     = 0;
-  datos.iva           = 0;
-  datos.ivaPct        = 0;
-  datos.prodAdicVal   = 0;
-  datos.esHibrido     = true;
-  if(datos.productosList) datos.productosList = productosAlContado(datos.productosList, contado);
+  // El valor que se imprime es el PRECIO TOTAL DE VENTA (el del formulario),
+  // no el de contado. De la parte del credito solo se muestran la inicial,
+  // el plazo y la cuota: el saldo a financiar no va en la factura.
+  datos.inicial        = hib.inicial;
+  datos.valorCuota     = hib.cuota;
+  datos.cuotas         = hib.plazo;
+  datos.intereses      = 0;      // no se imprimen en la factura
+  datos.tasaInteres    = 0;
+  datos.esHibrido      = true;
+  datos.ocultarSaldo   = true;
+  datos.precioContado  = hib.precioContado || 0;   // referencia, no se imprime
   return datos;
 }
 
@@ -14892,6 +14920,7 @@ function previsualizarFactura() {
     periodicidad: crdEsMensual() ? 'mensual' : 'quincenal',
     valorCuota, financiera:finSel,
     intereses:totalInt, tasaInteres:aplicaInt?tasaInt:0,
+    fga: crdFGAActivo() ? calcularFGA(precioFinal) : 0,
     productosList: (productosVentaCrd && productosVentaCrd.length > 0)
       ? productosAlContado(
           productosVentaCrd.map(p => ({ producto: p.producto || '—', imei: p.imei || '', precio: p.precio || 0 })),
@@ -16346,6 +16375,7 @@ function generarHTMLFactura(d) {
         ${d.descuento > 0 ? `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;"><span style="color:#555;">Descuento</span><span style="color:#dc2626;">-${fmt(d.descuento)}</span></div>` : ''}
         ${d.prodAdicVal > 0 ? `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;"><span style="color:#555;">${d.prodAdicDesc||'Adicional'}</span><span>+${fmt(d.prodAdicVal)}</span></div>` : ''}
         ${(d.iva > 0 || d.ivaPct > 0) ? `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;"><span style="color:#555;">📊 IVA${d.ivaPct>0?' ('+d.ivaPct+'%)':''}</span><span style="font-weight:600;color:#dc2626;">-${fmt(d.iva||0)}</span></div>` : ''}
+        ${d.fga > 0 ? `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;"><span style="color:#555;">🛡️ FGA</span><span style="font-weight:600;">${fmt(d.fga)}</span></div>` : ''}
         ${d.comision > 0 ? `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;border-top:1px dashed #ece8f5;margin-top:4px;"><span style="color:#555;">📊 Comisión financiera${d.comisionPct>0?' ('+d.comisionPct+'%)':''}<br><span style="font-size:10px;color:#aaa;">${d.financiera||''}</span></span><span style="font-weight:600;color:#dc2626;">-${fmt(d.comision)}</span></div>` : ''}
 
         <div style="display:flex;justify-content:space-between;padding:10px 0;font-size:16px;font-weight:700;border-top:2px solid #6B2D8B;margin-top:6px;">
@@ -16360,7 +16390,7 @@ function generarHTMLFactura(d) {
         ${d.tipo === 'credito' ? `
         <div style="background:#f7f5fb;border-radius:8px;padding:12px;margin-top:8px;font-size:13px;">
           <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:#555;">Inicial:</span><span style="font-weight:600;color:#16a34a;">${fmt(d.inicial)}</span></div>
-          <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:#555;">Saldo a financiar:</span><span style="font-weight:600;">${fmt(d.saldoFinanciar)}</span></div>
+          ${d.ocultarSaldo ? '' : `<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:#555;">Saldo a financiar:</span><span style="font-weight:600;">${fmt(d.saldoFinanciar)}</span></div>`}
           <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:#555;">Plazo:</span><span style="font-weight:700;color:#6B2D8B;">${d.cuotas} ${txtPlazo}</span></div>
           ${d.valorCuota > 0 ? `<div style="display:flex;justify-content:space-between;border-top:1px solid #ece8f5;padding-top:6px;margin-top:2px;"><span style="color:#555;">${cuotaMensual?'Cuota mensual':'Cuota quincenal'}:</span><span style="font-weight:700;color:#d97706;font-size:15px;">${fmt(d.valorCuota)}</span></div>` : ''}
         </div>` : ''}
