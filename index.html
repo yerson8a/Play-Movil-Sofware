@@ -1700,32 +1700,60 @@
 
           <div class="form-group">
             <label class="form-label">Margen contado (%)</label>
-            <select class="form-control" id="simCpMargen" onchange="calcularSimCrediplay()">
+            <select class="form-control" id="simCpMargen" onchange="simCpCambiarMargen()">
               <option value="20">20%</option>
               <option value="25">25%</option>
               <option value="30" selected>30%</option>
               <option value="35">35%</option>
               <option value="40">40%</option>
+              <option value="manual">✍️ Margen personalizado</option>
             </select>
             <div style="font-size:10px;color:#888899;margin-top:4px;">Precio contado = costo × (1 + margen)</div>
           </div>
 
-          <div class="form-group">
-            <label class="form-label">Plazo (cuotas quincenales)</label>
-            <select class="form-control" id="simCpPlazo" onchange="calcularSimCrediplay()"></select>
-            <div style="font-size:10px;color:#888899;margin-top:4px;">Sobreprecio aplicado: <strong id="simCpSobreLbl" style="color:#6B2D8B;">—</strong></div>
+          <!-- Margen escrito a mano: solo con la opcion "Margen personalizado" -->
+          <div class="form-group" id="simCpMargenManualRow" style="display:none;">
+            <label class="form-label">Margen contado (%)</label>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input type="number" class="form-control" id="simCpMargenValor" min="0" max="500" step="0.5" value="30" oninput="calcularSimCrediplay()" style="width:120px;">
+              <span style="font-weight:700;color:#6B2D8B;">%</span>
+            </div>
+            <div style="font-size:10px;color:#888899;margin-top:4px;">Precio contado con este margen: <strong id="simCpContadoRef" style="color:#6B2D8B;">—</strong></div>
           </div>
 
           <div class="form-group">
-            <label class="form-label">Inicial (%)</label>
-            <select class="form-control" id="simCpInicialPct" onchange="calcularSimCrediplay()">
+            <label class="form-label">Plazo (cuotas quincenales)</label>
+            <select class="form-control" id="simCpPlazo" onchange="simCpCambiarPlazo()"></select>
+            <div style="font-size:10px;color:#888899;margin-top:4px;">Sobreprecio aplicado: <strong id="simCpSobreLbl" style="color:#6B2D8B;">—</strong></div>
+          </div>
+
+          <!-- Cuota objetivo: el sistema busca el plazo que mas se acerque -->
+          <div class="form-group" id="simCpCuotaObjetivoRow" style="display:none;">
+            <label class="form-label">¿Cuánto puede pagar por quincena?</label>
+            <div class="input-money-wrap"><input type="text" class="form-control" id="simCpCuotaObjetivo" placeholder="0" oninput="fmtMoneyInput(this);calcularSimCrediplay()" inputmode="numeric"></div>
+            <div id="simCpCuotaObjetivoNota" style="font-size:11px;color:#6B2D8B;margin-top:6px;background:#fff;border:1px solid #e4d8f5;border-radius:8px;padding:8px;">
+              Escribe la cuota y el sistema busca el plazo que mejor se acomode.
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Inicial</label>
+            <select class="form-control" id="simCpInicialPct" onchange="simCpCambiarInicial()">
               <option value="20">20%</option>
               <option value="25">25%</option>
               <option value="30" selected>30%</option>
               <option value="35">35%</option>
               <option value="40">40%</option>
               <option value="50">50%</option>
+              <option value="manual">✍️ Inicial personalizada</option>
             </select>
+          </div>
+
+          <!-- Inicial escrita a mano: solo con la opcion "Inicial personalizada" -->
+          <div class="form-group" id="simCpInicialManualRow" style="display:none;">
+            <label class="form-label">Valor de la inicial ($)</label>
+            <div class="input-money-wrap"><input type="text" class="form-control" id="simCpInicialValor" placeholder="0" oninput="fmtMoneyInput(this);calcularSimCrediplay()" inputmode="numeric"></div>
+            <div style="font-size:10px;color:#888899;margin-top:4px;">Este valor manda: no se recalcula al mover el plazo ni la tasa.</div>
           </div>
 
           <div style="background:#fff;border:1px solid #e4d8f5;border-radius:10px;padding:12px;margin-bottom:12px;">
@@ -11216,10 +11244,16 @@ async function guardarCredito(){
 
     // Guardar cada producto en ventas_detalle
     const totalBaseCrd = productosVentaCrd.reduce((s,p)=>s+(p.precio||0),0);
-    for(const p of productosVentaCrd) {
+    let repartidoCrd = 0;
+    for(const [iProdC, p] of productosVentaCrd.entries()) {
       const pctC      = totalBaseCrd > 0 ? (p.precio||0)/totalBaseCrd : 1/nProdC;
       const descProdC = Math.round((desc||0) * pctC);
-      const pFinalC   = (p.precio||0) - descProdC;
+      // El precio del detalle sale del precio final de la venta repartido
+      // entre los productos; el ultimo absorbe el redondeo para que la
+      // suma del detalle sea exactamente el valor de la venta.
+      const ultimoC   = iProdC === productosVentaCrd.length - 1;
+      const pFinalC   = ultimoC ? (precioFinal - repartidoCrd) : Math.round(precioFinal * pctC);
+      repartidoCrd   += pFinalC;
       const comProdC  = Math.round(pFinalC * comPct/100);
       const ganProdC  = pFinalC - (p.costo||0) - comProdC;
 
@@ -13354,16 +13388,80 @@ function simCpTasaDesdeQuincenal() {
   calcularSimCrediplay();
 }
 
+// Muestra u oculta el campo de la inicial escrita a mano
+// Muestra u oculta el campo del margen escrito a mano
+function simCpCambiarMargen() {
+  const esManual = ($('simCpMargen')?.value || '') === 'manual';
+  const fila = $('simCpMargenManualRow');
+  if(fila) fila.style.display = esManual ? '' : 'none';
+  calcularSimCrediplay();
+}
+
+// Margen de contado que manda en el calculo
+function simCpMargenPct() {
+  const op = $('simCpMargen')?.value || '30';
+  if(op === 'manual') {
+    const v = parseFloat($('simCpMargenValor')?.value);
+    return (isNaN(v) || v < 0) ? 0 : v;
+  }
+  return parseFloat(op) || 30;
+}
+
+function simCpCambiarInicial() {
+  const esManual = ($('simCpInicialPct')?.value || '') === 'manual';
+  const fila = $('simCpInicialManualRow');
+  if(fila) fila.style.display = esManual ? '' : 'none';
+  // Al pasar a personalizada arranca con la inicial que ya estaba calculada
+  if(esManual && !getMoneyValue('simCpInicialValor') && simCpUltimaInicial > 0) {
+    setMoneyValue('simCpInicialValor', simCpUltimaInicial);
+  }
+  calcularSimCrediplay();
+}
+let simCpUltimaInicial = 0;   // ultima inicial calculada por porcentaje
+
 // El plazo del modo Crediplay va de 4 a 60 quincenas, de una en una
 function simCpLlenarPlazos() {
   const sel = $('simCpPlazo');
   if(!sel || sel.options.length) return;
-  let ops = '';
+  let ops = '<option value="objetivo">🎯 Desde la cuota objetivo</option>';
   for(let i = 4; i <= 60; i++) {
     const m = (i/2).toFixed(1).replace('.0','');
     ops += `<option value="${i}"${i===12?' selected':''}>${i} quincenas (${m} ${i===2?'mes':'meses'}) · +${getSobreprecio(i)}%</option>`;
   }
   sel.innerHTML = ops;
+  sel.value = '12';
+}
+
+// Muestra u oculta el campo de la cuota objetivo
+function simCpCambiarPlazo() {
+  const porCuota = ($('simCpPlazo')?.value || '') === 'objetivo';
+  const fila = $('simCpCuotaObjetivoRow');
+  if(fila) fila.style.display = porCuota ? '' : 'none';
+  calcularSimCrediplay();
+}
+
+// Busca el plazo cuya cuota mas se acerque a la que el cliente puede pagar.
+// Se prueban los 57 plazos porque el sobreprecio va por tramos: no hay una
+// formula directa que despeje el plazo con el precio cambiando al tiempo.
+function simCpPlazoParaCuota(costo, margenPct, inicialPct, tasaQ, objetivo, inicialFija) {
+  let mejor = null, minima = null, maxima = null;
+  for(let n = 4; n <= 60; n++) {
+    const r = calcularCrediplay(costo, margenPct, n, inicialPct, tasaQ, inicialFija);
+    if(r.capital <= 0) continue;
+    if(!maxima || r.cuota > maxima.cuota) maxima = r;
+    if(!minima || r.cuota < minima.cuota) minima = r;
+    const dif = Math.abs(r.cuota - objetivo);
+    if(!mejor || dif < mejor.dif) mejor = { plazo: n, cuota: r.cuota, dif };
+  }
+  if(!mejor) return null;
+  return {
+    ...mejor,
+    // Con una cuota por debajo de la minima posible no hay plazo que sirva
+    alcanza: !minima || objetivo >= minima.cuota,
+    cuotaMinima: minima ? minima.cuota : 0,
+    plazoMinima: minima ? minima.plazo : 0,
+    cuotaMaxima: maxima ? maxima.cuota : 0
+  };
 }
 
 // Cambia entre el simulador de siempre y el de Crediplay
@@ -13395,6 +13493,12 @@ function simSetModo(modo) {
   if(esCp) {
     simCpLlenarPlazos();
     simCpLlenarTasas();
+    const filaCuotaObj = $('simCpCuotaObjetivoRow');
+    if(filaCuotaObj) filaCuotaObj.style.display = ($('simCpPlazo')?.value === 'objetivo') ? '' : 'none';
+    const filaMarSim = $('simCpMargenManualRow');
+    if(filaMarSim) filaMarSim.style.display = ($('simCpMargen')?.value === 'manual') ? '' : 'none';
+    const filaIniSim = $('simCpInicialManualRow');
+    if(filaIniSim) filaIniSim.style.display = ($('simCpInicialPct')?.value === 'manual') ? '' : 'none';
     const tabla = $('simTablaWrap');
     if(tabla) tabla.style.display = 'none';
     calcularSimCrediplay();
@@ -13411,9 +13515,14 @@ function calcularSimCrediplay() {
   simCpLlenarPlazos();
   simCpLlenarTasas();
   const costo      = getMoneyValue('simCpCosto');
-  const margenPct  = parseFloat($('simCpMargen')?.value) || 30;
-  const plazo      = parseInt($('simCpPlazo')?.value) || 12;
-  const inicialPct = parseFloat($('simCpInicialPct')?.value) || 30;
+  const margenPct  = simCpMargenPct();
+  const opPlazo    = $('simCpPlazo')?.value || '12';
+  const porCuota   = opPlazo === 'objetivo';
+  let   plazo      = porCuota ? 12 : (parseInt(opPlazo) || 12);
+  const opcionIni   = $('simCpInicialPct')?.value || '30';
+  const iniManual   = opcionIni === 'manual';
+  const inicialPct  = iniManual ? 0 : (parseFloat(opcionIni) || 30);
+  const inicialFija = iniManual ? getMoneyValue('simCpInicialValor') : 0;
   const tasaQ      = simCpTasaQ();
 
   // Efectivo anual de la tasa escogida (24 quincenas). El tope de usura lo
@@ -13428,18 +13537,71 @@ function calcularSimCrediplay() {
   if(avisoUsura) avisoUsura.style.display = pasaUsura ? '' : 'none';
   if(elEA) elEA.style.color = pasaUsura ? '#dc2626' : '#6B2D8B';
 
-  const lblSobre = $('simCpSobreLbl');
-  if(lblSobre) lblSobre.textContent = `+${getSobreprecio(plazo)}%`;
-
   const tabla = $('simTablaWrap');
   if(tabla) tabla.style.display = 'none';
 
   if(!costo) {
     $('simResultado').innerHTML = '<div class="empty-state"><div class="empty-icon">💜</div><div class="empty-text">Ingresa el costo del equipo para ver el plan Crediplay</div></div>';
+    const notaVacia = $('simCpCuotaObjetivoNota');
+    if(porCuota && notaVacia) notaVacia.innerHTML = 'Ingresa primero el costo del equipo.';
     return;
   }
 
-  const r = calcularCrediplay(costo, margenPct, plazo, inicialPct, tasaQ);
+  // Desde la cuota: se busca el plazo que mas se acerque a lo que el cliente puede pagar
+  const nota = $('simCpCuotaObjetivoNota');
+  if(porCuota) {
+    const objetivo = getMoneyValue('simCpCuotaObjetivo');
+    if(!objetivo) {
+      if(nota) nota.innerHTML = 'Escribe la cuota y el sistema busca el plazo que mejor se acomode.';
+      $('simResultado').innerHTML = '<div class="empty-state"><div class="empty-icon">🎯</div><div class="empty-text">Escribe la cuota que puede pagar el cliente</div></div>';
+      return;
+    }
+    const busq = simCpPlazoParaCuota(costo, margenPct, inicialPct, tasaQ, objetivo, inicialFija);
+    if(!busq) {
+      if(nota) nota.innerHTML = '⚠️ Con esos datos no se puede armar el crédito. Revisa la inicial.';
+      $('simResultado').innerHTML = '<div style="background:#fee2e2;border:1px solid #fecaca;border-radius:12px;padding:16px;color:#dc2626;"><strong>No hay plazo posible con esos datos.</strong></div>';
+      return;
+    }
+    plazo = busq.plazo;
+    const meses = (plazo/2).toFixed(1).replace('.0','');
+    if(nota) {
+      if(!busq.alcanza) {
+        nota.innerHTML = `⚠️ <strong>Con ${fmt(objetivo)} no alcanza.</strong> La cuota más baja posible es `
+          + `<strong>${fmt(busq.cuotaMinima)}</strong> a ${busq.plazoMinima} quincenas. Sube la cuota, la inicial, o baja el margen.`;
+        nota.style.color = '#dc2626';
+      } else if(objetivo > busq.cuotaMaxima) {
+        // Puede pagar mas de lo que pide el plazo mas corto
+        nota.innerHTML = `✅ <strong>Con ${fmt(objetivo)} alcanza de sobra.</strong> El plazo más corto es `
+          + `<strong>${plazo} quincenas (${meses} meses)</strong> con cuota de <strong>${fmt(busq.cuota)}</strong>.`;
+        nota.style.color = '#16a34a';
+      } else {
+        const dif = busq.cuota - objetivo;
+        nota.innerHTML = `🎯 Plazo encontrado: <strong>${plazo} quincenas (${meses} meses)</strong> · cuota real <strong>${fmt(busq.cuota)}</strong>`
+          + (Math.abs(dif) >= 1 ? ` · ${dif > 0 ? fmt(dif) + ' por encima' : fmt(-dif) + ' por debajo'} de lo pedido` : ' · exacta');
+        nota.style.color = '#6B2D8B';
+      }
+    }
+  } else if(nota) {
+    nota.style.color = '#6B2D8B';
+  }
+
+  const lblSobre = $('simCpSobreLbl');
+  if(lblSobre) lblSobre.textContent = `+${getSobreprecio(plazo)}%`;
+
+  const r = calcularCrediplay(costo, margenPct, plazo, inicialPct, tasaQ, inicialFija);
+  const refContado = $('simCpContadoRef');
+  if(refContado) refContado.textContent = fmt(r.precioContado);
+  if(!iniManual) simCpUltimaInicial = r.inicial;
+
+  // La inicial no puede comerse el precio: sin capital no hay credito
+  if(r.capital <= 0) {
+    $('simResultado').innerHTML = `
+      <div style="background:#fee2e2;border:1px solid #fecaca;border-radius:12px;padding:16px;color:#dc2626;">
+        <strong>La inicial es igual o mayor al precio a crédito.</strong>
+        <div style="font-size:12px;margin-top:6px;">Precio a crédito: ${fmt(r.precioCredito)} · Inicial: ${fmt(r.inicial)}. Baja la inicial para que quede saldo por financiar.</div>
+      </div>`;
+    return;
+  }
   const meses = (plazo/2).toFixed(1).replace('.0','');
   const fila = (label, valor, color, fuerte) => `
     <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(0,0,0,.05);">
@@ -13460,7 +13622,7 @@ function calcularSimCrediplay() {
     <!-- Plan de pagos -->
     <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:14px;margin-bottom:12px;">
       <div style="font-size:12px;font-weight:800;color:#d97706;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">💰 Plan de pagos</div>
-      ${fila(`Inicial (${pctBonito(r.inicialPct)}%)`, fmt(r.inicial), '#16a34a', true)}
+      ${fila(`Inicial (${pctBonito(r.inicialPct)}%${r.inicialManual?' · personalizada':''})`, fmt(r.inicial), '#16a34a', true)}
       ${fila('Capital a financiar', fmt(r.capital), '#111')}
       ${fila('Plazo', `${r.plazo} quincenas (${meses} meses)`, '#555577')}
       <div style="background:#fff;border:1px solid #fed7aa;border-radius:10px;padding:10px 12px;margin:8px 0;display:flex;justify-content:space-between;align-items:center;">
@@ -13487,18 +13649,36 @@ function calcularSimCrediplay() {
     </div>`;
 }
 
+// Plazo con el que se esta simulando (el escogido, o el que se encontro
+// cuando se trabaja desde la cuota objetivo)
+function simCpPlazoActual() {
+  const op = $('simCpPlazo')?.value || '12';
+  if(op !== 'objetivo') return parseInt(op) || 12;
+  const objetivo = getMoneyValue('simCpCuotaObjetivo');
+  const opIni = $('simCpInicialPct')?.value || '30';
+  const esManual = opIni === 'manual';
+  const busq = simCpPlazoParaCuota(
+    getMoneyValue('simCpCosto'), simCpMargenPct(),
+    esManual ? 0 : (parseFloat(opIni) || 30), simCpTasaQ(),
+    objetivo, esManual ? getMoneyValue('simCpInicialValor') : 0
+  );
+  return busq ? busq.plazo : 12;
+}
+
 // Guarda la simulacion para pasarla al modal de venta (la logica de precarga
 // del formulario de ventas se implementa aparte)
 let simCrediplayPendiente = null;
 function simAplicarANuevaVenta() {
   const costo = getMoneyValue('simCpCosto');
   if(!costo) { toast('Ingresa el costo del equipo primero','error'); return; }
+  const opIni = $('simCpInicialPct')?.value || '30';
   simCrediplayPendiente = calcularCrediplay(
     costo,
-    parseFloat($('simCpMargen')?.value) || 30,
-    parseInt($('simCpPlazo')?.value) || 12,
-    parseFloat($('simCpInicialPct')?.value) || 30,
-    simCpTasaQ()
+    simCpMargenPct(),
+    simCpPlazoActual(),
+    opIni === 'manual' ? 0 : (parseFloat(opIni) || 30),
+    simCpTasaQ(),
+    opIni === 'manual' ? getMoneyValue('simCpInicialValor') : 0
   );
   toast(`Simulación lista: contado ${fmt(simCrediplayPendiente.precioContado)} · crédito ${fmt(simCrediplayPendiente.precioCredito)}`,'success');
 }
@@ -13567,7 +13747,7 @@ function renderFilaProducto(p, tipo) {
       <span style="font-weight:700;font-size:13px;color:#6B2D8B;">#${p.idx+1} ${p.producto||'Sin nombre'}</span>
       <button type="button" onclick="eliminarProductoVenta('${tipo}',${p.idx})" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:16px;" title="Eliminar">✕</button>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:12px;">
+    <div style="display:grid;grid-template-columns:repeat(${tipo === 'crd' ? (puedeVerCostos() ? 2 : 1) : 3},1fr);gap:8px;font-size:12px;">
       <div>
         <div style="color:#888899;margin-bottom:2px;">IMEI / Serial</div>
         <div style="font-family:monospace;color:#0066cc;">${p.imei||'—'}</div>
@@ -13576,10 +13756,10 @@ function renderFilaProducto(p, tipo) {
         <div style="color:#888899;margin-bottom:2px;">Costo</div>
         <div style="font-weight:600;color:#6B2D8B;">${fmt(p.costo||0)}</div>
       </div>` : ''}
-      <div>
+      ${tipo === 'crd' ? '' : `<div>
         <div style="color:#888899;margin-bottom:2px;">Precio Venta</div>
         <div style="font-weight:600;color:#16a34a;">${fmt(p.precio||0)}</div>
-      </div>
+      </div>`}
     </div>
   </div>`;
 }
