@@ -11044,7 +11044,10 @@ async function guardarVentaContado(){
       comision_asesor: 0, sede_id: sedeIdPorNombre(sedeActual),
       observaciones: obs + (nMulti>1 ? ` | Venta con ${nMulti} productos` : ''),
       estado: 'activa',
-      fecha_venta: fechaColombia()
+      fecha_venta: fechaColombia(),
+      // IVA: solo para imprimirlo en la factura, no entra en ningun total
+      iva_valor: Math.round(precioFinal * ivaPct/100),
+      iva_pct:   ivaPct || 0
     };
     const resM = await sbFetch('ventas', { method:'POST', body:rowMaestra });
     const ventaPrincipal = mapVenta(resM[0]);
@@ -11285,7 +11288,9 @@ async function guardarCredito(){
       observaciones: (datos.obs||'') + (nProdC>1 ? ` | Venta con ${nProdC} productos` : ''),
       estado: 'activa',
       fecha_venta: fechaColombia(),
-      // FGA: solo para imprimirlo en la factura, no entra en ningun total
+      // IVA y FGA: solo para imprimirlos en la factura, no entran en ningun total
+      iva_valor: ivaVal,
+      iva_pct:   ivaPct || 0,
       fga_valor: fgaActivo ? calcularFGA(precioFinal) : 0
     };
     const resVM = await sbFetch('ventas', { method:'POST', body:rowVM });
@@ -11777,8 +11782,9 @@ async function verFacturaVenta() {
     precioBase:   totalBase,
     precioFinal:  precioFinal,
     descuento:    0,
-    iva:          0,
-    ivaPct:       0,
+    // IVA guardado el dia de la venta (antes se perdia y salia en cero)
+    iva:          parseFloat(ventaCompleta.iva_valor) || 0,
+    ivaPct:       parseFloat(ventaCompleta.iva_pct)   || 0,
     comision:     comisionFinanciera,
     comisionAsesor,
     ganancia,
